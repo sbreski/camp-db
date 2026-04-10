@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Pencil } from 'lucide-react'
+import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Pencil, Calendar } from 'lucide-react'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -92,24 +92,28 @@ export default function SignInOut({ participants, attendance, setAttendance, set
   const [editingParticipant, setEditingParticipant] = useState(null)
   const [editingAdults, setEditingAdults] = useState([])
   const [newAdult, setNewAdult] = useState('')
+  const [selectedDate, setSelectedDate] = useState(todayKey())
   const today = todayKey()
-  const todayRecords = attendance.filter(a => a.date === today)
+  const selectedRecords = attendance.filter(a => a.date === selectedDate)
 
   function getRecord(participantId) {
-    return todayRecords.find(r => r.participantId === participantId) || null
+    return selectedRecords.find(r => r.participantId === participantId) || null
   }
 
   function signIn(participant) {
     const now = new Date()
+    // For past dates, use a reasonable sign-in time (9:00 AM)
+    const signInTime = selectedDate < today ? new Date(`${selectedDate}T09:00:00`) : now
+    
     setAttendance(prev => [
-      ...prev.filter(r => !(r.date === today && r.participantId === participant.id)),
+      ...prev.filter(r => !(r.date === selectedDate && r.participantId === participant.id)),
       { 
         participantId: participant.id, 
-        date: today, 
-        signIn: now.toISOString(), 
+        date: selectedDate, 
+        signIn: signInTime.toISOString(), 
         signOut: null, 
         collectedBy: null, 
-        id: `${participant.id}-${today}` 
+        id: `${participant.id}-${selectedDate}` 
       }
     ])
     setFlash({ id: participant.id, type: 'in' })
@@ -118,7 +122,7 @@ export default function SignInOut({ participants, attendance, setAttendance, set
 
   function undoSignIn(participant) {
     if (!window.confirm(`Undo sign-in for ${participant.name}?`)) return
-    setAttendance(prev => prev.filter(r => !(r.date === today && r.participantId === participant.id)))
+    setAttendance(prev => prev.filter(r => !(r.date === selectedDate && r.participantId === participant.id)))
   }
 
   function undoSignOut(participant) {
@@ -132,8 +136,12 @@ export default function SignInOut({ participants, attendance, setAttendance, set
     setCollectingFor(null)
     const existing = getRecord(participant.id)
     if (!existing) return
-    const now = new Date().toISOString()
-    setAttendance(prev => prev.map(r => r.id === existing.id ? { ...r, signOut: now, collectedBy } : r))
+    
+    const now = new Date()
+    // For past dates, use a reasonable sign-out time (3:00 PM)
+    const signOutTime = selectedDate < today ? new Date(`${selectedDate}T15:00:00`) : now
+    
+    setAttendance(prev => prev.map(r => r.id === existing.id ? { ...r, signOut: signOutTime.toISOString(), collectedBy } : r))
     setFlash({ id: participant.id, type: 'out' })
     setTimeout(() => setFlash(null), 2000)
   }
@@ -241,7 +249,8 @@ export default function SignInOut({ participants, attendance, setAttendance, set
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Sign In / Out</h2>
           <p className="text-stone-500 text-sm">
-            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {selectedDate === today && ' (Today)'}
           </p>
         </div>
         <div className="flex gap-2 text-center">
@@ -254,6 +263,24 @@ export default function SignInOut({ participants, attendance, setAttendance, set
             <p className="text-xs text-stone-500">Expected</p>
           </div>
         </div>
+      </div>
+
+      {/* Date selector */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-stone-700">Select Date:</label>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={e => setSelectedDate(e.target.value)}
+          className="input"
+          max={new Date().toISOString().slice(0, 10)}
+        />
+        <button
+          onClick={() => setSelectedDate(today)}
+          className="btn-secondary text-sm"
+        >
+          Today
+        </button>
       </div>
 
       <div className="relative">
@@ -283,9 +310,9 @@ export default function SignInOut({ participants, attendance, setAttendance, set
               const isOut = !!rec?.signOut
               const isFlashing = flash?.id === p.id
 
-              // Check if sign-in was late (after 10:15am)
+              // Check if sign-in was late (after 10:15am) - only for today
               const signInTime = rec?.signIn ? new Date(rec.signIn) : null
-              const isLate = signInTime && (signInTime.getHours() > 10 || (signInTime.getHours() === 10 && signInTime.getMinutes() > 15))
+              const isLate = selectedDate === today && signInTime && (signInTime.getHours() > 10 || (signInTime.getHours() === 10 && signInTime.getMinutes() > 15))
 
               const hasAllergy = p.medicalType?.includes('Allergy')
               const hasMedical = p.medicalType?.includes('Medical') || p.medicalType?.includes('Dietary')
