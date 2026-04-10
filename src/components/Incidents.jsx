@@ -127,7 +127,15 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                     {p?.parentEmail && (
                       <button onClick={(e) => {
                         e.stopPropagation()
-                        const mailtoLink = `mailto:?bcc=${encodeURIComponent(p.parentEmail)}&subject=${encodeURIComponent(`Incident Report - ${p.name}`)}`
+                        const subject = `Incident Report - ${p.name}`
+                        let body = `Please find details of the incident involving ${p.name}.\n\n`
+                        if (inc.pdfData) {
+                          body += `Attachment: ${inc.pdfName}\nYou can download the attachment here: ${inc.pdfData}\n\n`
+                        }
+                        body += `Incident Type: ${inc.type}\nDate: ${new Date(inc.createdAt).toLocaleDateString('en-GB')}\nReported by: ${inc.staffMember || 'Staff'}\n\n`
+                        body += `For more details or to discuss this incident, please contact the camp.`
+                        
+                        const mailtoLink = `mailto:?bcc=${encodeURIComponent(p.parentEmail)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
                         window.open(mailtoLink, '_blank')
                       }}
                         className="p-1.5 text-stone-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
