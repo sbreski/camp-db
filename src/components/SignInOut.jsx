@@ -15,6 +15,15 @@ function parseApprovedAdults(str) {
   return str.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+function formatParentLabel(parentName) {
+  return `${parentName} (Parent)`
+}
+
+function hasSameAdult(adults, parentName) {
+  const formatted = formatParentLabel(parentName)
+  return adults.some(a => a.toLowerCase() === formatted.toLowerCase())
+}
+
 function CollectionModal({ participant, onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
