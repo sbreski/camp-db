@@ -125,12 +125,15 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {p?.parentEmail && (
-                      <a href={`mailto:${p.parentEmail}?subject=Incident Report - ${p.name}`}
-                        onClick={e => e.stopPropagation()}
+                      <button onClick={(e) => {
+                        e.stopPropagation()
+                        const mailtoLink = `mailto:?bcc=${encodeURIComponent(p.parentEmail)}&subject=${encodeURIComponent(`Incident Report - ${p.name}`)}`
+                        window.open(mailtoLink, '_blank')
+                      }}
                         className="p-1.5 text-stone-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
                         title="Email parent">
                         <Mail size={15} />
-                      </a>
+                      </button>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); deleteIncident(inc.id) }}
                       className="p-1.5 text-stone-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
