@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Plus, FileText, Search, ChevronRight } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2 } from 'lucide-react'
 import IncidentForm from './IncidentForm'
 
 export default function Incidents({ incidents, setIncidents, participants, staffList = [], onView }) {
@@ -15,6 +15,12 @@ export default function Incidents({ incidents, setIncidents, participants, staff
     ])
     setShowForm(false)
     setSelectedParticipant('')
+  }
+
+  function deleteIncident(id) {
+    if (window.confirm('Delete this incident? This cannot be undone.')) {
+      setIncidents(prev => prev.filter(inc => inc.id !== id))
+    }
   }
 
   const filtered = incidents
@@ -117,7 +123,13 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                       )}
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-stone-300 group-hover:text-stone-500 flex-shrink-0 mt-1" />
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); deleteIncident(inc.id) }}
+                      className="p-1.5 text-stone-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                      <Trash2 size={15} />
+                    </button>
+                    <ChevronRight size={16} className="text-stone-300 group-hover:text-stone-500 mt-1" />
+                  </div>
                 </div>
               </div>
             )

@@ -88,10 +88,17 @@ export default function SignInOut({ participants, attendance, setAttendance }) {
   }
 
   function signIn(participant) {
-    const now = new Date().toISOString()
+    const now = new Date()
     setAttendance(prev => [
       ...prev.filter(r => !(r.date === today && r.participantId === participant.id)),
-      { participantId: participant.id, date: today, signIn: now, signOut: null, collectedBy: null, id: `${participant.id}-${today}` }
+      { 
+        participantId: participant.id, 
+        date: today, 
+        signIn: now.toISOString(), 
+        signOut: null, 
+        collectedBy: null, 
+        id: `${participant.id}-${today}` 
+      }
     ])
     setFlash({ id: participant.id, type: 'in' })
     setTimeout(() => setFlash(null), 2000)
@@ -178,6 +185,10 @@ export default function SignInOut({ participants, attendance, setAttendance }) {
               const isOut = !!rec?.signOut
               const isFlashing = flash?.id === p.id
 
+              // Check if sign-in was late (after 10:15am)
+              const signInTime = rec?.signIn ? new Date(rec.signIn) : null
+              const isLate = signInTime && (signInTime.getHours() > 10 || (signInTime.getHours() === 10 && signInTime.getMinutes() > 15))
+
               const hasAllergy = p.medicalType?.includes('Allergy')
               const hasMedical = p.medicalType?.includes('Medical') || p.medicalType?.includes('Dietary')
               const hasSend = !!p.sendNeeds
@@ -216,9 +227,14 @@ export default function SignInOut({ participants, attendance, setAttendance }) {
 
                   {/* Sign in time */}
                   <div className="text-right w-24">
-                    <span className={`text-xs font-mono ${rec?.signIn ? 'text-green-700 font-semibold' : 'text-stone-300'}`}>
-                      {fmt(rec?.signIn)}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span className={`text-xs font-mono ${rec?.signIn ? 'text-green-700 font-semibold' : 'text-stone-300'}`}>
+                        {fmt(rec?.signIn)}
+                      </span>
+                      {isLate && (
+                        <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Late</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Sign out time */}
