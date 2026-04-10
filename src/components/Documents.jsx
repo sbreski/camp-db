@@ -62,15 +62,35 @@ export default function Documents() {
 
     setUploading(true)
     try {
+      // Debug: Check authentication
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError) {
+        console.error('Auth error:', authError)
+        alert('Authentication error: ' + authError.message)
+        return
+      }
+      if (!user) {
+        alert('You must be logged in to upload documents')
+        return
+      }
+      console.log('Authenticated user:', user.id)
+
       const fileName = `${Date.now()}-${selectedFile.name}`
       const filePath = `${section}/${fileName}`
+
+      console.log('Uploading to path:', filePath)
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(filePath, selectedFile)
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError)
+        throw uploadError
+      }
+
+      console.log('Storage upload successful')
 
       // Save metadata to database
       const { error: dbError } = await supabase.from('documents').insert({
@@ -81,11 +101,17 @@ export default function Documents() {
         created_at: new Date().toISOString(),
       })
 
-      if (dbError) throw dbError
+      if (dbError) {
+        console.error('Database insert error:', dbError)
+        throw dbError
+      }
+
+      console.log('Database insert successful')
 
       setSelectedFile(null)
       setNewCategory('')
       loadDocuments()
+      alert('Document uploaded successfully!')
     } catch (error) {
       console.error('Error uploading document:', error)
       alert('Error uploading document: ' + error.message)
