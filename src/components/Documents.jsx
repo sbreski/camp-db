@@ -4,7 +4,6 @@ import { Upload, FileText, Download, Trash2, Lock, Eye, EyeOff } from 'lucide-re
 
 export default function Documents() {
   const [section, setSection] = useState('policies') // 'policies' or 'other'
-  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [documents, setDocuments] = useState([])
@@ -155,9 +154,8 @@ export default function Documents() {
   }
 
   function handlePasswordSubmit() {
-    if (passwordInput === STAFF_PASSWORD) {
+    if (passwordInput.trim() === STAFF_PASSWORD) {
       setIsAuthenticated(true)
-      setShowPasswordPrompt(false)
       setPasswordInput('')
     } else {
       alert('Incorrect password')
@@ -192,7 +190,7 @@ export default function Documents() {
               <button onClick={handlePasswordSubmit} className="btn-primary flex-1">
                 Unlock
               </button>
-              <button onClick={() => setSection('policies')} className="btn-secondary flex-1">
+              <button onClick={() => { setSection('policies'); setPasswordInput(''); }} className="btn-secondary flex-1">
                 Back
               </button>
             </div>
@@ -248,7 +246,7 @@ export default function Documents() {
           Policies
         </button>
         <button
-          onClick={() => setShowPasswordPrompt(true)}
+          onClick={() => setSection('other')}
           className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all flex items-center gap-2 ${
             section === 'other'
               ? 'bg-amber-500 text-white'
