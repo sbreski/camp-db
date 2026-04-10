@@ -431,7 +431,7 @@ export default function Documents() {
       )}
 
       {/* Password prompt modal */}
-      {showPasswordPrompt && section === 'policies' && (
+      {requiresAuth && !isAuthenticated && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
             <div className="p-5 border-b border-stone-100">
@@ -457,7 +457,7 @@ export default function Documents() {
               <button onClick={handlePasswordSubmit} className="btn-primary flex-1">
                 Unlock
               </button>
-              <button onClick={() => { setShowPasswordPrompt(false); setPasswordInput('') }} className="btn-secondary">
+              <button onClick={() => { setSection('policies'); setPasswordInput('') }} className="btn-secondary">
                 Cancel
               </button>
             </div>
