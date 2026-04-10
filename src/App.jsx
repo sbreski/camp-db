@@ -11,6 +11,7 @@ import Medical from './components/Medical'
 import Incidents from './components/Incidents'
 import AttendanceOverview from './components/AttendanceOverview'
 import Staff from './components/Staff'
+import DressingRooms from './components/DressingRooms'
 
 export const CAMP_NAME = 'Impact Kidz Summer Camp'
 export const CAMP_PASSWORD = 'mickey2026'
@@ -274,6 +275,7 @@ export default function App() {
       case 'parents': return <Parents participants={participants} onUpdateParticipant={(id, approvedAdults) => {
         setParticipants(prev => prev.map(p => p.id === id ? { ...p, approvedAdults } : p))
       }} />
+      case 'dressing-rooms': return <DressingRooms participants={participants} />
       case 'participant': return (
         <ParticipantDetail
           participant={participants.find(p => p.id === selectedParticipantId)}

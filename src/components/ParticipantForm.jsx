@@ -2,12 +2,11 @@ import { useState } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 
 const EMPTY = {
-  name: '', pronouns: '', age: '', role: '',
+  name: '', pronouns: '', age: '',
   parentName: '', parentEmail: '', parentPhone: '',
   approvedAdults: '',
   medicalType: [], medicalDetails: '',
   sendNeeds: '', sendDiagnosed: false,
-  castPart: '', dressingRoom: '',
   notes: '',
 }
 
@@ -104,14 +103,6 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
             <div>
               <label className="label">Age</label>
               <input className="input" type="number" min="1" max="25" value={form.age} onChange={e => set('age', e.target.value)} placeholder="10" />
-            </div>
-            <div>
-              <label className="label">Role / Part</label>
-              <input className="input" value={form.role} onChange={e => set('role', e.target.value)} placeholder="e.g. Dorothy, Ensemble" />
-            </div>
-            <div>
-              <label className="label">Dressing Room</label>
-              <input className="input" value={form.dressingRoom} onChange={e => set('dressingRoom', e.target.value)} placeholder="Room 1" />
             </div>
           </div>
         </section>
