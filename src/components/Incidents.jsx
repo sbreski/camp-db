@@ -131,7 +131,7 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                         let body = `Dear ${p.parentName || 'Parent/Guardian'},\n\n`
                         body += `Please find details of the incident involving ${p.name}.\n\n`
                         if (inc.pdfName) {
-                          body += `Attachment: ${inc.pdfName}\n(Please download the attachment from the camp database app and attach it to this email.)\n\n`
+                          body += `Attachment: ${inc.pdfName}\nYou can download the attachment here: ${inc.pdfData}\n\n`
                         }
                         body += `Incident Type: ${inc.type}\nDate: ${new Date(inc.createdAt).toLocaleDateString('en-GB')}\nReported by: ${inc.staffMember || 'Staff'}\n\n`
                         body += `This email is being sent following our discussion about this incident.`

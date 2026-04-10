@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { X, Upload, CheckCircle } from 'lucide-react'
+import { supabase } from '../supabase.js'
 
 export default function IncidentForm({ participantId, staffList = [], onSave, onCancel }) {
   const defaultStaff = staffList.find(s => s.name === 'Sam Brenner')?.name
@@ -17,19 +18,22 @@ export default function IncidentForm({ participantId, staffList = [], onSave, on
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  function handleFile(e) {
+  async function handleFile(e) {
     const file = e.target.files[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) {
-      alert('File must be under 5MB. For larger files, upgrade to Supabase storage.')
+      alert('File must be under 5MB.')
       return
     }
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      set('pdfName', file.name)
-      set('pdfData', ev.target.result)
+    const fileName = `${crypto.randomUUID()}-${file.name}`
+    const { data, error } = await supabase.storage.from('incidents').upload(fileName, file)
+    if (error) {
+      alert('Failed to upload file: ' + error.message)
+      return
     }
-    reader.readAsDataURL(file)
+    const publicUrl = `https://guujqyawgxioicnclabc.supabase.co/storage/v1/object/public/incidents/${fileName}`
+    set('pdfName', file.name)
+    set('pdfData', publicUrl)
   }
 
   function handleSubmit(e) {
