@@ -268,10 +268,12 @@ export default function App() {
   function renderPage() {
     switch (page) {
       case 'dashboard': return <Dashboard participants={participants} attendance={attendance} incidents={incidents} onNavigate={navigate} />
-      case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} />
+      case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} setParticipants={setParticipants} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} />
       case 'participants': return <Participants participants={participants} setParticipants={setParticipants} onView={(id) => navigate('participant', id)} />
-      case 'parents': return <Parents participants={participants} />
+      case 'parents': return <Parents participants={participants} onUpdateParticipant={(id, approvedAdults) => {
+        setParticipants(prev => prev.map(p => p.id === id ? { ...p, approvedAdults } : p))
+      }} />
       case 'participant': return (
         <ParticipantDetail
           participant={participants.find(p => p.id === selectedParticipantId)}

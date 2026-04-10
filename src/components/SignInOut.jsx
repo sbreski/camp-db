@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X } from 'lucide-react'
+import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Pencil } from 'lucide-react'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -76,10 +76,13 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
   )
 }
 
-export default function SignInOut({ participants, attendance, setAttendance }) {
+export default function SignInOut({ participants, attendance, setAttendance, setParticipants }) {
   const [search, setSearch] = useState('')
   const [flash, setFlash] = useState(null)
   const [collectingFor, setCollectingFor] = useState(null)
+  const [editingParticipant, setEditingParticipant] = useState(null)
+  const [editingAdults, setEditingAdults] = useState([])
+  const [newAdult, setNewAdult] = useState('')
   const today = todayKey()
   const todayRecords = attendance.filter(a => a.date === today)
 
@@ -126,6 +129,47 @@ export default function SignInOut({ participants, attendance, setAttendance }) {
     setTimeout(() => setFlash(null), 2000)
   }
 
+  function startEditAdults(participant) {
+    const adults = parseApprovedAdults(participant.approvedAdults)
+    if (participant.parentName && !adults.some(a => a.toLowerCase() === participant.parentName.toLowerCase())) {
+      adults.unshift(participant.parentName)
+    }
+    setEditingParticipant(participant)
+    setEditingAdults(adults)
+    setNewAdult('')
+  }
+
+  function addAdult() {
+    const trimmed = newAdult.trim()
+    if (!trimmed) return
+    if (!editingAdults.some(a => a.toLowerCase() === trimmed.toLowerCase())) {
+      setEditingAdults(prev => [...prev, trimmed])
+    }
+    setNewAdult('')
+  }
+
+  function removeAdult(index) {
+    setEditingAdults(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function saveAdults() {
+    if (!editingParticipant) return
+    const normalized = [...editingAdults]
+    if (editingParticipant.parentName && !normalized.some(a => a.toLowerCase() === editingParticipant.parentName.toLowerCase())) {
+      normalized.unshift(editingParticipant.parentName)
+    }
+    setParticipants(prev => prev.map(p => p.id === editingParticipant.id ? { ...p, approvedAdults: normalized.join(', ') } : p))
+    setEditingParticipant(null)
+    setEditingAdults([])
+    setNewAdult('')
+  }
+
+  function cancelEditAdults() {
+    setEditingParticipant(null)
+    setEditingAdults([])
+    setNewAdult('')
+  }
+
   // Alphabetical by first name
   const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name))
   const filtered = sorted.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
@@ -137,6 +181,51 @@ export default function SignInOut({ participants, attendance, setAttendance }) {
     <div className="fade-in space-y-4">
       {collectingFor && (
         <CollectionModal participant={collectingFor} onConfirm={confirmSignOut} onCancel={() => setCollectingFor(null)} />
+      )}
+      {editingParticipant && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
+            <div className="flex items-center justify-between p-5 border-b border-stone-100">
+              <div>
+                <h3 className="font-display font-bold text-forest-950">Edit Approved Adults</h3>
+                <p className="text-sm text-stone-500 mt-0.5">{editingParticipant.name}</p>
+              </div>
+              <button onClick={cancelEditAdults} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="label">Add approved adult</label>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1"
+                    value={newAdult}
+                    onChange={e => setNewAdult(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAdult() } }}
+                    placeholder="Name (Relationship)"
+                  />
+                  <button type="button" onClick={addAdult} className="btn-secondary">Add</button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="label">Approved adults</p>
+                <div className="flex flex-wrap gap-2">
+                  {editingAdults.length === 0 ? (
+                    <span className="text-sm text-stone-500">No approved adults yet.</span>
+                  ) : editingAdults.map((adult, index) => (
+                    <span key={`${adult}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-sm text-stone-700">
+                      {adult}
+                      <button type="button" onClick={() => removeAdult(index)} className="text-stone-500 hover:text-red-600">×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-5 pt-0 flex gap-2">
+              <button onClick={saveAdults} className="btn-primary flex-1">Save Changes</button>
+              <button onClick={cancelEditAdults} className="btn-secondary">Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="flex items-center justify-between">
@@ -245,7 +334,7 @@ export default function SignInOut({ participants, attendance, setAttendance }) {
                   </div>
 
                   {/* Buttons */}
-                  <div className="flex items-center gap-1.5 justify-end w-28">
+                  <div className="flex items-center gap-1.5 justify-end w-40">
                     {!rec?.signIn && (
                       <button onClick={() => signIn(p)}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition-all">
@@ -264,6 +353,10 @@ export default function SignInOut({ participants, attendance, setAttendance }) {
                         </button>
                       </>
                     )}
+                    <button onClick={() => startEditAdults(p)} title="Edit approved adults"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all">
+                      <Pencil size={12} /> Edit
+                    </button>
                     {rec?.signOut && (
                       <button onClick={() => undoSignOut(p)} title="Undo sign-out"
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-medium bg-stone-100 hover:bg-red-100 hover:text-red-700 text-stone-500 active:scale-95 transition-all">

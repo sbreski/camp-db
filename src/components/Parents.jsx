@@ -6,9 +6,12 @@ function parseApprovedAdults(str) {
   return str.split(',').map(s => s.trim()).filter(Boolean)
 }
 
-export default function Parents({ participants }) {
+export default function Parents({ participants, onUpdateParticipant }) {
   const [search, setSearch] = useState('')
   const [selectedParents, setSelectedParents] = useState(new Set())
+  const [editingId, setEditingId] = useState(null)
+  const [editingAdults, setEditingAdults] = useState([])
+  const [newAdult, setNewAdult] = useState('')
 
   function toggleParentSelection(parentId) {
     const newSelected = new Set(selectedParents)
@@ -18,6 +21,44 @@ export default function Parents({ participants }) {
       newSelected.add(parentId)
     }
     setSelectedParents(newSelected)
+  }
+
+  function startEditing(participant) {
+    const adults = parseApprovedAdults(participant.approvedAdults)
+    if (participant.parentName && !adults.some(a => a.toLowerCase() === participant.parentName.toLowerCase())) {
+      adults.unshift(participant.parentName)
+    }
+    setEditingId(participant.id)
+    setEditingAdults(adults)
+    setNewAdult('')
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditingAdults([])
+    setNewAdult('')
+  }
+
+  function addAdult() {
+    const trimmed = newAdult.trim()
+    if (!trimmed) return
+    if (!editingAdults.some(a => a.toLowerCase() === trimmed.toLowerCase())) {
+      setEditingAdults(prev => [...prev, trimmed])
+    }
+    setNewAdult('')
+  }
+
+  function removeAdult(index) {
+    setEditingAdults(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function saveAdults(participant) {
+    const normalized = [...editingAdults]
+    if (participant.parentName && !normalized.some(a => a.toLowerCase() === participant.parentName.toLowerCase())) {
+      normalized.unshift(participant.parentName)
+    }
+    onUpdateParticipant(participant.id, normalized.join(', '))
+    cancelEdit()
   }
 
   function emailSelectedParents() {
@@ -106,6 +147,7 @@ export default function Parents({ participants }) {
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Phone</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Child</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Approved Adults</th>
+                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -113,7 +155,8 @@ export default function Parents({ participants }) {
                   const adults = parseApprovedAdults(p.approvedAdults)
                   const isSelected = selectedParents.has(p.id)
                   return (
-                    <tr key={p.id} className={`border-b border-stone-100 hover:bg-stone-50 transition-colors ${isSelected ? 'bg-forest-50' : ''}`}>
+                    <>
+                      <tr key={p.id} className={`border-b border-stone-100 hover:bg-stone-50 transition-colors ${isSelected ? 'bg-forest-50' : ''}`}>
                       <td className="py-3 px-4">
                         <input
                           type="checkbox"
@@ -166,7 +209,46 @@ export default function Parents({ participants }) {
                           </div>
                         ) : '—'}
                       </td>
+                      <td className="py-3 px-4 text-sm text-stone-700">
+                        <button type="button" onClick={() => startEditing(p)}
+                          className="btn-secondary text-xs px-3 py-1.5">
+                          {adults.length > 0 ? 'Edit' : 'Add'}
+                        </button>
+                      </td>
                     </tr>
+                    {editingId === p.id && (
+                      <tr key={`${p.id}-edit`} className="bg-stone-50">
+                        <td colSpan="7" className="px-4 py-3">
+                          <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                            <div className="flex gap-2 flex-col sm:flex-row items-stretch">
+                              <input
+                                className="input flex-1"
+                                value={newAdult}
+                                onChange={e => setNewAdult(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAdult() } }}
+                                placeholder="Name (Relationship)"
+                              />
+                              <button type="button" onClick={addAdult} className="btn-secondary w-full sm:w-auto">Add</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {editingAdults.length === 0 ? (
+                                <span className="text-sm text-stone-500">No approved adults yet.</span>
+                              ) : editingAdults.map((adult, i) => (
+                                <span key={`${adult}-${i}`} className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-sm text-stone-700">
+                                  {adult}
+                                  <button type="button" onClick={() => removeAdult(i)} className="text-stone-500 hover:text-red-600">×</button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="mt-4 flex gap-2 flex-wrap">
+                              <button type="button" onClick={() => saveAdults(p)} className="btn-primary">Save</button>
+                              <button type="button" onClick={cancelEdit} className="btn-secondary">Cancel</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   )
                 })}
               </tbody>
