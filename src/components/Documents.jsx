@@ -60,21 +60,15 @@ export default function Documents() {
       return
     }
 
+    // Check if user is authenticated using sessionStorage (same as main app)
+    const isLoggedIn = sessionStorage.getItem('camp_authed') === 'true'
+    if (!isLoggedIn) {
+      alert('You must be logged in to upload documents')
+      return
+    }
+
     setUploading(true)
     try {
-      // Debug: Check authentication
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError) {
-        console.error('Auth error:', authError)
-        alert('Authentication error: ' + authError.message)
-        return
-      }
-      if (!user) {
-        alert('You must be logged in to upload documents')
-        return
-      }
-      console.log('Authenticated user:', user.id)
-
       const fileName = `${Date.now()}-${selectedFile.name}`
       const filePath = `${section}/${fileName}`
 
