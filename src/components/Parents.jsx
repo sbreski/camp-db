@@ -36,6 +36,8 @@ export default function Parents({ participants }) {
   function clearSelection() {
     setSelectedParents(new Set())
   }
+
+  const filtered = participants
     .filter(p => p.parentName || p.parentEmail || p.parentPhone)
     .filter(p => {
       const query = search.toLowerCase()
