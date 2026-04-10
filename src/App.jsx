@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import SignInOut from './components/SignInOut'
 import Participants from './components/Participants'
 import ParticipantDetail from './components/ParticipantDetail'
+import Parents from './components/Parents'
 import Medical from './components/Medical'
 import Incidents from './components/Incidents'
 import AttendanceOverview from './components/AttendanceOverview'
@@ -201,6 +202,7 @@ export default function App() {
       case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} />
       case 'participants': return <Participants participants={participants} setParticipants={setParticipants} onView={(id) => navigate('participant', id)} />
+      case 'parents': return <Parents participants={participants} />
       case 'participant': return (
         <ParticipantDetail
           participant={participants.find(p => p.id === selectedParticipantId)}
