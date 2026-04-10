@@ -100,8 +100,8 @@ function toCamel(obj) {
 
 export default function App() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem('camp_authed') === 'true')
-  const [page, setPage] = useState('dashboard')
-  const [selectedParticipantId, setSelectedParticipantId] = useState(null)
+  const [page, setPage] = useState(() => sessionStorage.getItem('camp_page') || 'dashboard')
+  const [selectedParticipantId, setSelectedParticipantId] = useState(() => sessionStorage.getItem('camp_selectedParticipantId') || null)
 
   const [rawParticipants, , loadingP, reloadP] = useSupabaseTable('participants')
   const [rawAttendance, , loadingA, reloadA] = useSupabaseTable('attendance', 'date')
@@ -207,6 +207,8 @@ export default function App() {
       if (logoutTimer.current) clearTimeout(logoutTimer.current)
       logoutTimer.current = setTimeout(() => {
         sessionStorage.removeItem('camp_authed')
+        sessionStorage.removeItem('camp_page')
+        sessionStorage.removeItem('camp_selectedParticipantId')
         setAuthed(false)
       }, 10 * 60 * 1000) // 10 minutes
     }
@@ -253,7 +255,14 @@ export default function App() {
 
   function navigate(p, id = null) {
     setPage(p)
-    if (id !== null) setSelectedParticipantId(id)
+    sessionStorage.setItem('camp_page', p)
+    if (id !== null) {
+      setSelectedParticipantId(id)
+      sessionStorage.setItem('camp_selectedParticipantId', id)
+    } else {
+      setSelectedParticipantId(null)
+      sessionStorage.removeItem('camp_selectedParticipantId')
+    }
   }
 
   function renderPage() {
@@ -286,6 +295,8 @@ export default function App() {
     <div className="min-h-screen bg-[#f5f3ef]">
       <Nav page={page} onNavigate={navigate} onLogout={() => {
         sessionStorage.removeItem('camp_authed')
+        sessionStorage.removeItem('camp_page')
+        sessionStorage.removeItem('camp_selectedParticipantId')
         setAuthed(false)
       }} />
       <main className="max-w-5xl mx-auto px-4 py-6">{renderPage()}</main>
