@@ -164,10 +164,15 @@ export default function App() {
   async function setIncidents(updater) {
     const next = typeof updater === 'function' ? updater(incidents) : updater
     const added = next.filter(i => !incidents.find(x => x.id === i.id))
+    const removed = incidents.filter(i => !next.find(x => x.id === i.id))
     for (const inc of added) {
       const { id, ...rest } = toSnake(inc)
       const { error } = await supabase.from('incidents').insert({ id: inc.id, ...rest })
       if (error) console.error('INCIDENT INSERT ERROR:', error.message)
+    }
+    for (const inc of removed) {
+      const { error } = await supabase.from('incidents').delete().eq('id', inc.id)
+      if (error) console.error('INCIDENT DELETE ERROR:', error.message)
     }
     reloadI()
   }
