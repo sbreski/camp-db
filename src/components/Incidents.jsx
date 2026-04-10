@@ -125,22 +125,19 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {p?.parentEmail && (
-                      <button onClick={async (e) => {
+                      <button onClick={(e) => {
                         e.stopPropagation()
-                        try {
-                          const response = await fetch('/.netlify/functions/send-incident-email', {
-                            method: 'POST',
-                            body: JSON.stringify({ incident: inc, participant: p }),
-                          })
-                          const result = await response.json()
-                          if (result.success) {
-                            alert('Email sent successfully!')
-                          } else {
-                            alert('Failed to send email: ' + result.error)
-                          }
-                        } catch (error) {
-                          alert('Error sending email: ' + error.message)
+                        const subject = `Incident Report - ${p.name}`
+                        let body = `Dear ${p.parentName || 'Parent/Guardian'},\n\n`
+                        body += `Please find details of the incident involving ${p.name}.\n\n`
+                        if (inc.pdfName) {
+                          body += `Attachment: ${inc.pdfName}\nYou can download the attachment here: ${inc.pdfData}\n\n`
                         }
+                        body += `Incident Type: ${inc.type}\nDate: ${new Date(inc.createdAt).toLocaleDateString('en-GB')}\nReported by: ${inc.staffMember || 'Staff'}\n\n`
+                        body += `This email is being sent following our discussion about this incident.`
+                        
+                        const mailtoLink = `mailto:?bcc=${encodeURIComponent(p.parentEmail)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+                        window.open(mailtoLink, '_blank')
                       }}
                         className="p-1.5 text-stone-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
                         title="Email parent">
