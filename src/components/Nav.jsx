@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt } from 'lucide-react'
+import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText } from 'lucide-react'
 import { CAMP_NAME } from '../App'
 
 const NAV_ITEMS = [
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { id: 'medical', label: 'Medical', icon: Stethoscope },
   { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
   { id: 'staff', label: 'Staff', icon: UserCog },
+  { id: 'documents', label: 'Documents', icon: FileText },
 ]
 
 export default function Nav({ page, onNavigate, onLogout }) {
