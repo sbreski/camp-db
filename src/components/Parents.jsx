@@ -6,6 +6,20 @@ function parseApprovedAdults(str) {
   return str.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+function stripParentSuffix(name) {
+  return name.trim().replace(/\s*\(parent\)$/i, '').trim()
+}
+
+function hasSameAdult(list, name) {
+  const normalized = stripParentSuffix(name).toLowerCase()
+  return list.some(a => stripParentSuffix(a).toLowerCase() === normalized)
+}
+
+function formatParentLabel(name) {
+  const clean = stripParentSuffix(name)
+  return clean ? `${clean} (Parent)` : ''
+}
+
 export default function Parents({ participants, onUpdateParticipant }) {
   const [search, setSearch] = useState('')
   const [selectedParents, setSelectedParents] = useState(new Set())
@@ -25,8 +39,8 @@ export default function Parents({ participants, onUpdateParticipant }) {
 
   function startEditing(participant) {
     const adults = parseApprovedAdults(participant.approvedAdults)
-    if (participant.parentName && !adults.some(a => a.toLowerCase() === participant.parentName.toLowerCase())) {
-      adults.unshift(participant.parentName)
+    if (participant.parentName && !hasSameAdult(adults, participant.parentName)) {
+      adults.unshift(formatParentLabel(participant.parentName))
     }
     setEditingId(participant.id)
     setEditingAdults(adults)
@@ -54,8 +68,8 @@ export default function Parents({ participants, onUpdateParticipant }) {
 
   function saveAdults(participant) {
     const normalized = [...editingAdults]
-    if (participant.parentName && !normalized.some(a => a.toLowerCase() === participant.parentName.toLowerCase())) {
-      normalized.unshift(participant.parentName)
+    if (participant.parentName && !hasSameAdult(normalized, participant.parentName)) {
+      normalized.unshift(formatParentLabel(participant.parentName))
     }
     onUpdateParticipant(participant.id, normalized.join(', '))
     cancelEdit()

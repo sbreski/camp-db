@@ -35,6 +35,20 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     setApprovedAdultsList(prev => prev.filter((_, i) => i !== index))
   }
 
+  function stripParentSuffix(name) {
+    return name.trim().replace(/\s*\(parent\)$/i, '').trim()
+  }
+
+  function hasSameAdult(list, name) {
+    const normalized = stripParentSuffix(name).toLowerCase()
+    return list.some(a => stripParentSuffix(a).toLowerCase() === normalized)
+  }
+
+  function formatParentLabel(name) {
+    const clean = stripParentSuffix(name)
+    return clean ? `${clean} (Parent)` : ''
+  }
+
   function toggleMedType(type) {
     set('medicalType', form.medicalType.includes(type)
       ? form.medicalType.filter(t => t !== type)
@@ -48,8 +62,11 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
 
     const normalizedAdults = [...approvedAdultsList]
     const parentName = form.parentName.trim()
-    if (parentName && !normalizedAdults.some(a => a.toLowerCase() === parentName.toLowerCase())) {
-      normalizedAdults.unshift(parentName)
+    if (parentName) {
+      const parentLabel = formatParentLabel(parentName)
+      if (!hasSameAdult(normalizedAdults, parentName)) {
+        normalizedAdults.unshift(parentLabel)
+      }
     }
 
     onSave({

@@ -131,8 +131,8 @@ export default function SignInOut({ participants, attendance, setAttendance, set
 
   function startEditAdults(participant) {
     const adults = parseApprovedAdults(participant.approvedAdults)
-    if (participant.parentName && !adults.some(a => a.toLowerCase() === participant.parentName.toLowerCase())) {
-      adults.unshift(participant.parentName)
+    if (participant.parentName && !hasSameAdult(adults, participant.parentName)) {
+      adults.unshift(formatParentLabel(participant.parentName))
     }
     setEditingParticipant(participant)
     setEditingAdults(adults)
@@ -155,8 +155,8 @@ export default function SignInOut({ participants, attendance, setAttendance, set
   function saveAdults() {
     if (!editingParticipant) return
     const normalized = [...editingAdults]
-    if (editingParticipant.parentName && !normalized.some(a => a.toLowerCase() === editingParticipant.parentName.toLowerCase())) {
-      normalized.unshift(editingParticipant.parentName)
+    if (editingParticipant.parentName && !hasSameAdult(normalized, editingParticipant.parentName)) {
+      normalized.unshift(formatParentLabel(editingParticipant.parentName))
     }
     setParticipants(prev => prev.map(p => p.id === editingParticipant.id ? { ...p, approvedAdults: normalized.join(', ') } : p))
     setEditingParticipant(null)
