@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import Login from './components/Login'
 import Nav from './components/Nav'
@@ -199,6 +199,39 @@ export default function App() {
     }
     reloadS()
   }
+
+  const logoutTimer = useRef(null)
+
+  useEffect(() => {
+    function resetTimer() {
+      if (logoutTimer.current) clearTimeout(logoutTimer.current)
+      logoutTimer.current = setTimeout(() => {
+        sessionStorage.removeItem('camp_authed')
+        setAuthed(false)
+      }, 10 * 60 * 1000) // 10 minutes
+    }
+
+    function handleActivity() {
+      resetTimer()
+    }
+
+    // Set initial timer
+    resetTimer()
+
+    // Add event listeners
+    window.addEventListener('mousemove', handleActivity)
+    window.addEventListener('keydown', handleActivity)
+    window.addEventListener('click', handleActivity)
+    window.addEventListener('scroll', handleActivity)
+
+    return () => {
+      if (logoutTimer.current) clearTimeout(logoutTimer.current)
+      window.removeEventListener('mousemove', handleActivity)
+      window.removeEventListener('keydown', handleActivity)
+      window.removeEventListener('click', handleActivity)
+      window.removeEventListener('scroll', handleActivity)
+    }
+  }, [])
 
   if (!authed) {
     return <Login onSuccess={() => {
