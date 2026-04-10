@@ -13,9 +13,26 @@ const EMPTY = {
 
 export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
   const [form, setForm] = useState({ ...EMPTY, ...initial })
+  const [approvedAdultsList, setApprovedAdultsList] = useState(() => (
+    initial.approvedAdults?.split(',').map(a => a.trim()).filter(Boolean) || []
+  ))
+  const [newApprovedAdult, setNewApprovedAdult] = useState('')
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  function addApprovedAdult() {
+    const next = newApprovedAdult.trim()
+    if (!next) return
+    if (!approvedAdultsList.some(a => a.toLowerCase() === next.toLowerCase())) {
+      setApprovedAdultsList(prev => [...prev, next])
+    }
+    setNewApprovedAdult('')
+  }
+
+  function removeApprovedAdult(index) {
+    setApprovedAdultsList(prev => prev.filter((_, i) => i !== index))
   }
 
   function toggleMedType(type) {
@@ -28,7 +45,17 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
   function handleSubmit(e) {
     e.preventDefault()
     if (!form.name.trim()) return
-    onSave(form)
+
+    const normalizedAdults = [...approvedAdultsList]
+    const parentName = form.parentName.trim()
+    if (parentName && !normalizedAdults.some(a => a.toLowerCase() === parentName.toLowerCase())) {
+      normalizedAdults.unshift(parentName)
+    }
+
+    onSave({
+      ...form,
+      approvedAdults: normalizedAdults.join(', '),
+    })
   }
 
   return (
@@ -91,8 +118,34 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
               <input className="input" type="email" value={form.parentEmail} onChange={e => set('parentEmail', e.target.value)} placeholder="parent@email.com" />
             </div>
             <div className="col-span-2">
-              <label className="label">Approved Adults for Collection (comma separated)</label>
-              <textarea className="input resize-none" rows={2} value={form.approvedAdults} onChange={e => set('approvedAdults', e.target.value)} placeholder="Name (Relationship), Name (Relationship)" />
+              <label className="label">Approved Adults for Collection</label>
+              <div className="flex items-center gap-2">
+                <input
+                  className="input flex-1"
+                  value={newApprovedAdult}
+                  onChange={e => setNewApprovedAdult(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addApprovedAdult() } }}
+                  placeholder="Name (Relationship)"
+                />
+                <button type="button" onClick={addApprovedAdult} className="btn-secondary h-11">
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {approvedAdultsList.length === 0 ? (
+                  <p className="text-sm text-stone-500">No approved adults recorded yet.</p>
+                ) : approvedAdultsList.map((adult, index) => (
+                  <button
+                    key={`${adult}-${index}`}
+                    type="button"
+                    onClick={() => removeApprovedAdult(index)}
+                    className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1 text-sm text-stone-700 hover:border-forest-300"
+                  >
+                    {adult}
+                    <Trash2 size={14} />
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </section>
