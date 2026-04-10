@@ -53,8 +53,30 @@ function toSnake(obj) {
   for (const [k, v] of Object.entries(obj)) {
     result[map[k] || k] = v
   }
-  if (result.age === '' || result.age === undefined) result.age = null
-  if (result.age !== null) result.age = parseInt(result.age) || null
+  // Only process age if it exists in the input object (for participants table)
+  if ('age' in obj) {
+    if (result.age === '' || result.age === undefined) result.age = null
+    if (result.age !== null) result.age = parseInt(result.age) || null
+  }
+  return result
+}
+
+function attendanceToSnake(obj) {
+  const map = {
+    participantId: 'participant_id', 
+    signIn: 'sign_in', 
+    signOut: 'sign_out',
+    collectedBy: 'collected_by',
+    createdAt: 'created_at',
+  }
+  const result = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (k in map) {
+      result[map[k]] = v
+    } else {
+      result[k] = v // Keep original key if not in map
+    }
+  }
   return result
 }
 
@@ -125,11 +147,11 @@ export default function App() {
     })
     const removed = attendance.filter(a => !next.find(x => x.id === a.id))
     for (const a of added) {
-      const { error } = await supabase.from('attendance').insert(toSnake(a))
+      const { error } = await supabase.from('attendance').insert(attendanceToSnake(a))
       if (error) console.error('ATTENDANCE INSERT ERROR:', error.message)
     }
     for (const a of changed) {
-      const { id, ...rest } = toSnake(a)
+      const { id, ...rest } = attendanceToSnake(a)
       const { error } = await supabase.from('attendance').update(rest).eq('id', a.id)
       if (error) console.error('ATTENDANCE UPDATE ERROR:', error.message)
     }
