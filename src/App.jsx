@@ -365,6 +365,14 @@ export default function App() {
     return String(name || '').trim().split(/\s+/).filter(Boolean)[0] || ''
   }
 
+  function stripMissingColumn(error, payload) {
+    const match = String(error?.message || '').match(/column "([^"]+)" of relation "[^"]+" does not exist/)
+    if (!match) return null
+    const col = match[1]
+    const { [col]: _dropped, ...rest } = payload
+    return rest
+  }
+
   async function setParticipants(updater) {
     const next = typeof updater === 'function' ? updater(participants) : updater
     const added = next.filter(p => !participants.find(x => x.id === p.id))
@@ -375,7 +383,14 @@ export default function App() {
     })
     for (const p of added) {
       const { id, ...rest } = toSnake(p)
-      const { error } = await supabase.from('participants').insert({ id: p.id, ...rest })
+      let payload = { id: p.id, ...rest }
+      let { error } = await supabase.from('participants').insert(payload)
+      while (error && String(error.message).includes('does not exist')) {
+        const stripped = stripMissingColumn(error, payload)
+        if (!stripped) break
+        payload = stripped
+        ;({ error } = await supabase.from('participants').insert(payload))
+      }
       if (error) console.error('INSERT ERROR:', error.message, error.details, error.hint)
     }
     for (const p of removed) {
@@ -383,7 +398,15 @@ export default function App() {
     }
     for (const p of changed) {
       const { id, ...rest } = toSnake(p)
-      await supabase.from('participants').update(rest).eq('id', p.id)
+      let payload = rest
+      let { error } = await supabase.from('participants').update(payload).eq('id', p.id)
+      while (error && String(error.message).includes('does not exist')) {
+        const stripped = stripMissingColumn(error, payload)
+        if (!stripped) break
+        payload = stripped
+        ;({ error } = await supabase.from('participants').update(payload).eq('id', p.id))
+      }
+      if (error) console.error('UPDATE ERROR:', error.message, error.details, error.hint)
     }
     reloadP()
   }
