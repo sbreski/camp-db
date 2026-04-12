@@ -300,6 +300,7 @@ export default function App() {
   const [permissionsLoading, setPermissionsLoading] = useState(true)
   const [allowedTabIds, setAllowedTabIds] = useState(BASIC_TABS)
     const [canViewTimetableOverview, setCanViewTimetableOverview] = useState(false)
+  const [canEditTimetable, setCanEditTimetable] = useState(false)
   const [showSessionWarning, setShowSessionWarning] = useState(false)
   const [warningCountdown, setWarningCountdown] = useState(SESSION_WARNING_SECONDS)
   const [forcePassword, setForcePassword] = useState('')
@@ -789,6 +790,7 @@ export default function App() {
 
       setIsAdminUser(false)
       setCanViewTimetableOverview(Boolean(data?.can_view_timetable_overview))
+      setCanEditTimetable(Boolean(data?.can_edit_timetable))
 
       if (Array.isArray(data?.allowed_tabs) && data.allowed_tabs.length > 0) {
         setAllowedTabIds(sanitizeAllowedTabs(data.allowed_tabs))
@@ -1307,6 +1309,7 @@ export default function App() {
           isOwnerUser={isOwnerUser}
           isAdminUser={isAdminUser}
           canViewTimetableOverview={canViewTimetableOverview}
+          canEditTimetable={canEditTimetable}
         />
       )
       case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onView={(id) => navigate('participant', id)} />

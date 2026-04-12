@@ -219,8 +219,9 @@ export default function Timetable({
   isOwnerUser = false,
   isAdminUser = false,
   canViewTimetableOverview = false,
+  canEditTimetable = false,
 }) {
-  const canEdit = Boolean(isOwnerUser || isAdminUser)
+  const canEdit = Boolean(isOwnerUser || isAdminUser || canEditTimetable)
   const canSeeOverview = Boolean(canEdit || canViewTimetableOverview)
 
   const [selectedDate, setSelectedDate] = useState(todayKey())

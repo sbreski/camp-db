@@ -132,7 +132,7 @@ export async function handler(event) {
     if (event.httpMethod === 'GET') {
       const [authUsers, permissionsRows, resetRequestsRows] = await Promise.all([
         listUsers(admin),
-        admin.from('user_tab_permissions').select('user_id, is_admin, allowed_tabs, can_view_timetable_overview'),
+        admin.from('user_tab_permissions').select('user_id, is_admin, allowed_tabs, can_view_timetable_overview, can_edit_timetable'),
         admin
           .from('password_reset_requests')
           .select('id, requester_user_id, requester_email, requester_identifier, reason, status, requested_at')
