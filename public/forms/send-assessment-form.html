@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SEND Mid-Camp Assessment — Impact Kidz</title>
+<style>
+  :root {
+    --green: #1a6b3c;
+    --blue: #1a4d8f;
+    --lightgreen: #f0f7f3;
+    --border: #ccc;
+    --label: #222;
+    --note: #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #f5f5f0; color: #222; font-size: 14px; }
+
+  .header-banner {
+    background: var(--green);
+    color: #fff;
+    text-align: center;
+    padding: 10px 24px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .title-block {
+    text-align: center;
+    padding: 24px 24px 16px;
+    background: #fff;
+    border-bottom: 3px solid var(--green);
+  }
+  .title-block .org { color: var(--blue); font-size: 22px; font-style: italic; font-weight: 700; }
+  .title-block .doc-title { font-size: 18px; font-weight: 700; margin-top: 6px; color: #222; }
+  .title-block .subtitle { font-size: 12px; color: var(--note); margin-top: 6px; font-style: italic; line-height: 1.5; max-width: 640px; margin-left: auto; margin-right: auto; }
+
+  .form-body { max-width: 800px; margin: 0 auto; padding: 24px; }
+
+  .section {
+    background: #fff;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+  }
+  .section-header {
+    background: var(--green);
+    color: #fff;
+    padding: 10px 20px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  .section-body { padding: 20px; }
+  .section-note {
+    background: var(--lightgreen);
+    border-left: 3px solid var(--green);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--note);
+    font-style: italic;
+    margin-bottom: 16px;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-weight: 700; font-size: 13px; color: var(--label); margin-bottom: 5px; }
+  .field .field-note { font-size: 11px; color: var(--note); font-style: italic; margin-bottom: 5px; }
+  .field input[type="text"],
+  .field input[type="date"],
+  .field textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    font-family: Georgia, serif;
+    font-size: 13px;
+    color: #222;
+    background: #fafafa;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--green); background: #fff; }
+  .field textarea { resize: vertical; min-height: 70px; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  .check-group { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px; }
+  .check-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 400;
+    font-size: 13px;
+    cursor: pointer;
+    color: #333;
+  }
+  .check-group input[type="checkbox"],
+  .check-group input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--green);
+  }
+
+  .criterion {
+    border: 1.5px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 14px;
+    background: #fafafa;
+  }
+  .criterion-q { font-weight: 700; font-size: 13px; color: var(--label); margin-bottom: 6px; }
+  .criterion-note { font-size: 11px; color: var(--note); font-style: italic; margin-bottom: 10px; line-height: 1.5; }
+  .criterion-checks { margin-bottom: 10px; }
+  .criterion textarea { width: 100%; padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 5px; font-family: Georgia, serif; font-size: 12px; color: #222; background: #fff; resize: vertical; min-height: 55px; }
+  .criterion textarea:focus { outline: none; border-color: var(--green); }
+  .notes-label { font-size: 11px; font-weight: 700; color: #555; margin-bottom: 4px; }
+
+  .conclusion-options { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+  .conclusion-option { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1.5px solid #e0e0e0; border-radius: 6px; cursor: pointer; background: #fafafa; }
+  .conclusion-option:has(input:checked) { border-color: var(--green); background: var(--lightgreen); }
+  .conclusion-option input { margin-top: 2px; accent-color: var(--green); }
+  .conclusion-option span { font-size: 13px; }
+
+  .saved-note { text-align: center; font-size: 12px; color: var(--green); padding: 6px; font-style: italic; min-height: 22px; }
+
+  .action-bar {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding: 20px 24px;
+    background: #fff;
+    border-top: 2px solid #e0e0e0;
+    position: sticky;
+    bottom: 0;
+  }
+  .btn {
+    padding: 10px 28px;
+    border-radius: 6px;
+    border: none;
+    font-family: Georgia, serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-send { background: #145a32; color: #fff; }
+  .btn-secondary { background: #f0f0f0; color: #333; }
+  .btn-danger { background: #c0392b; color: #fff; }
+
+  @media (max-width: 700px) {
+    .action-bar {
+      flex-direction: column;
+      align-items: stretch;
+      position: static;
+      padding: 16px;
+    }
+    .action-bar .btn { width: 100%; }
+  }
+
+  @media print {
+    body { background: #fff; font-size: 12px; }
+    .action-bar { display: none; }
+    .header-banner { font-size: 10px; }
+    .section { box-shadow: none; border: 1px solid #ccc; }
+    .form-body { padding: 0; max-width: 100%; }
+    .field input, .field textarea, .criterion textarea {
+      background: #fff !important;
+      border: 1px solid #999 !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="header-banner">SEND Mid-Camp Assessment and Decision Record — Impact Kidz Summer Camp</div>
+
+<div class="title-block">
+  <div class="org">Impact Kidz Summer Camp</div>
+  <div class="doc-title">SEND Mid-Camp Assessment and Decision Record</div>
+  <div class="subtitle">To be completed by the Camp Coordinator where a child's additional needs have become apparent during camp, either because they were not disclosed in advance or because they are presenting more significantly than anticipated. Keep on the child's file. Share with parent or carer as appropriate.</div>
+</div>
+
+<div class="form-body">
+
+  <!-- SECTION A -->
+  <div class="section">
+    <div class="section-header">Section A — Child and context</div>
+    <div class="section-body">
+      <div class="field-row">
+        <div class="field">
+          <label>Child's full name</label>
+          <input type="text" id="child_name" placeholder="Full name"/>
+        </div>
+        <div class="field">
+          <label>Child age</label>
+          <input type="text" id="child_age" placeholder="e.g. 8"/>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Date of assessment</label>
+          <input type="date" id="date"/>
+        </div>
+        <div></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Camp Coordinator completing this form</label>
+          <input type="text" id="coordinator" value="Sam Brenner"/>
+        </div>
+        <div class="field">
+          <label>Day of camp (e.g. Day 1, Day 3)</label>
+          <input type="text" id="camp_day" placeholder="e.g. Day 2"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Were the child's needs disclosed at registration?</label>
+        <div class="check-group">
+          <label><input type="radio" name="disclosed" value="yes"/> Yes</label>
+          <label><input type="radio" name="disclosed" value="no"/> No</label>
+          <label><input type="radio" name="disclosed" value="partial"/> Partially disclosed</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Was a pre-camp meeting or individual support plan completed for this child?</label>
+        <div class="check-group">
+          <label><input type="radio" name="precampmeeting" value="yes"/> Yes</label>
+          <label><input type="radio" name="precampmeeting" value="no"/> No</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Brief description of the concern or situation prompting this assessment</label>
+        <div class="field-note">What has happened, when, and why is an assessment needed now?</div>
+        <textarea id="concern_desc" rows="4" placeholder="Describe the situation..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION B -->
+  <div class="section">
+    <div class="section-header">Section B — Assessment criteria</div>
+    <div class="section-body">
+      <div class="section-note">Consider each of the following and provide notes. Answer honestly — this record exists to support the child and protect staff, not to find a justification for a particular outcome.</div>
+
+      <div class="criterion">
+        <div class="criterion-q">1. Can the child participate in activities without requiring one-to-one staff support?</div>
+        <div class="criterion-note">Consider whether the child is able to follow group instructions, engage with activities safely, and manage transitions without needing a dedicated adult alongside them at all times.</div>
+        <div class="criterion-checks">
+          <div class="check-group">
+            <label><input type="radio" name="crit1" value="yes"/> Yes</label>
+            <label><input type="radio" name="crit1" value="no"/> No</label>
+            <label><input type="radio" name="crit1" value="partial"/> Partially / Uncertain</label>
+          </div>
+        </div>
+        <div class="notes-label">Notes:</div>
+        <textarea id="crit1_notes" placeholder="Add notes here..."></textarea>
+      </div>
+
+      <div class="criterion">
+        <div class="criterion-q">2. Can the child's behaviour or care needs be managed safely within the group context?</div>
+        <div class="criterion-note">Consider whether the child's needs are placing an undue demand on staff attention, creating risk for the child or others, or requiring a level of intervention the team cannot sustain across a full session.</div>
+        <div class="criterion-checks">
+          <div class="check-group">
+            <label><input type="radio" name="crit2" value="yes"/> Yes</label>
+            <label><input type="radio" name="crit2" value="no"/> No</label>
+            <label><input type="radio" name="crit2" value="partial"/> Partially / Uncertain</label>
+          </div>
+        </div>
+        <div class="notes-label">Notes:</div>
+        <textarea id="crit2_notes" placeholder="Add notes here..."></textarea>
+      </div>
+
+      <div class="criterion">
+        <div class="criterion-q">3. Can the child's wellbeing and dignity be maintained appropriately?</div>
+        <div class="criterion-note">Consider whether the child appears distressed, whether their needs are being met in a way that preserves their dignity, and whether the camp environment is suitable for them at this time.</div>
+        <div class="criterion-checks">
+          <div class="check-group">
+            <label><input type="radio" name="crit3" value="yes"/> Yes</label>
+            <label><input type="radio" name="crit3" value="no"/> No</label>
+            <label><input type="radio" name="crit3" value="partial"/> Partially / Uncertain</label>
+          </div>
+        </div>
+        <div class="notes-label">Notes:</div>
+        <textarea id="crit3_notes" placeholder="Add notes here..."></textarea>
+      </div>
+
+      <div class="criterion">
+        <div class="criterion-q">4. Are the child's needs having a significant impact on the safety or experience of other participants or staff?</div>
+        <div class="criterion-note">Consider whether other children's participation is being disrupted, whether staff are stretched beyond safe capacity, or whether the situation is creating risk for the wider group.</div>
+        <div class="criterion-checks">
+          <div class="check-group">
+            <label><input type="radio" name="crit4" value="yes"/> Yes</label>
+            <label><input type="radio" name="crit4" value="no"/> No</label>
+            <label><input type="radio" name="crit4" value="partial"/> Partially / Uncertain</label>
+          </div>
+        </div>
+        <div class="notes-label">Notes:</div>
+        <textarea id="crit4_notes" placeholder="Add notes here..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION C -->
+  <div class="section">
+    <div class="section-header">Section C — Reasonable adjustments considered</div>
+    <div class="section-body">
+      <div class="section-note">Before reaching a conclusion, record any adjustments tried or considered. This is important for demonstrating a fair and thorough process was followed.</div>
+      <div class="field">
+        <label>Adjustments already tried during camp</label>
+        <textarea id="adjust_tried" rows="3" placeholder="What has already been put in place or attempted?"></textarea>
+      </div>
+      <div class="field">
+        <label>Further adjustments considered but not yet tried</label>
+        <textarea id="adjust_considered" rows="3" placeholder="What else could be tried before making a decision?"></textarea>
+      </div>
+      <div class="field">
+        <label>Has a staged response under the Behaviour Management Policy been followed where relevant?</label>
+        <div class="check-group">
+          <label><input type="radio" name="staged" value="yes"/> Yes</label>
+          <label><input type="radio" name="staged" value="no"/> No</label>
+          <label><input type="radio" name="staged" value="na"/> Not applicable</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Has another staff member been consulted?</label>
+        <div class="check-group">
+          <label><input type="radio" name="consulted" value="yes"/> Yes</label>
+          <label><input type="radio" name="consulted" value="no"/> No</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>If yes, who was consulted and what was discussed?</label>
+        <textarea id="consulted_detail" rows="2" placeholder="Name and summary of discussion..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION D -->
+  <div class="section">
+    <div class="section-header">Section D — Conclusion and decision</div>
+    <div class="section-body">
+      <div class="field">
+        <label>Based on the above assessment, can the camp continue to meet this child's needs safely?</label>
+        <div class="conclusion-options" style="margin-top:10px;">
+          <label class="conclusion-option">
+            <input type="radio" name="conclusion" value="yes"/>
+            <span><strong>Yes</strong> — the camp can continue to meet this child's needs. No further action required at this time.</span>
+          </label>
+          <label class="conclusion-option">
+            <input type="radio" name="conclusion" value="yes_adjustments"/>
+            <span><strong>Yes, with adjustments</strong> — the camp can continue with the following changes in place.</span>
+          </label>
+          <label class="conclusion-option">
+            <input type="radio" name="conclusion" value="no"/>
+            <span><strong>No</strong> — the camp is unable to meet this child's needs safely at this time.</span>
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label>If yes with adjustments, state what will be put in place:</label>
+        <textarea id="adjustments_detail" rows="3" placeholder="Describe the specific adjustments..."></textarea>
+      </div>
+      <div class="field">
+        <label>If no, state the reason clearly:</label>
+        <textarea id="no_reason" rows="3" placeholder="Explain clearly why the camp cannot continue to meet this child's needs..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION E -->
+  <div class="section">
+    <div class="section-header">Section E — Next steps and communication</div>
+    <div class="section-body">
+      <div class="field">
+        <label>Has the parent or carer been contacted?</label>
+        <div class="check-group">
+          <label><input type="radio" name="parent_contact" value="yes"/> Yes</label>
+          <label><input type="radio" name="parent_contact" value="not_yet"/> Not yet</label>
+          <label><input type="radio" name="parent_contact" value="attempted"/> Attempted, no response</label>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Date of contact or attempt</label>
+          <input type="date" id="contact_date"/>
+        </div>
+        <div class="field">
+          <label>Time of contact or attempt</label>
+          <input type="text" id="contact_time" placeholder="e.g. 10:45am"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Summary of conversation with parent or carer</label>
+        <textarea id="parent_summary" rows="4" placeholder="What was discussed, what was the parent's response, what was agreed?"></textarea>
+      </div>
+      <div class="field">
+        <label>Has the artsdepot DSL been informed or consulted?</label>
+        <div class="check-group">
+          <label><input type="radio" name="artsdsl" value="yes"/> Yes</label>
+          <label><input type="radio" name="artsdsl" value="no"/> No</label>
+          <label><input type="radio" name="artsdsl" value="not_required"/> Not required at this stage</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Outcome and agreed next steps</label>
+        <textarea id="outcome" rows="4" placeholder="What will happen next? What has been agreed with all parties?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION F -->
+  <div class="section">
+    <div class="section-header">Section F — Sign off</div>
+    <div class="section-body">
+      <div class="section-note">This form should be signed by the Camp Coordinator and kept on the child's file. A copy should be shared with the parent or carer where appropriate. If the child is asked to leave camp, this form provides the written record of the process followed.</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Camp Coordinator name</label>
+          <input type="text" id="sign_name" value="Sam Brenner"/>
+        </div>
+        <div class="field">
+          <label>Date completed</label>
+          <input type="date" id="sign_date"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Has a copy been shared with the parent or carer?</label>
+        <div class="check-group">
+          <label><input type="radio" name="copy_shared" value="yes"/> Yes</label>
+          <label><input type="radio" name="copy_shared" value="no"/> No</label>
+          <label><input type="radio" name="copy_shared" value="offered"/> Offered but declined</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Any additional notes</label>
+        <textarea id="additional_notes" rows="3" placeholder="Anything else relevant to record..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="saved-note" id="saved_note"></div>
+
+</div><!-- /form-body -->
+
+<div class="action-bar">
+  <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear form</button>
+  <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Attach to Incident Log</button>
+  <button type="button" class="btn btn-secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <button type="button" class="btn btn-primary" onclick="saveForm()">💾 Save progress</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+  const STORAGE_KEY = 'ik_send_assessment';
+
+  async function sendPdfToCampDb() {
+    try {
+      saveForm()
+
+      if (!window.parent || window.parent === window) {
+        alert('Open this form inside Camp DB to send PDF directly to incident log.')
+        return
+      }
+
+      if (!window.html2canvas || !window.jspdf) {
+        alert('PDF libraries failed to load. Please check internet access and try again.')
+        return
+      }
+
+      const formRoot = document.querySelector('.form-body')
+      if (!formRoot) {
+        alert('Could not find the form content to export.')
+        return
+      }
+
+      const canvas = await window.html2canvas(formRoot, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      })
+
+      const { jsPDF } = window.jspdf
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = 210
+      const pageHeight = 297
+      const margin = 8
+      const usableWidth = pageWidth - margin * 2
+      const usableHeight = pageHeight - margin * 2
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      const imgHeight = (canvas.height * usableWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let y = margin
+
+      pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
+      heightLeft -= usableHeight
+
+      while (heightLeft > 0) {
+        y = margin - (imgHeight - heightLeft)
+        pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
+        heightLeft -= usableHeight
+      }
+
+      const now = new Date().toISOString().slice(0, 10)
+      const titleName = (document.getElementById('child_name')?.value || 'participant').trim().replace(/\s+/g, '-').toLowerCase()
+      const fileName = `send-assessment-${titleName || 'participant'}-${now}.pdf`
+
+      window.parent.postMessage(
+        {
+          type: 'campdb-form-pdf',
+          payload: {
+            base64Pdf: pdf.output('dataurlstring'),
+            fileName,
+            mimeType: 'application/pdf',
+          },
+        },
+        window.location.origin,
+      )
+
+      const note = document.getElementById('saved_note')
+      note.textContent = 'PDF sent to Camp DB. Return to the incident form and save the incident record.'
+      setTimeout(() => { if (note.textContent.includes('PDF sent')) note.textContent = '' }, 5000)
+    } catch (error) {
+      alert('Failed to send PDF to Camp DB: ' + error.message)
+    }
+  }
+
+  function getFormData() {
+    const data = {};
+    document.querySelectorAll('input[type="text"], input[type="date"], textarea').forEach(el => {
+      if (el.id) data[el.id] = el.value;
+    });
+    document.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+      data[el.name] = el.value;
+    });
+    return data;
+  }
+
+  function setFormData(data) {
+    Object.entries(data).forEach(([key, val]) => {
+      const el = document.getElementById(key);
+      if (el) { el.value = val; return; }
+      const radio = document.querySelector(`input[name="${key}"][value="${val}"]`);
+      if (radio) radio.checked = true;
+    });
+  }
+
+  function saveForm() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getFormData()));
+    const note = document.getElementById('saved_note');
+    note.textContent = '✓ Progress saved — your data will be here when you reopen this file on this computer.';
+    setTimeout(() => note.textContent = '', 4000);
+  }
+
+  function clearForm() {
+    if (!confirm('Are you sure you want to clear all fields? This cannot be undone.')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('input[type="text"], input[type="date"], textarea').forEach(el => {
+      if (el.id === 'coordinator' || el.id === 'sign_name') { el.value = 'Sam Brenner'; return; }
+      el.value = '';
+    });
+    document.querySelectorAll('input[type="radio"]').forEach(el => el.checked = false);
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('sign_date').value = new Date().toISOString().split('T')[0];
+  }
+
+  // Auto-save every 30 seconds
+  setInterval(saveForm, 30000);
+
+  function applyParticipantPrefillFromQuery() {
+    const params = new URLSearchParams(window.location.search)
+    const participantName = params.get('participantName') || ''
+    const participantAge = params.get('participantAge') || ''
+
+    const nameField = document.getElementById('child_name')
+    const ageField = document.getElementById('child_age')
+
+    if (nameField && participantName) nameField.value = participantName
+    if (ageField && participantAge) ageField.value = participantAge
+  }
+
+  // Load saved data on open
+  window.addEventListener('load', () => {
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('sign_date').value = new Date().toISOString().split('T')[0];
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try { setFormData(JSON.parse(saved)); } catch(e) {}
+    }
+
+    applyParticipantPrefillFromQuery()
+  });
+</script>
+</body>
+</html>

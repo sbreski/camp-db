@@ -1,16 +1,82 @@
-import { useState } from 'react'
-import { Lock, Eye, EyeOff, Plus, Trash2, ChevronRight, Edit2, X, User } from 'lucide-react'
-import { STAFF_PASSWORD } from '../App'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertCircle,
+  Check,
+  ChevronRight,
+  Edit2,
+  Plus,
+  RefreshCw,
+  Save,
+  Shield,
+  Trash2,
+  User,
+  X,
+} from 'lucide-react'
+import { supabase } from '../supabase'
+
+const TAB_OPTIONS = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'signin', label: 'Sign In / Out' },
+  { id: 'shared-info', label: 'Shared Info' },
+  { id: 'attendance', label: 'Attendance' },
+  { id: 'participants', label: 'Participants' },
+  { id: 'parents', label: 'Parents' },
+  { id: 'dressing-rooms', label: 'Dressing Rooms' },
+  { id: 'medical', label: 'Medical' },
+  { id: 'behaviour', label: 'Behaviour Log' },
+  { id: 'timetable', label: 'Timetable' },
+  { id: 'incidents', label: 'Reporting' },
+  { id: 'staff', label: 'Staff' },
+  { id: 'documents', label: 'Documents' },
+]
+
+function sanitizeAllowedTabs(tabIds) {
+  const valid = (Array.isArray(tabIds) ? tabIds : []).filter(tab => TAB_OPTIONS.some(option => option.id === tab))
+  if (!valid.includes('dashboard')) valid.unshift('dashboard')
+  if (!valid.includes('signin')) valid.unshift('signin')
+  if (!valid.includes('shared-info')) valid.unshift('shared-info')
+  return [...new Set(valid)]
+}
+
+function normalizeUsername(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[']/g, '')
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^\.+|\.+$/g, '')
+}
 
 function StaffForm({ initial, onSave, onCancel }) {
-  const empty = { name: '', role: '', phone: '', email: '', emergencyContact: '', emergencyPhone: '', notes: '' }
-  const [form, setForm] = useState({ ...empty, ...initial })
+  const empty = {
+    name: '',
+    role: '',
+    phone: '',
+    email: '',
+    emergencyContact: '',
+    emergencyPhone: '',
+    notes: '',
+    firstAidTrained: false,
+    safeguardingTrained: false,
+    firstAidExpiresOn: '',
+    safeguardingExpiresOn: '',
+  }
+  const [form, setForm] = useState({
+    ...empty,
+    ...initial,
+    firstAidTrained: Boolean(initial?.firstAidTrained),
+    safeguardingTrained: Boolean(initial?.safeguardingTrained),
+    firstAidExpiresOn: initial?.firstAidExpiresOn || '',
+    safeguardingExpiresOn: initial?.safeguardingExpiresOn || '',
+  })
   function set(k, v) { setForm(p => ({ ...p, [k]: v })) }
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
     if (!form.name.trim()) return
-    onSave(form)
+    await onSave(form)
   }
+
   return (
     <div className="card border-2 border-forest-200 fade-in">
       <div className="flex items-center justify-between mb-4">
@@ -47,6 +113,47 @@ function StaffForm({ initial, onSave, onCancel }) {
             <label className="label">Notes</label>
             <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
           </div>
+          <div className="col-span-2">
+            <p className="label mb-2">Training & Expiry</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+              <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={form.firstAidTrained}
+                  onChange={e => set('firstAidTrained', e.target.checked)}
+                />
+                First aid trained
+              </label>
+              <div>
+                <label className="label">First aid expiry</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={form.firstAidExpiresOn || ''}
+                  onChange={e => set('firstAidExpiresOn', e.target.value)}
+                />
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={form.safeguardingTrained}
+                  onChange={e => set('safeguardingTrained', e.target.checked)}
+                />
+                Safeguarding trained
+              </label>
+              <div>
+                <label className="label">Safeguarding expiry</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={form.safeguardingExpiresOn || ''}
+                  onChange={e => set('safeguardingExpiresOn', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
         </div>
         <div className="flex gap-3">
           <button type="submit" className="btn-primary flex-1">{initial?.id ? 'Save Changes' : 'Add Staff Member'}</button>
@@ -58,9 +165,10 @@ function StaffForm({ initial, onSave, onCancel }) {
 }
 
 function StaffDetail({ member, onEdit, onClose }) {
+  const username = normalizeUsername(member.name)
   return (
     <div className="card fade-in">
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-forest-900 flex items-center justify-center text-white font-display font-bold text-lg">
             {member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -76,6 +184,7 @@ function StaffDetail({ member, onEdit, onClose }) {
         </div>
       </div>
       <div className="space-y-3 text-sm">
+        <p className="flex items-center gap-2 text-forest-700"><span className="text-stone-500 w-28 flex-shrink-0">Username</span>{username || '—'}</p>
         {member.phone && <p className="flex items-center gap-2 text-forest-700"><span className="text-stone-500 w-28 flex-shrink-0">Phone</span>{member.phone}</p>}
         {member.email && <p className="flex items-center gap-2 text-forest-700"><span className="text-stone-500 w-28 flex-shrink-0">Email</span>{member.email}</p>}
         {member.emergencyContact && (
@@ -90,88 +199,641 @@ function StaffDetail({ member, onEdit, onClose }) {
             <p className="text-stone-700 leading-relaxed">{member.notes}</p>
           </div>
         )}
+        <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
+          <p className="label">Training & Expiry</p>
+          <p className="flex items-center gap-2 text-stone-700">
+            <span className="text-stone-500 w-28 flex-shrink-0">First Aid</span>
+            <span>{member.firstAidTrained ? 'Yes' : 'No'}</span>
+            {member.firstAidExpiresOn && <span className="text-xs text-stone-500">(expires {member.firstAidExpiresOn})</span>}
+          </p>
+          <p className="flex items-center gap-2 text-stone-700">
+            <span className="text-stone-500 w-28 flex-shrink-0">Safeguarding</span>
+            <span>{member.safeguardingTrained ? 'Yes' : 'No'}</span>
+            {member.safeguardingExpiresOn && <span className="text-xs text-stone-500">(expires {member.safeguardingExpiresOn})</span>}
+          </p>
+        </div>
       </div>
     </div>
   )
 }
 
+function CreateAccountForm({ onSubmit, loading }) {
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    name: '',
+    role: '',
+    isAdmin: false,
+    canViewTimetableOverview: false,
+    allowedTabs: ['dashboard', 'signin'],
+  })
+
+  function updateField(key, value) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  function toggleTab(tabId) {
+    setForm(prev => {
+      const nextTabs = prev.allowedTabs.includes(tabId)
+        ? prev.allowedTabs.filter(tab => tab !== tabId)
+        : [...prev.allowedTabs, tabId]
+      return { ...prev, allowedTabs: sanitizeAllowedTabs(nextTabs) }
+    })
+  }
+
+  function submit(e) {
+    e.preventDefault()
+    onSubmit(form)
+  }
+
+  return (
+    <form onSubmit={submit} className="card border-2 border-amber-200 space-y-4">
+      <div>
+        <h3 className="font-display font-bold text-forest-950 text-lg">Create Login Account</h3>
+        <p className="text-sm text-stone-500">Creates a Supabase auth user and permission row in one action.</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="label">Email *</label>
+          <input className="input" type="email" value={form.email} onChange={e => updateField('email', e.target.value)} required />
+        </div>
+        <div>
+          <label className="label">Temporary Password *</label>
+          <input className="input" type="text" minLength={8} value={form.password} onChange={e => updateField('password', e.target.value)} required />
+        </div>
+        <div>
+          <label className="label">Staff Name (optional)</label>
+          <input className="input" value={form.name} onChange={e => updateField('name', e.target.value)} placeholder="For staff directory" />
+        </div>
+        <div>
+          <label className="label">Role (optional)</label>
+          <input className="input" value={form.role} onChange={e => updateField('role', e.target.value)} />
+        </div>
+      </div>
+
+      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={form.isAdmin}
+          onChange={e => updateField('isAdmin', e.target.checked)}
+        />
+        Full admin access
+      </label>
+
+      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={form.canViewTimetableOverview}
+          onChange={e => updateField('canViewTimetableOverview', e.target.checked)}
+          disabled={form.isAdmin}
+        />
+        Can view timetable overviews
+      </label>
+
+      <div>
+        <p className="label mb-2">Allowed Tabs</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {TAB_OPTIONS.map(tab => (
+            <label key={tab.id} className="inline-flex items-center gap-2 text-sm text-forest-800">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={form.allowedTabs.includes(tab.id)}
+                onChange={() => toggleTab(tab.id)}
+                disabled={form.isAdmin}
+              />
+              {tab.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <button type="submit" className="btn-primary flex items-center gap-2" disabled={loading}>
+        <Plus size={15} />
+        {loading ? 'Creating...' : 'Create Account'}
+      </button>
+    </form>
+  )
+}
+
 export default function Staff({ staffList, setStaffList }) {
-  const [authed, setAuthed] = useState(false)
-  const [pwInput, setPwInput] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [pwError, setPwError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState(null)
   const [editing, setEditing] = useState(false)
 
-  function submitPassword(e) {
-    e.preventDefault()
-    if (pwInput === STAFF_PASSWORD) { setAuthed(true) }
-    else { setPwError(true); setPwInput('') }
+  const [currentUserEmail, setCurrentUserEmail] = useState('')
+  const [canManageAccess, setCanManageAccess] = useState(false)
+  const [accessUsers, setAccessUsers] = useState([])
+  const [accessEdits, setAccessEdits] = useState({})
+  const [accessLoading, setAccessLoading] = useState(true)
+  const [accessActionLoading, setAccessActionLoading] = useState(false)
+  const [accessError, setAccessError] = useState('')
+  const [accessMessage, setAccessMessage] = useState('')
+  const [resetRequests, setResetRequests] = useState([])
+  const [staffActionLoading, setStaffActionLoading] = useState(false)
+  const [staffMessage, setStaffMessage] = useState('')
+  const [staffError, setStaffError] = useState('')
+  const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
+
+  async function addStaff(data) {
+    setStaffActionLoading(true)
+    setStaffError('')
+    setStaffMessage('')
+    try {
+      await setStaffList(prev => [...prev, { ...data, id: crypto.randomUUID() }])
+      setShowForm(false)
+      setStaffMessage('Staff profile added.')
+    } catch (error) {
+      setStaffError(error.message || 'Unable to add staff profile')
+    } finally {
+      setStaffActionLoading(false)
+    }
   }
 
-  function addStaff(data) {
-    setStaffList(prev => [...prev, { ...data, id: crypto.randomUUID() }])
-    setShowForm(false)
+  async function saveEdit(data) {
+    if (!selected) return
+    setStaffActionLoading(true)
+    setStaffError('')
+    setStaffMessage('')
+    try {
+      await setStaffList(prev => prev.map(s => s.id === selected.id ? { ...s, ...data } : s))
+      setSelected(s => ({ ...s, ...data }))
+      setEditing(false)
+      setStaffMessage('Staff profile updated.')
+    } catch (error) {
+      setStaffError(error.message || 'Unable to update staff profile')
+    } finally {
+      setStaffActionLoading(false)
+    }
   }
 
-  function saveEdit(data) {
-    setStaffList(prev => prev.map(s => s.id === selected.id ? { ...s, ...data } : s))
-    setSelected(s => ({ ...s, ...data }))
-    setEditing(false)
-  }
-
-  function deleteStaff(id) {
+  async function deleteStaff(id) {
     if (!window.confirm('Remove this staff member?')) return
-    setStaffList(prev => prev.filter(s => s.id !== id))
-    setSelected(null)
+    setStaffActionLoading(true)
+    setStaffError('')
+    setStaffMessage('')
+    try {
+      await setStaffList(prev => prev.filter(s => s.id !== id))
+      setSelected(null)
+      setStaffMessage('Staff profile removed.')
+    } catch (error) {
+      setStaffError(error.message || 'Unable to remove staff profile')
+    } finally {
+      setStaffActionLoading(false)
+    }
   }
 
-  if (!authed) {
-    return (
-      <div className="fade-in max-w-sm mx-auto mt-12">
-        <div className="card text-center">
-          <div className="w-14 h-14 bg-forest-900 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Lock size={24} className="text-amber-400" />
-          </div>
-          <h2 className="font-display font-bold text-forest-950 text-xl mb-1">Staff Records</h2>
-          <p className="text-stone-500 text-sm mb-6">This section requires a separate password.</p>
-          <form onSubmit={submitPassword} className="space-y-3 text-left">
-            <div>
-              <label className="label">Staff Password</label>
-              <div className="relative">
-                <input type={showPw ? 'text' : 'password'} value={pwInput}
-                  onChange={e => { setPwInput(e.target.value); setPwError(false) }}
-                  className={`input pr-10 ${pwError ? 'border-red-400 ring-2 ring-red-200' : ''}`}
-                  placeholder="Enter staff password" autoFocus />
-                <button type="button" onClick={() => setShowPw(s => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
-                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {pwError && <p className="text-red-600 text-xs mt-1.5 font-medium">Incorrect password.</p>}
-            </div>
-            <button type="submit" className="btn-primary w-full">Unlock</button>
-          </form>
-        </div>
-      </div>
-    )
+  function setEdit(userId, nextState) {
+    setAccessEdits(prev => ({
+      ...prev,
+      [userId]: {
+        ...prev[userId],
+        ...nextState,
+      },
+    }))
   }
+
+  async function withAccessToken() {
+    const { data, error } = await supabase.auth.getSession()
+    if (error || !data.session?.access_token) {
+      throw new Error('No active auth session')
+    }
+    setCurrentUserEmail((data.session.user?.email || '').toLowerCase())
+    return data.session.access_token
+  }
+
+  async function loadAccessUsers() {
+    setAccessLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to load users')
+      }
+
+      const users = payload.users || []
+      setCanManageAccess(!!payload.currentUser?.isAdmin)
+      setAccessUsers(users)
+      setResetRequests(Array.isArray(payload.resetRequests) ? payload.resetRequests : [])
+
+      const edits = {}
+      users.forEach(user => {
+        edits[user.id] = {
+          email: user.email || '',
+          isAdmin: !!user.isAdmin,
+          canViewTimetableOverview: !!user.canViewTimetableOverview,
+          allowedTabs: sanitizeAllowedTabs(user.allowedTabs),
+          newPassword: '',
+          deleteConfirmed: false,
+        }
+      })
+      setAccessEdits(edits)
+    } catch (error) {
+      setCanManageAccess(false)
+      setAccessUsers([])
+      setResetRequests([])
+      setAccessError(error.message)
+    } finally {
+      setAccessLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadAccessUsers()
+  }, [])
+
+  async function createAccount(form) {
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'create_user',
+          email: form.email,
+          password: form.password,
+          isAdmin: form.isAdmin,
+          canViewTimetableOverview: !!form.canViewTimetableOverview,
+          allowedTabs: sanitizeAllowedTabs(form.allowedTabs),
+        }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to create account')
+      }
+
+      if (form.name.trim()) {
+        const exists = staffList.some(member => (member.email || '').toLowerCase() === form.email.trim().toLowerCase())
+        if (!exists) {
+          setStaffList(prev => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              name: form.name.trim(),
+              role: form.role.trim(),
+              email: form.email.trim().toLowerCase(),
+              phone: '',
+              emergencyContact: '',
+              emergencyPhone: '',
+              notes: '',
+            },
+          ])
+        }
+      }
+
+      setAccessMessage(`Created account for ${payload.user.email}`)
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(error.message)
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function savePermissions(userId) {
+    const edit = accessEdits[userId]
+    if (!edit) return
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'update_permissions',
+          userId,
+          isAdmin: !!edit.isAdmin,
+          canViewTimetableOverview: !!edit.canViewTimetableOverview,
+          allowedTabs: sanitizeAllowedTabs(edit.allowedTabs),
+        }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to save permissions')
+      }
+
+      setAccessMessage('Permissions updated successfully')
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(error.message)
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function saveUserDetails(userId) {
+    const edit = accessEdits[userId]
+    if (!edit) return
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'update_user',
+          userId,
+          email: edit.email,
+        }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to save user details')
+      }
+
+      setAccessMessage('User details updated successfully')
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(error.message)
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function resetPassword(userId, requestId = '') {
+    const edit = accessEdits[userId]
+    const newPassword = edit?.newPassword || ''
+    if (newPassword.length < 8) {
+      setAccessError('Password must be at least 8 characters')
+      return
+    }
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'reset_password',
+          userId,
+          newPassword,
+          requestId,
+        }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to reset password')
+      }
+
+      setEdit(userId, { newPassword: '' })
+      setAccessMessage('Password reset. User will be asked to set a new password at next login.')
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(error.message)
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function setArchivedState(user, shouldArchive) {
+    const email = (user.email || '').toLowerCase()
+    if (email && email === currentUserEmail) {
+      setAccessError('You cannot change archive status for your own account while signed in')
+      return
+    }
+
+    const label = shouldArchive ? 'archive' : 'restore'
+    const confirmed = window.confirm(`${label === 'archive' ? 'Archive' : 'Restore'} login account for ${user.email}?`)
+    if (!confirmed) return
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: shouldArchive ? 'archive_user' : 'restore_user',
+          userId: user.id,
+        }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || `Unable to ${label} account`)
+      }
+
+      setAccessMessage(`${shouldArchive ? 'Archived' : 'Restored'} account: ${user.email}`)
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(error.message)
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function permanentlyDeleteUser(user) {
+    const email = (user.email || '').toLowerCase()
+    if (email && email === currentUserEmail) {
+      setAccessError('You cannot permanently delete your own account while signed in')
+      return
+    }
+
+    const check = window.prompt(`Type DELETE to permanently remove ${user.email}. This cannot be undone.`)
+    if (check !== 'DELETE') return
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'delete_user',
+          userId: user.id,
+        }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Unable to permanently delete account')
+      }
+
+      setAccessMessage(`Permanently deleted account: ${user.email}`)
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(error.message)
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function assignLoginToStaff(user) {
+    const edit = accessEdits[user.id]
+    const selectedStaffId = edit?.linkedStaffId || ''
+    if (!selectedStaffId) {
+      setAccessError('Choose a staff profile first.')
+      return
+    }
+
+    const loginEmail = String(user.email || '').trim().toLowerCase()
+    if (!loginEmail) {
+      setAccessError('This login account has no email.')
+      return
+    }
+
+    const selectedStaff = staffList.find(member => member.id === selectedStaffId)
+    if (!selectedStaff) {
+      setAccessError('Selected staff profile no longer exists.')
+      return
+    }
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+    try {
+      await setStaffList(prev => prev.map(member => {
+        if (member.id === selectedStaffId) {
+          return { ...member, email: loginEmail }
+        }
+        return member
+      }))
+      setAccessMessage(`Linked ${selectedStaff.name} to ${loginEmail}`)
+    } catch (error) {
+      setAccessError(error.message || 'Unable to link staff to login email')
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function assignOwnerProfile() {
+    if (!ownerEmail) {
+      setStaffError('Owner email is not configured.')
+      return
+    }
+
+    setStaffActionLoading(true)
+    setStaffError('')
+    setStaffMessage('')
+    try {
+      await setStaffList(prev => {
+        const existing = prev.find(member => (member.email || '').toLowerCase() === ownerEmail)
+        if (existing) {
+          return prev.map(member => member.id === existing.id
+            ? { ...member, name: 'Sam Brenner', role: 'Camp Coordinator', email: ownerEmail }
+            : member
+          )
+        }
+
+        return [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            name: 'Sam Brenner',
+            role: 'Camp Coordinator',
+            email: ownerEmail,
+            phone: '',
+            emergencyContact: '',
+            emergencyPhone: '',
+            notes: '',
+            firstAidTrained: false,
+            safeguardingTrained: false,
+            firstAidExpiresOn: '',
+            safeguardingExpiresOn: '',
+          },
+        ]
+      })
+      setStaffMessage(`Owner profile assigned to Sam Brenner (${ownerEmail}).`)
+    } catch (error) {
+      setStaffError(error.message || 'Unable to assign owner profile')
+    } finally {
+      setStaffActionLoading(false)
+    }
+  }
+
+  const staffByEmail = useMemo(() => {
+    const map = new Map()
+    staffList.forEach(member => {
+      const email = (member.email || '').toLowerCase()
+      if (email) map.set(email, member)
+    })
+    return map
+  }, [staffList])
 
   return (
-    <div className="fade-in space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="fade-in space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Staff</h2>
           <p className="text-stone-500 text-sm">{staffList.length} staff members</p>
         </div>
-        <button onClick={() => { setShowForm(true); setSelected(null) }} className="btn-primary flex items-center gap-2">
+        <button onClick={() => { setShowForm(true); setSelected(null) }} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
           <Plus size={15} strokeWidth={2.5} /> Add Staff
         </button>
       </div>
 
       {showForm && (
         <StaffForm onSave={addStaff} onCancel={() => setShowForm(false)} />
+      )}
+
+      {staffError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5" />
+          <span>{staffError}</span>
+        </div>
+      )}
+
+      {staffMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-700 text-sm flex items-start gap-2">
+          <Check size={16} className="mt-0.5" />
+          <span>{staffMessage}</span>
+        </div>
       )}
 
       {selected && !editing && (
@@ -203,9 +865,14 @@ export default function Staff({ staffList, setStaffList }) {
               <div className="flex-1 min-w-0">
                 <p className="font-display font-semibold text-forest-950 group-hover:text-forest-700">{s.name}</p>
                 <p className="text-xs text-stone-400 truncate">{s.role || 'Staff'}{s.phone ? ` · ${s.phone}` : ''}</p>
+                <p className="text-xs text-forest-700 mt-0.5">@{normalizeUsername(s.name) || 'no-username'}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  {s.firstAidTrained && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">FA</span>}
+                  {s.safeguardingTrained && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">SG</span>}
+                </div>
               </div>
               <button onClick={e => { e.stopPropagation(); deleteStaff(s.id) }}
-                className="p-1.5 text-stone-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                className="p-1.5 text-stone-400 hover:text-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                 <Trash2 size={15} />
               </button>
               <ChevronRight size={18} className="text-stone-400 group-hover:text-forest-700" />
@@ -213,6 +880,237 @@ export default function Staff({ staffList, setStaffList }) {
           ))
         )}
       </div>
+
+      <section className="card border-2 border-forest-200 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h3 className="font-display font-bold text-forest-950 text-lg flex items-center gap-2">
+              <Shield size={18} /> User Access Management
+            </h3>
+            <p className="text-sm text-stone-500">Create login accounts, edit tab permissions, and reset passwords.</p>
+            {currentUserEmail && <p className="text-xs text-stone-400 mt-1">Signed in as: {currentUserEmail}</p>}
+          </div>
+          <button className="btn-secondary text-sm flex items-center gap-2" onClick={loadAccessUsers} disabled={accessLoading || accessActionLoading}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </div>
+
+        {accessLoading && <p className="text-sm text-stone-500">Loading user accounts...</p>}
+
+        {accessError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm flex items-start gap-2">
+            <AlertCircle size={16} className="mt-0.5" />
+            <span>{accessError}</span>
+          </div>
+        )}
+
+        {accessMessage && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-700 text-sm flex items-start gap-2">
+            <Check size={16} className="mt-0.5" />
+            <span>{accessMessage}</span>
+          </div>
+        )}
+
+        {!accessLoading && !canManageAccess && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm">
+            This account does not have admin permission to manage users. Sign in with the owner/admin account.
+          </div>
+        )}
+
+        {!accessLoading && canManageAccess && (
+          <>
+            <div className="rounded-xl border border-stone-200 p-3 bg-stone-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <p className="text-sm text-stone-700">Quick setup: assign owner profile to Sam Brenner / Camp Coordinator.</p>
+              <button className="btn-secondary text-sm" onClick={assignOwnerProfile} disabled={staffActionLoading}>
+                Set Owner Profile
+              </button>
+            </div>
+
+            <CreateAccountForm onSubmit={createAccount} loading={accessActionLoading} />
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-sm font-semibold text-amber-900">Open Password Reset Requests</p>
+              {resetRequests.length === 0 ? (
+                <p className="text-xs text-amber-800">No open requests.</p>
+              ) : (
+                <div className="space-y-2">
+                  {resetRequests.map(request => (
+                    <div key={request.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700">
+                      <p><span className="font-semibold">Email:</span> {request.requester_email}</p>
+                      {request.requester_identifier && <p><span className="font-semibold">Identifier:</span> {request.requester_identifier}</p>}
+                      {request.reason && <p><span className="font-semibold">Reason:</span> {request.reason}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-display font-semibold text-forest-950">Existing Login Accounts</h4>
+              {accessUsers.length === 0 && <p className="text-sm text-stone-500">No auth users found.</p>}
+
+              {accessUsers.map(user => {
+                const edit = accessEdits[user.id] || { email: user.email || '', isAdmin: false, canViewTimetableOverview: false, allowedTabs: ['dashboard', 'signin'], newPassword: '', deleteConfirmed: false }
+                const linkedStaff = staffByEmail.get((user.email || '').toLowerCase())
+                const isCurrentUser = (user.email || '').toLowerCase() === currentUserEmail
+                const pendingRequest = resetRequests.find(request => (request.requester_email || '').toLowerCase() === (user.email || '').toLowerCase())
+                const derivedUsername = linkedStaff?.name
+                  ? normalizeUsername(linkedStaff.name)
+                  : normalizeUsername((user.email || '').split('@')[0] || '')
+
+                return (
+                  <div key={user.id} className="rounded-xl border border-stone-200 p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-forest-950">{user.email}</p>
+                        <p className="text-xs text-stone-600 mt-1">Username: <span className="font-semibold text-forest-900">{derivedUsername || 'not available'}</span></p>
+                        <p className="text-xs text-stone-500">User ID: {user.id}</p>
+                        {pendingRequest && <p className="text-xs text-amber-700 mt-1">Open reset request pending</p>}
+                        {user.isArchived && <p className="text-xs text-amber-700 mt-1">Archived (login disabled)</p>}
+                        {linkedStaff && <p className="text-xs text-forest-700 mt-1">Linked staff record: {linkedStaff.name}</p>}
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={!!edit.isAdmin}
+                          onChange={e => setEdit(user.id, { isAdmin: e.target.checked })}
+                        />
+                        Full admin
+                      </label>
+                    </div>
+
+                    <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={!!edit.canViewTimetableOverview}
+                        onChange={e => setEdit(user.id, { canViewTimetableOverview: e.target.checked })}
+                        disabled={!!edit.isAdmin}
+                      />
+                      Can view timetable overviews
+                    </label>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                      <input
+                        className="input"
+                        value={edit.email || ''}
+                        onChange={e => setEdit(user.id, { email: e.target.value })}
+                        placeholder="Login email"
+                        disabled={isCurrentUser}
+                      />
+                      <button
+                        className="btn-secondary text-sm"
+                        onClick={() => saveUserDetails(user.id)}
+                        disabled={accessActionLoading || isCurrentUser}
+                        title={isCurrentUser ? 'Sign in as another admin to edit this email' : 'Save account email'}
+                      >
+                        Save Account
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                      <select
+                        className="input"
+                        value={edit.linkedStaffId || linkedStaff?.id || ''}
+                        onChange={e => setEdit(user.id, { linkedStaffId: e.target.value })}
+                      >
+                        <option value="">Select staff profile to link</option>
+                        {[...staffList]
+                          .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+                          .map(member => (
+                            <option key={member.id} value={member.id}>
+                              {member.name}{member.email ? ` (${member.email})` : ''}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        className="btn-secondary text-sm"
+                        onClick={() => assignLoginToStaff(user)}
+                        disabled={accessActionLoading || staffActionLoading}
+                      >
+                        Link Staff Email
+                      </button>
+                    </div>
+
+                    <div>
+                      <p className="label mb-2">Allowed Tabs</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {TAB_OPTIONS.map(tab => (
+                          <label key={tab.id} className="inline-flex items-center gap-2 text-sm text-forest-800">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={edit.allowedTabs.includes(tab.id)}
+                              onChange={() => {
+                                const nextTabs = edit.allowedTabs.includes(tab.id)
+                                  ? edit.allowedTabs.filter(value => value !== tab.id)
+                                  : [...edit.allowedTabs, tab.id]
+                                setEdit(user.id, { allowedTabs: sanitizeAllowedTabs(nextTabs) })
+                              }}
+                              disabled={!!edit.isAdmin}
+                            />
+                            {tab.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        className="btn-secondary text-sm flex items-center justify-center gap-2"
+                        onClick={() => savePermissions(user.id)}
+                        disabled={accessActionLoading}
+                      >
+                        <Save size={14} /> Save Permissions
+                      </button>
+                      <input
+                        className="input sm:max-w-xs"
+                        placeholder="New password (min 8 chars)"
+                        value={edit.newPassword || ''}
+                        onChange={e => setEdit(user.id, { newPassword: e.target.value })}
+                      />
+                      <button
+                        className="btn-primary text-sm"
+                        onClick={() => resetPassword(user.id, pendingRequest?.id || '')}
+                        disabled={accessActionLoading}
+                      >
+                        Reset Password
+                      </button>
+                      <button
+                        className={`btn-secondary text-sm ${user.isArchived ? 'text-forest-700 border-forest-200' : 'text-amber-700 border-amber-200'}`}
+                        onClick={() => setArchivedState(user, !user.isArchived)}
+                        disabled={accessActionLoading || isCurrentUser}
+                        title={isCurrentUser ? 'You cannot change archive status on your currently signed-in account' : user.isArchived ? 'Restore login account' : 'Archive login account'}
+                      >
+                        {user.isArchived ? 'Restore Account' : 'Archive Account'}
+                      </button>
+                      <label className="inline-flex items-center gap-2 text-xs text-stone-600 px-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={!!edit.deleteConfirmed}
+                          onChange={e => setEdit(user.id, { deleteConfirmed: e.target.checked })}
+                          disabled={isCurrentUser}
+                        />
+                        I understand this permanently deletes the account.
+                      </label>
+                      <button
+                        className="btn-secondary text-sm text-red-700 border-red-200"
+                        onClick={() => permanentlyDeleteUser(user)}
+                        disabled={accessActionLoading || isCurrentUser || !edit.deleteConfirmed}
+                        title={isCurrentUser ? 'You cannot delete your currently signed-in account' : !edit.deleteConfirmed ? 'Tick the confirmation checkbox first' : 'Permanently delete login account'}
+                      >
+                        Permanent Delete
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </section>
     </div>
   )
 }

@@ -1,21 +1,179 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { X, Upload, CheckCircle } from 'lucide-react'
 import { supabase } from '../supabase.js'
 
-export default function IncidentForm({ participantId, staffList = [], onSave, onCancel }) {
-  const defaultStaff = staffList.find(s => s.name === 'Sam Brenner')?.name
+function templateKeyForType(type, templates) {
+  return templates.find(t => t.type === type)?.key || 'incident-accident'
+}
+
+export default function IncidentForm({
+  participantId,
+  participantName = '',
+  participantAge = '',
+  staffList = [],
+  defaultStaffMember = '',
+  initial = null,
+  canEditSafeguarding = true,
+  onSave,
+  onCancel,
+}) {
+  const defaultStaff = String(defaultStaffMember || '').trim()
+    || staffList.find(s => s.name === 'Sam Brenner')?.name
     || staffList[0]?.name
     || 'Sam Brenner'
 
-  const [form, setForm] = useState({
-    type: 'Accident',
+  const [form, setForm] = useState(() => ({
+    type: 'Incident/Accident',
     staffMember: defaultStaff,
+    followUpRequired: false,
     pdfName: null,
     pdfData: null,
-  })
+    ...(initial || {}),
+    id: initial?.id,
+    pdfPayload: null,
+  }))
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState(templateKeyForType(initial?.type || 'Incident/Accident', [
+    { key: 'incident-accident', type: 'Incident/Accident' },
+    { key: 'mid-camp', type: 'Mid-Camp Assessment' },
+    { key: 'send-assessment', type: 'SEND Assessment' },
+    { key: 'safeguarding', type: 'Safeguarding' },
+  ]))
+  const [isReceivingPdf, setIsReceivingPdf] = useState(false)
+  const [uploadNotice, setUploadNotice] = useState('')
+  const formTypeRef = useRef(form.type)
+
+  const templates = useMemo(() => ([
+    {
+      key: 'incident-accident',
+      label: 'Incident/Accident',
+      type: 'Incident/Accident',
+      path: '/forms/incident-accident-reporting-form.html',
+    },
+    {
+      key: 'mid-camp',
+      label: 'Mid-Camp Assessment',
+      type: 'Mid-Camp Assessment',
+      path: '/forms/mid-camp-assessment-form.html',
+    },
+    {
+      key: 'send-assessment',
+      label: 'SEND Assessment',
+      type: 'SEND Assessment',
+      path: '/forms/send-assessment-form.html',
+    },
+    {
+      key: 'safeguarding',
+      label: 'Safeguarding',
+      type: 'Safeguarding',
+      path: '/forms/safeguarding-assessment-form.html',
+    },
+  ]), [])
+
+  useEffect(() => {
+    const nextType = initial?.type || 'Incident/Accident'
+    const nextStaff = initial?.staffMember || defaultStaff
+    setForm({
+      ...(initial || {}),
+      followUpRequired: Boolean(initial?.followUpRequired),
+      pdfName: initial?.pdfName || null,
+      pdfData: initial?.pdfData || null,
+      id: initial?.id,
+      type: nextType,
+      staffMember: nextStaff,
+      pdfPayload: null,
+    })
+    formTypeRef.current = nextType
+    setSelectedTemplateKey(templateKeyForType(nextType, templates))
+    setUploadNotice('')
+  }, [initial?.id, initial?.type, initial?.staffMember, initial?.pdfName, initial?.pdfData, initial?.followUpRequired, defaultStaff, templates])
 
   function set(field, value) {
-    setForm(prev => ({ ...prev, [field]: value }))
+    setForm(prev => {
+      const next = { ...prev, [field]: value }
+      if (field === 'type') formTypeRef.current = value
+      return next
+    })
+  }
+
+  async function uploadPdfFile(file, fileDisplayName) {
+    const fileName = `${crypto.randomUUID()}-${fileDisplayName}`
+    const uploadTargets = [
+      { bucket: 'incidents', filePath: fileName },
+      // Fallback for projects that only have a documents bucket.
+      { bucket: 'documents', filePath: `incidents/${fileName}` },
+    ]
+
+    let lastError = null
+
+    for (const target of uploadTargets) {
+      const { error } = await supabase.storage.from(target.bucket).upload(target.filePath, file)
+
+      if (error) {
+        lastError = error
+        if (/bucket not found/i.test(error.message || '')) {
+          continue
+        }
+        throw error
+      }
+
+      const { data } = supabase.storage.from(target.bucket).getPublicUrl(target.filePath)
+      set('pdfName', fileDisplayName)
+      set('pdfData', data?.publicUrl || null)
+      set('pdfPayload', null)
+      return
+    }
+
+    throw new Error(lastError?.message || 'No storage bucket available for incident uploads.')
+  }
+
+  async function buildRestrictedPayload(file, fileDisplayName) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ''))
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsDataURL(file)
+    })
+
+    setForm(prev => ({
+      ...prev,
+      pdfName: fileDisplayName,
+      pdfData: null,
+      pdfPayload: {
+        base64Pdf: dataUrl,
+        fileName: fileDisplayName,
+        mimeType: file.type || 'application/pdf',
+      },
+    }))
+  }
+
+  async function saveSafeguardingReport(incidentId, payload) {
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data.session?.access_token
+
+    if (!accessToken) {
+      throw new Error('You must be logged in to save a safeguarding report')
+    }
+
+    const response = await fetch('/.netlify/functions/safeguarding-reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        action: 'create_report',
+        participantId,
+        incidentId,
+        reportName: payload.fileName,
+        base64Pdf: payload.base64Pdf,
+        mimeType: payload.mimeType,
+      }),
+    })
+
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to save safeguarding report')
+    }
   }
 
   async function handleFile(e) {
@@ -25,43 +183,137 @@ export default function IncidentForm({ participantId, staffList = [], onSave, on
       alert('File must be under 5MB.')
       return
     }
-    const fileName = `${crypto.randomUUID()}-${file.name}`
-    const { data, error } = await supabase.storage.from('incidents').upload(fileName, file)
-    if (error) {
+    try {
+      if (form.type === 'Safeguarding') {
+        await buildRestrictedPayload(file, file.name)
+      } else {
+        await uploadPdfFile(file, file.name)
+      }
+      setUploadNotice(`Form attached: ${file.name}`)
+    } catch (error) {
       alert('Failed to upload file: ' + error.message)
+    } finally {
+      e.target.value = ''
+    }
+  }
+
+  useEffect(() => {
+    async function handleFormPdfMessage(event) {
+      if (event.origin !== window.location.origin) return
+      if (!event.data || typeof event.data !== 'object') return
+      if (event.data.type !== 'campdb-form-pdf') return
+
+      const payload = event.data.payload || {}
+      const rawBase64 = payload.base64Pdf || ''
+      const fileName = payload.fileName || `form-${Date.now()}.pdf`
+
+      if (!rawBase64) {
+        alert('The form did not return a PDF payload.')
+        return
+      }
+
+      setIsReceivingPdf(true)
+      try {
+        const cleanBase64 = rawBase64.includes(',') ? rawBase64.split(',')[1] : rawBase64
+        const binary = atob(cleanBase64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i)
+        }
+
+        const blob = new Blob([bytes], { type: payload.mimeType || 'application/pdf' })
+        const file = new File([blob], fileName, { type: 'application/pdf' })
+
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Generated PDF is over 5MB. Please reduce size and try again.')
+          return
+        }
+
+        if (formTypeRef.current === 'Safeguarding') {
+          await buildRestrictedPayload(file, fileName)
+        } else {
+          await uploadPdfFile(file, fileName)
+        }
+        setUploadNotice(`Form attached: ${fileName}`)
+      } catch (error) {
+        alert('Failed to receive PDF from form: ' + error.message)
+      } finally {
+        setIsReceivingPdf(false)
+      }
+    }
+
+    window.addEventListener('message', handleFormPdfMessage)
+    return () => window.removeEventListener('message', handleFormPdfMessage)
+  }, [])
+
+  const selectedTemplate = templates.find(t => t.key === selectedTemplateKey)
+  const iframeSrc = selectedTemplate
+    ? `${selectedTemplate.path}?participantId=${encodeURIComponent(participantId)}&participantName=${encodeURIComponent(participantName || '')}&participantAge=${encodeURIComponent(participantAge === null || participantAge === undefined ? '' : String(participantAge))}&staffMember=${encodeURIComponent(form.staffMember || '')}`
+    : ''
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+
+    if (form.type === 'Safeguarding' && !canEditSafeguarding) {
+      alert('Only authorised safeguarding users can edit safeguarding submissions.')
       return
     }
-    const publicUrl = `https://guujqyawgxioicnclabc.supabase.co/storage/v1/object/public/incidents/${fileName}`
-    set('pdfName', file.name)
-    set('pdfData', publicUrl)
+
+    const isEditing = Boolean(initial?.id)
+    const incidentId = form.id || crypto.randomUUID()
+    const nextForm = { ...form, id: incidentId }
+    const incidentRecord = {
+      ...nextForm,
+      // Client-only field used by safeguarding function upload path.
+      pdfPayload: undefined,
+    }
+
+    if (nextForm.type === 'Safeguarding' && !nextForm.pdfPayload && !isEditing) {
+      alert('Attach the completed safeguarding form before saving.')
+      return
+    }
+
+    try {
+      await onSave(incidentRecord)
+      if (nextForm.type === 'Safeguarding' && nextForm.pdfPayload) {
+        await saveSafeguardingReport(incidentId, nextForm.pdfPayload)
+      }
+    } catch (error) {
+      alert(error.message || 'Failed to save incident')
+    }
   }
 
-  function handleSubmit(e) {
-    e.preventDefault()
-    onSave(form)
-  }
-
-  const staffNames = staffList.length > 0
-    ? staffList.map(s => s.name)
-    : ['Sam Brenner']
+  const staffNames = (() => {
+    const names = staffList.length > 0 ? staffList.map(s => s.name) : []
+    if (!names.includes(defaultStaff)) names.unshift(defaultStaff)
+    return names.length > 0 ? names : ['Sam Brenner']
+  })()
 
   return (
     <div className="border-2 border-amber-200 bg-amber-50 rounded-xl p-4 mb-4 fade-in">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-display font-semibold text-forest-950">Log Incident / Accident</h4>
+        <h4 className="font-display font-semibold text-forest-950">{initial?.id ? 'Edit Submission' : 'Log Incident / Accident'}</h4>
         <button onClick={onCancel} className="text-stone-400 hover:text-stone-600"><X size={18} /></button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Type</label>
-            <select className="input" value={form.type} onChange={e => set('type', e.target.value)}>
-              <option>Accident</option>
-              <option>Incident</option>
-              <option>Near Miss</option>
-              <option>Medical</option>
-              <option>Behavioural</option>
-              <option>Other</option>
+            <select
+              className="input"
+              value={form.type}
+              onChange={e => {
+                const nextType = e.target.value
+                set('type', nextType)
+                const matchingTemplate = templates.find(t => t.type === nextType)
+                setSelectedTemplateKey(matchingTemplate?.key || '')
+                setForm(prev => ({ ...prev, pdfName: null, pdfData: null, pdfPayload: null }))
+                setUploadNotice('')
+              }}
+            >
+              {templates.map(template => (
+                <option key={template.key} value={template.type}>{template.type}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -74,7 +326,55 @@ export default function IncidentForm({ participantId, staffList = [], onSave, on
           </div>
         </div>
 
+        <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            checked={form.followUpRequired}
+            onChange={e => set('followUpRequired', e.target.checked)}
+            className="h-4 w-4"
+          />
+          Follow Up needed on tomorrow's register
+        </label>
+
         <div>
+          <label className="label">Complete One Of Your Interactive Forms</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+            {templates.map(template => (
+              <button
+                key={template.key}
+                type="button"
+                onClick={() => {
+                  setSelectedTemplateKey(template.key)
+                  set('type', template.type)
+                  setForm(prev => ({ ...prev, pdfName: null, pdfData: null, pdfPayload: null }))
+                  setUploadNotice('')
+                }}
+                className={`text-left border rounded-lg p-2 text-sm transition-colors ${
+                  selectedTemplateKey === template.key
+                    ? 'border-forest-500 bg-forest-50 text-forest-800'
+                    : 'border-stone-200 bg-white text-stone-700 hover:border-forest-400'
+                }`}
+              >
+                {template.label}
+              </button>
+            ))}
+          </div>
+
+          {selectedTemplate && (
+            <div className="border border-stone-200 rounded-xl overflow-hidden bg-white mb-3">
+              <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
+                {isReceivingPdf
+                  ? 'Receiving PDF from form...'
+                  : 'Complete the form, then use its "Save/Send to Camp DB" action to attach the PDF automatically.'}
+              </div>
+              <iframe
+                title={selectedTemplate.label}
+                src={iframeSrc}
+                className="w-full h-[520px] border-0"
+              />
+            </div>
+          )}
+
           <label className="label">Attach Completed Form (PDF or image)</label>
           <label className={`flex items-center gap-3 cursor-pointer border-2 border-dashed rounded-xl p-3 transition-colors bg-white ${
             form.pdfName ? 'border-green-400 bg-green-50' : 'border-stone-200 hover:border-forest-400'
@@ -88,10 +388,17 @@ export default function IncidentForm({ participantId, staffList = [], onSave, on
             </span>
             <input type="file" accept=".pdf,image/*" onChange={handleFile} className="hidden" />
           </label>
+          {uploadNotice && (
+            <p className="text-xs text-green-700 mt-1">{uploadNotice}</p>
+          )}
         </div>
 
         <div className="flex gap-2 pt-1">
-          <button type="submit" className="btn-primary flex-1">Save Incident</button>
+          <button type="submit" className="btn-primary flex-1">
+            {initial?.id
+              ? (form.type === 'Safeguarding' ? 'Update Safeguarding Submission' : 'Update Submission')
+              : (form.type === 'Safeguarding' ? 'Save Safeguarding Report' : 'Save Incident')}
+          </button>
           <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
         </div>
       </form>

@@ -1,22 +1,26 @@
 import { useState } from 'react'
-import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText } from 'lucide-react'
+import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText, ClipboardList } from 'lucide-react'
 import { CAMP_NAME } from '../App'
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'signin', label: 'Sign In / Out', icon: LogIn },
+  { id: 'shared-info', label: 'Shared Info', icon: ClipboardList },
   { id: 'attendance', label: 'Attendance', icon: CalendarDays },
   { id: 'participants', label: 'Participants', icon: Users },
   { id: 'parents', label: 'Parents', icon: UserCheck },
   { id: 'dressing-rooms', label: 'Dressing Rooms', icon: Shirt },
   { id: 'medical', label: 'Medical', icon: Stethoscope },
-  { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
+  { id: 'behaviour', label: 'Behaviour Log', icon: FileText },
+  { id: 'timetable', label: 'Timetable', icon: CalendarDays },
+  { id: 'incidents', label: 'Reporting', icon: AlertTriangle },
   { id: 'staff', label: 'Staff', icon: UserCog },
   { id: 'documents', label: 'Documents', icon: FileText },
 ]
 
-export default function Nav({ page, onNavigate, onLogout }) {
+export default function Nav({ page, onNavigate, onLogout, visibleTabIds = [] }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const visibleItems = NAV_ITEMS.filter(item => visibleTabIds.includes(item.id))
 
   // Short name for sidebar
   const [line1, line2] = CAMP_NAME.includes(' ') ? [CAMP_NAME.split(' ').slice(0, 2).join(' '), CAMP_NAME.split(' ').slice(2).join(' ')] : [CAMP_NAME, '']
@@ -33,7 +37,7 @@ export default function Nav({ page, onNavigate, onLogout }) {
           <p className="text-forest-400 text-xs mt-1 font-body">Staff Portal</p>
         </div>
         <div className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+          {visibleItems.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => onNavigate(id)}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-display font-medium transition-all duration-150 ${
                 page === id ? 'bg-amber-500 text-forest-950' : 'text-forest-200 hover:bg-forest-800 hover:text-white'
@@ -64,7 +68,7 @@ export default function Nav({ page, onNavigate, onLogout }) {
         <div className="md:hidden fixed inset-0 z-20 bg-black/50" onClick={() => setMobileOpen(false)}>
           <div className="absolute top-14 left-0 right-0 bg-forest-950 p-3 space-y-1 shadow-xl"
             onClick={e => e.stopPropagation()}>
-            {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            {visibleItems.map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => { onNavigate(id); setMobileOpen(false) }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-display font-medium transition-all ${
                   page === id ? 'bg-amber-500 text-forest-950' : 'text-forest-200 hover:bg-forest-800 hover:text-white'
@@ -79,8 +83,6 @@ export default function Nav({ page, onNavigate, onLogout }) {
           </div>
         </div>
       )}
-
-      <div className="md:pl-56 pt-14 md:pt-0" />
     </>
   )
 }

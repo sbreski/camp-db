@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Safeguarding Concern Form — Impact Kidz</title>
+<style>
+  :root {
+    --tone: #7a2e1f;
+    --tone-dark: #5f2317;
+    --light: #fdf3ef;
+    --border: #ccc;
+    --label: #222;
+    --note: #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #f5f5f0; color: #222; font-size: 14px; }
+
+  .header-banner {
+    background: var(--tone);
+    color: #fff;
+    text-align: center;
+    padding: 10px 24px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .title-block {
+    text-align: center;
+    padding: 24px 24px 16px;
+    background: #fff;
+    border-bottom: 3px solid var(--tone);
+  }
+  .title-block .org { color: var(--tone); font-size: 22px; font-style: italic; font-weight: 700; }
+  .title-block .doc-title { font-size: 18px; font-weight: 700; margin-top: 6px; color: #222; }
+  .title-block .subtitle {
+    font-size: 12px;
+    color: var(--note);
+    margin-top: 6px;
+    font-style: italic;
+    line-height: 1.5;
+    max-width: 660px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .form-body { max-width: 800px; margin: 0 auto; padding: 24px; }
+
+  .section { background: #fff; border-radius: 8px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+  .section-header { background: var(--tone); color: #fff; padding: 10px 20px; font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+  .section-body { padding: 20px; }
+  .section-note {
+    background: var(--light);
+    border-left: 3px solid var(--tone);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--note);
+    font-style: italic;
+    margin-bottom: 16px;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-weight: 700; font-size: 13px; color: var(--label); margin-bottom: 5px; }
+  .field .field-note { font-size: 11px; color: var(--note); font-style: italic; margin-bottom: 5px; }
+  .field input[type="text"], .field input[type="date"], .field input[type="time"], .field textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    font-family: Georgia, serif;
+    font-size: 13px;
+    color: #222;
+    background: #fafafa;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--tone); background: #fff; }
+  .field textarea { resize: vertical; min-height: 70px; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  .check-group { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px; }
+  .check-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 400;
+    font-size: 13px;
+    cursor: pointer;
+    color: #333;
+  }
+  .check-group input[type="checkbox"], .check-group input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--tone);
+  }
+
+  .saved-note { text-align: center; font-size: 12px; color: var(--tone); padding: 6px; font-style: italic; min-height: 22px; }
+
+  .action-bar {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding: 20px 24px;
+    background: #fff;
+    border-top: 2px solid #e0e0e0;
+    position: sticky;
+    bottom: 0;
+  }
+  .btn {
+    padding: 10px 28px;
+    border-radius: 6px;
+    border: none;
+    font-family: Georgia, serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--tone); color: #fff; }
+  .btn-send { background: var(--tone-dark); color: #fff; }
+  .btn-secondary { background: #f0f0f0; color: #333; }
+
+  @media (max-width: 700px) {
+    .action-bar {
+      flex-direction: column;
+      align-items: stretch;
+      position: static;
+      padding: 16px;
+    }
+    .action-bar .btn { width: 100%; }
+  }
+
+  @media print {
+    body { background: #fff; font-size: 12px; }
+    .action-bar { display: none; }
+    .section { box-shadow: none; border: 1px solid #ccc; }
+    .form-body { padding: 0; max-width: 100%; }
+    .field input, .field textarea { background: #fff !important; border: 1px solid #999 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header-banner">Safeguarding Concern Record — Impact Kidz Summer Camp</div>
+
+<div class="title-block">
+  <div class="org">Impact Kidz Summer Camp</div>
+  <div class="doc-title">Safeguarding Concern Record</div>
+  <div class="subtitle">Use this form to record any safeguarding concern, disclosure, allegation, or welfare issue. Record facts clearly and objectively. Do not delay immediate action where a child is at risk of significant harm.</div>
+</div>
+
+<div class="form-body">
+
+  <div class="section">
+    <div class="section-header">Section A — Child and context</div>
+    <div class="section-body">
+      <div class="field-row">
+        <div class="field">
+          <label>Child's full name</label>
+          <input type="text" id="child_name" placeholder="Full name"/>
+        </div>
+        <div class="field">
+          <label>Child age</label>
+          <input type="text" id="child_age" placeholder="e.g. 8"/>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Date of concern</label>
+          <input type="date" id="date"/>
+        </div>
+        <div></div>
+      </div>
+      <div class="field-row-3">
+        <div class="field">
+          <label>Time</label>
+          <input type="time" id="time"/>
+        </div>
+        <div class="field">
+          <label>Recorded by</label>
+          <input type="text" id="recorded_by" value="Sam Brenner"/>
+        </div>
+        <div class="field"><label>Site address</label><input type="text" id="location" value="artsdepot, 5 Nether St, London N12 0GA" readonly/></div>
+      </div>
+      <div class="field">
+        <label>Room / Area in building</label>
+        <input type="text" id="location_detail" placeholder="e.g. Dance Space, Level 3"/>
+      </div>
+      <div class="field">
+        <label>Nature of concern</label>
+        <div class="check-group">
+          <label><input type="checkbox" name="nature" value="disclosure"/> Disclosure</label>
+          <label><input type="checkbox" name="nature" value="physical"/> Physical injury concern</label>
+          <label><input type="checkbox" name="nature" value="neglect"/> Neglect indicators</label>
+          <label><input type="checkbox" name="nature" value="emotional"/> Emotional wellbeing concern</label>
+          <label><input type="checkbox" name="nature" value="behaviour"/> Behavioural safeguarding risk</label>
+          <label><input type="checkbox" name="nature" value="other"/> Other</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">Section B — Concern details</div>
+    <div class="section-body">
+      <div class="section-note">Write exact words used by the child where relevant. Distinguish facts from your professional opinion.</div>
+      <div class="field">
+        <label>What was observed or reported?</label>
+        <textarea id="observed" rows="6" placeholder="Describe clearly and factually..."></textarea>
+      </div>
+      <div class="field">
+        <label>Who was present?</label>
+        <textarea id="present" rows="3" placeholder="Children, staff, visitors present at the time..."></textarea>
+      </div>
+      <div class="field">
+        <label>Previous related concerns (if any)</label>
+        <textarea id="previous" rows="3" placeholder="Any relevant prior concerns or incidents..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">Section C — Immediate action taken</div>
+    <div class="section-body">
+      <div class="field">
+        <label>Actions taken immediately</label>
+        <div class="check-group">
+          <label><input type="checkbox" name="actions" value="dso"/> Designated Safeguarding Lead informed</label>
+          <label><input type="checkbox" name="actions" value="parent"/> Parent/carer informed</label>
+          <label><input type="checkbox" name="actions" value="firstaid"/> First aid provided</label>
+          <label><input type="checkbox" name="actions" value="separated"/> Child moved to safe space</label>
+          <label><input type="checkbox" name="actions" value="agency"/> External agency contacted</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Action detail and timeline</label>
+        <textarea id="timeline" rows="5" placeholder="What happened next, in order, and by whom..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">Section D — Outcome and follow up</div>
+    <div class="section-body">
+      <div class="field">
+        <label>Current outcome / status</label>
+        <div class="check-group">
+          <label><input type="radio" name="outcome" value="monitor"/> Monitor in camp</label>
+          <label><input type="radio" name="outcome" value="escalated"/> Escalated to DSL / manager</label>
+          <label><input type="radio" name="outcome" value="external"/> Referred externally</label>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Follow-up owner</label>
+          <input type="text" id="followup_owner" placeholder="Name"/>
+        </div>
+        <div class="field">
+          <label>Follow-up date</label>
+          <input type="date" id="followup_date"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Additional notes</label>
+        <textarea id="additional_notes" rows="4" placeholder="Any further safeguarding notes..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="saved-note" id="saved_note"></div>
+
+</div>
+
+<div class="action-bar">
+  <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear form</button>
+  <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Attach to Incident Log</button>
+  <button type="button" class="btn btn-secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <button type="button" class="btn btn-primary" onclick="saveForm()">💾 Save progress</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+  const STORAGE_KEY = 'ik_safeguarding_assessment';
+
+  function getFormData() {
+    const data = {};
+    document.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(el => {
+      if (el.id) data[el.id] = el.value;
+    });
+    document.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+      data['radio_' + el.name] = el.value;
+    });
+    const checked = [];
+    document.querySelectorAll('input[type="checkbox"]:checked').forEach(el => {
+      checked.push({ name: el.name, value: el.value });
+    });
+    data.checked = checked;
+    return data;
+  }
+
+  function setFormData(data) {
+    Object.entries(data).forEach(([key, val]) => {
+      if (key === 'checked' && Array.isArray(val)) {
+        val.forEach(item => {
+          const cb = document.querySelector(`input[type="checkbox"][name="${item.name}"][value="${item.value}"]`);
+          if (cb) cb.checked = true;
+        });
+        return;
+      }
+      if (key.startsWith('radio_')) {
+        const name = key.replace('radio_', '');
+        const radio = document.querySelector(`input[type="radio"][name="${name}"][value="${val}"]`);
+        if (radio) radio.checked = true;
+        return;
+      }
+      const el = document.getElementById(key);
+      if (el) el.value = val;
+    });
+  }
+
+  function saveForm() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getFormData()));
+    const note = document.getElementById('saved_note');
+    note.textContent = '✓ Progress saved — your data will be here when you reopen this file on this computer.';
+    setTimeout(() => { if (note.textContent.includes('Progress saved')) note.textContent = ''; }, 4000);
+  }
+
+  function clearForm() {
+    if (!confirm('Are you sure you want to clear all fields? This cannot be undone.')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(el => {
+      if (el.id === 'recorded_by') { el.value = 'Sam Brenner'; return; }
+      el.value = '';
+    });
+    document.getElementById('location').value = 'artsdepot, 5 Nether St, London N12 0GA';
+    document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => { el.checked = false; });
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+  }
+
+  function applyParticipantPrefillFromQuery() {
+    const params = new URLSearchParams(window.location.search)
+    const participantName = params.get('participantName') || ''
+    const participantAge = params.get('participantAge') || ''
+
+    const nameField = document.getElementById('child_name')
+    const ageField = document.getElementById('child_age')
+
+    if (nameField && participantName) nameField.value = participantName
+    if (ageField && participantAge) ageField.value = participantAge
+  }
+
+  async function sendPdfToCampDb() {
+    try {
+      saveForm();
+
+      if (!window.parent || window.parent === window) {
+        alert('Open this form inside Camp DB to send PDF directly to incident log.');
+        return;
+      }
+
+      if (!window.html2canvas || !window.jspdf) {
+        alert('PDF libraries failed to load. Please check internet access and try again.');
+        return;
+      }
+
+      const formRoot = document.querySelector('.form-body');
+      if (!formRoot) {
+        alert('Could not find the form content to export.');
+        return;
+      }
+
+      const canvas = await window.html2canvas(formRoot, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      const jsPDFCtor = window.jspdf.jsPDF;
+      const pdf = new jsPDFCtor('p', 'mm', 'a4');
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 8;
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgHeight = (canvas.height * usableWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let y = margin;
+
+      pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight);
+      heightLeft -= usableHeight;
+
+      while (heightLeft > 0) {
+        y = margin - (imgHeight - heightLeft);
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight);
+        heightLeft -= usableHeight;
+      }
+
+      const now = new Date().toISOString().slice(0, 10);
+      const titleName = (document.getElementById('child_name')?.value || 'participant').trim().replace(/\s+/g, '-').toLowerCase();
+      const fileName = `safeguarding-assessment-${titleName || 'participant'}-${now}.pdf`;
+
+      window.parent.postMessage(
+        {
+          type: 'campdb-form-pdf',
+          payload: {
+            base64Pdf: pdf.output('dataurlstring'),
+            fileName,
+            mimeType: 'application/pdf'
+          }
+        },
+        window.location.origin
+      );
+
+      const note = document.getElementById('saved_note');
+      note.textContent = 'PDF sent to Camp DB. Return to reporting and save the record.';
+      setTimeout(() => { if (note.textContent.includes('PDF sent')) note.textContent = ''; }, 5000);
+    } catch (error) {
+      alert('Failed to send PDF to Camp DB: ' + error.message);
+    }
+  }
+
+  setInterval(saveForm, 30000);
+
+  window.addEventListener('load', () => {
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('location').value = 'artsdepot, 5 Nether St, London N12 0GA';
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try { setFormData(JSON.parse(saved)); } catch (e) {}
+    }
+    applyParticipantPrefillFromQuery();
+  });
+</script>
+</body>
+</html>

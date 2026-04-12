@@ -130,8 +130,8 @@ export default function ImportParticipants({ onImport, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4 fade-in">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4 fade-in max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-stone-100">
           <div>
             <h3 className="font-display font-bold text-forest-950 text-lg">Import Participants</h3>
@@ -140,7 +140,7 @@ export default function ImportParticipants({ onImport, onClose }) {
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
         </div>
 
-        <div className="p-5">
+        <div className="p-5 overflow-y-auto">
           {/* STEP: Upload */}
           {step === 'upload' && (
             <div className="space-y-4">

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { X, Plus } from 'lucide-react'
+import ParticipantNameText from './ParticipantNameText'
 
 export default function DressingRooms({ participants }) {
   const [rooms, setRooms] = useState(() => {
@@ -68,7 +69,7 @@ export default function DressingRooms({ participants }) {
             <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
               {room.participants.map(p => (
                 <div key={p.id} className="text-xs bg-forest-100 text-forest-900 rounded px-2 py-1 truncate">
-                  {p.name}
+                  <ParticipantNameText participant={p} className="text-xs text-forest-900" />
                 </div>
               ))}
             </div>
@@ -115,7 +116,7 @@ export default function DressingRooms({ participants }) {
                         className="w-full text-left px-4 py-2 hover:bg-amber-50 border-b border-stone-100 last:border-b-0 transition-all flex items-center gap-2"
                       >
                         <Plus size={14} className="text-amber-500" />
-                        <span className="text-sm font-medium text-stone-700">{p.name}</span>
+                        <ParticipantNameText participant={p} className="text-sm font-medium text-stone-700" />
                         {p.pronouns && <span className="text-xs text-stone-500">({p.pronouns})</span>}
                       </button>
                     ))}
@@ -138,7 +139,7 @@ export default function DressingRooms({ participants }) {
                       className="flex items-center justify-between p-3 rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 transition-all"
                     >
                       <div className="min-w-0">
-                        <p className="font-medium text-sm text-stone-900">{p.name}</p>
+                        <ParticipantNameText participant={p} className="font-medium text-sm text-stone-900" />
                         {p.pronouns && <p className="text-xs text-stone-500">{p.pronouns}</p>}
                       </div>
                       <button

@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Staff &amp; Visitor Incident Form — Impact Kidz</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #f5f5f0; color: #222; font-size: 14px; }
+
+  /* ── Screen layout ── */
+  .header-banner {
+    background: #c0392b;
+    color: #fff;
+    text-align: center;
+    padding: 10px 24px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .title-block {
+    text-align: center;
+    padding: 24px 24px 16px;
+    background: #fff;
+    border-bottom: 3px solid #c0392b;
+  }
+  .title-block .org { color: #c0392b; font-size: 22px; font-style: italic; font-weight: 700; }
+  .title-block .doc-title { font-size: 18px; font-weight: 700; margin-top: 6px; color: #222; }
+  .title-block .subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-top: 6px;
+    font-style: italic;
+    line-height: 1.5;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .page { max-width: 820px; margin: 0 auto; padding: 22px 18px 50px; }
+  .intro { background: #fdf0f0; border-left: 4px solid #c0392b; padding: 10px 14px; margin-bottom: 18px; font-size: 12px; color: #555; line-height: 1.6; font-style: italic; border-radius: 0 5px 5px 0; }
+  .section { background: #fff; border-radius: 8px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); overflow: hidden; }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    background: #c0392b;
+    color: #fff;
+    margin: -16px -20px 14px;
+    padding: 10px 20px;
+    letter-spacing: 0.5px;
+    border: 0;
+    text-transform: none;
+  }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-weight: 700; font-size: 12px; margin-bottom: 4px; color: #333; }
+  .field .hint { font-size: 11px; color: #888; font-style: italic; margin-bottom: 4px; line-height: 1.4; }
+  input[type="text"], input[type="date"], input[type="time"], textarea {
+    width: 100%; padding: 7px 10px; border: 1.5px solid #ddd; border-radius: 5px;
+    font-family: Georgia, serif; font-size: 13px; color: #222; background: #fafafa; transition: border 0.2s;
+  }
+  input:focus, textarea:focus { outline: none; border-color: #c0392b; background: #fff; }
+  textarea { min-height: 56px; resize: vertical; line-height: 1.5; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .four-col { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+  .radio-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+  .radio-group label, .check-group label {
+    display: flex; align-items: center; gap: 5px; font-weight: 400; font-size: 12px;
+    cursor: pointer; padding: 5px 11px; border: 1.5px solid #ddd; border-radius: 16px;
+    background: #fafafa; color: #555; transition: all 0.15s;
+  }
+  .check-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+  .radio-group input[type="radio"], .check-group input[type="checkbox"] { accent-color: #c0392b; width: 13px; height: 13px; cursor: pointer; }
+
+  /* Body diagram */
+  .body-diagram-wrapper { display: flex; gap: 18px; align-items: flex-start; }
+  .body-svg { cursor: crosshair; border: 1.5px solid #e0e0e0; border-radius: 6px; background: #fafafa; display: block; }
+  .body-part { fill: #e8e8e8; stroke: #bbb; stroke-width: 1.5; transition: fill 0.15s; }
+  .body-part:hover { fill: #ffd5d5; stroke: #c0392b; }
+  .body-part.marked { fill: #e74c3c; stroke: #922b21; }
+  .diagram-hint { font-size: 10px; color: #aaa; font-style: italic; margin-top: 4px; text-align: center; }
+  .area-tag { display: inline-block; background: #fdf0f0; border: 1px solid #e74c3c; color: #c0392b; border-radius: 10px; padding: 2px 8px; font-size: 11px; margin: 1px; }
+  .clear-marks { background: none; border: 1px solid #ddd; color: #aaa; border-radius: 5px; padding: 3px 10px; font-size: 11px; cursor: pointer; margin-top: 4px; font-family: Georgia, serif; }
+
+  /* Checklist */
+  .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .checklist-item { display: flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1.5px solid #eee; border-radius: 6px; font-size: 12px; background: #fafafa; }
+  .checklist-item input[type="checkbox"] { accent-color: #c0392b; width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
+  .checklist-item label { cursor: pointer; margin: 0; font-weight: 400; font-size: 12px; }
+
+  /* RIDDOR */
+  .riddor-box { background: #fdf8e6; border: 1.5px solid #e6a817; border-radius: 6px; padding: 12px 14px; }
+  .riddor-title { font-weight: 700; font-size: 12px; color: #b5500a; margin-bottom: 8px; }
+
+  /* Signature lines */
+  .sig-line { border-bottom: 1.5px solid #aaa; height: 30px; background: #fafafa; border-radius: 4px 4px 0 0; }
+  .sig-note { font-size: 10px; color: #aaa; font-style: italic; margin-top: 2px; }
+  .signoff-row { display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 12px; }
+
+  /* Buttons */
+  .saved-note { text-align: center; font-size: 12px; color: #c0392b; padding: 6px; font-style: italic; min-height: 22px; }
+  .action-bar {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding: 20px 24px;
+    background: #fff;
+    border-top: 2px solid #e0e0e0;
+    position: sticky;
+    bottom: 0;
+  }
+  .btn { padding: 11px 32px; border: none; border-radius: 7px; font-size: 14px; font-weight: 700; font-family: Georgia, serif; cursor: pointer; }
+  .btn-secondary { background: #f0f0f0; color: #333; }
+  .btn-primary { background: #c0392b; color: #fff; }
+  .btn-send { background: #922b21; color: #fff; }
+  .btn:hover { opacity: 0.88; }
+
+  @media (max-width: 700px) {
+    .action-bar {
+      flex-direction: column;
+      align-items: stretch;
+      position: static;
+      padding: 16px;
+    }
+    .action-bar .btn { width: 100%; }
+  }
+
+  #sectionD { display: none; }
+  #riddorDetails { display: none; }
+
+  /* ── Print styles ── */
+  @media print {
+    @page { size: A4; margin: 8mm 10mm; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: #fff; font-size: 10pt; }
+    .header-banner { padding: 7px 12px; font-size: 8pt; }
+    .title-block { padding: 10px 12px 8px; border-bottom-width: 2px; }
+    .title-block .org { font-size: 13pt; }
+    .title-block .doc-title { font-size: 11pt; margin-top: 4px; }
+    .title-block .subtitle { font-size: 7pt; margin-top: 4px; }
+    .page { padding: 0; max-width: 100%; }
+    .intro { padding: 6px 10px; font-size: 8pt; margin-bottom: 8px; }
+    .section { padding: 8px 12px; margin-bottom: 8px; box-shadow: none; border: 1px solid #ccc; border-radius: 4px; }
+    .section-title { font-size: 8pt; padding-bottom: 4px; margin-bottom: 8px; }
+    .field { margin-bottom: 6px; }
+    .field label { font-size: 8pt; margin-bottom: 2px; }
+    .field .hint { font-size: 7pt; margin-bottom: 2px; }
+    input[type="text"], input[type="date"], input[type="time"], textarea { font-size: 9pt; padding: 4px 6px; border: 1px solid #aaa !important; background: #fff !important; }
+    textarea { min-height: 36px; }
+    .radio-group label, .check-group label { font-size: 8pt; padding: 3px 7px; border: 1px solid #ccc; }
+    .checklist-item { padding: 4px 7px; font-size: 8pt; border: 1px solid #ccc; }
+    .riddor-box { padding: 8px 10px; background: #fffdf0 !important; border: 1px solid #ccc !important; }
+    .riddor-title { font-size: 8pt; }
+    .body-svg { width: 120px; height: 210px; }
+    .action-bar, #toast { display: none !important; }
+    /* sectionD visibility is controlled by JS inline style — do not override here */
+    .sig-line { height: 22px; background: #fff !important; }
+    .sig-note { font-size: 7pt; }
+    .signoff-row { gap: 8px; }
+    .two-col, .three-col { gap: 8px; }
+    .body-diagram-wrapper { gap: 12px; }
+    .section:nth-child(n) { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header-banner">Staff and Visitor Incident Reporting Record — Impact Kidz Summer Camp</div>
+
+<div class="title-block">
+  <div class="org">Impact Kidz Summer Camp</div>
+  <div class="doc-title">Staff and Visitor Incident Report Form</div>
+  <div class="subtitle">Record all incidents clearly on the same day for staff, volunteers and visitors. Keep notes factual, identify immediate actions, and retain signed copies on file where required.</div>
+</div>
+
+<div class="page">
+  <div class="intro">Complete this form on the same day as the incident. For serious incidents call 999 first, then notify the Camp Coordinator. Keep the signed original on the staff or visitor file.</div>
+
+  <!-- A: TYPE -->
+  <div class="section">
+    <div class="section-title">A — Incident type</div>
+    <div class="field">
+      <label>Type of report</label>
+      <div class="radio-group">
+        <label><input type="radio" name="reporttype" value="Accident" onchange="toggleSectionD(this)"/> Accident</label>
+        <label><input type="radio" name="reporttype" value="Incident (no injury)" onchange="toggleSectionD(this)"/> Incident (no injury)</label>
+        <label><input type="radio" name="reporttype" value="Near miss" onchange="toggleSectionD(this)"/> Near miss</label>
+        <label><input type="radio" name="reporttype" value="Allergic reaction" onchange="toggleSectionD(this)"/> Allergic reaction</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: INDIVIDUAL -->
+  <div class="section">
+    <div class="section-title">B — Individual involved</div>
+    <div class="two-col">
+      <div class="field"><label>Full name</label><input type="text" id="f-name" placeholder="Full name"/></div>
+      <div class="field"><label>Role</label>
+        <div class="radio-group">
+          <label><input type="radio" name="role" value="Staff"/> Staff</label>
+          <label><input type="radio" name="role" value="Volunteer"/> Volunteer</label>
+          <label><input type="radio" name="role" value="Contractor"/> Contractor</label>
+          <label><input type="radio" name="role" value="Visitor"/> Visitor</label>
+        </div>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Age (if relevant)</label><input type="text" id="f-age" placeholder="Optional"/></div>
+      <div class="field"><label>Known medical conditions / allergies</label><input type="text" id="f-medical" placeholder="e.g. asthma — or None known"/></div>
+    </div>
+  </div>
+
+  <!-- C: DATE / TIME / LOCATION -->
+  <div class="section">
+    <div class="section-title">C — Date, time &amp; location</div>
+    <div class="three-col">
+      <div class="field"><label>Date</label><input type="date" id="f-date"/></div>
+      <div class="field"><label>Time</label><input type="time" id="f-time"/></div>
+      <div class="field"><label>Authorised activity?</label>
+        <div class="radio-group">
+          <label><input type="radio" name="authorised" value="Yes"/> Yes</label>
+          <label><input type="radio" name="authorised" value="No"/> No</label>
+        </div>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Site address</label><input type="text" id="f-location" value="artsdepot, 5 Nether St, London N12 0GA" readonly/></div>
+      <div class="field"><label>Room / Area in building</label><input type="text" id="f-location-detail" placeholder="e.g. Dance Space, Level 3"/></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Activity at time of incident</label><input type="text" id="f-activity" placeholder="e.g. dance warm-up, lunch break..."/></div>
+      <div class="field"><label>Staff present</label><input type="text" id="f-staff" placeholder="Names of staff / volunteers present"/></div>
+    </div>
+  </div>
+
+  <!-- D: INJURY (accident only) -->
+  <div class="section" id="sectionD">
+    <div class="section-title">D — Nature and location of injury</div>
+    <div class="body-diagram-wrapper">
+      <div style="flex:0 0 auto;">
+        <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
+          <ellipse class="body-part" cx="90" cy="30" rx="24" ry="28" data-label="Head"/>
+          <rect class="body-part" x="80" y="56" width="20" height="14" rx="4" data-label="Neck"/>
+          <ellipse class="body-part" cx="55" cy="78" rx="16" ry="12" data-label="Left shoulder"/>
+          <ellipse class="body-part" cx="125" cy="78" rx="16" ry="12" data-label="Right shoulder"/>
+          <rect class="body-part" x="65" y="68" width="50" height="70" rx="6" data-label="Chest/torso"/>
+          <rect class="body-part" x="38" y="88" width="18" height="36" rx="6" data-label="Left upper arm"/>
+          <rect class="body-part" x="124" y="88" width="18" height="36" rx="6" data-label="Right upper arm"/>
+          <rect class="body-part" x="34" y="128" width="16" height="34" rx="6" data-label="Left forearm"/>
+          <rect class="body-part" x="130" y="128" width="16" height="34" rx="6" data-label="Right forearm"/>
+          <ellipse class="body-part" cx="42" cy="174" rx="10" ry="12" data-label="Left hand"/>
+          <ellipse class="body-part" cx="138" cy="174" rx="10" ry="12" data-label="Right hand"/>
+          <rect class="body-part" x="68" y="138" width="44" height="30" rx="4" data-label="Abdomen"/>
+          <rect class="body-part" x="66" y="170" width="22" height="50" rx="6" data-label="Left thigh"/>
+          <rect class="body-part" x="92" y="170" width="22" height="50" rx="6" data-label="Right thigh"/>
+          <ellipse class="body-part" cx="77" cy="228" rx="12" ry="10" data-label="Left knee"/>
+          <ellipse class="body-part" cx="103" cy="228" rx="12" ry="10" data-label="Right knee"/>
+          <rect class="body-part" x="67" y="238" width="18" height="40" rx="5" data-label="Left shin"/>
+          <rect class="body-part" x="95" y="238" width="18" height="40" rx="5" data-label="Right shin"/>
+          <ellipse class="body-part" cx="74" cy="288" rx="14" ry="10" data-label="Left foot"/>
+          <ellipse class="body-part" cx="106" cy="288" rx="14" ry="10" data-label="Right foot"/>
+          <text x="90" y="310" text-anchor="middle" font-size="9" fill="#bbb" font-family="Georgia,serif">Click to mark</text>
+        </svg>
+        <div class="diagram-hint">Click areas to mark</div>
+        <div id="markedAreas" style="margin-top:5px;"></div>
+        <button class="clear-marks" onclick="clearMarks()">Clear</button>
+      </div>
+      <div style="flex:1;">
+        <div class="field">
+          <label>Injury type(s)</label>
+          <div class="check-group">
+            <label><input type="checkbox"/> Cut / laceration</label>
+            <label><input type="checkbox"/> Bruise / swelling</label>
+            <label><input type="checkbox"/> Graze / abrasion</label>
+            <label><input type="checkbox"/> Sprain / strain</label>
+            <label><input type="checkbox"/> Fracture / suspected fracture</label>
+            <label><input type="checkbox"/> Bump to head</label>
+            <label><input type="checkbox"/> Burn / scald</label>
+            <label><input type="checkbox"/> Allergic reaction</label>
+            <label><input type="checkbox"/> Loss of consciousness</label>
+            <label><input type="checkbox"/> Other</label>
+          </div>
+        </div>
+        <div class="field"><label>If other</label><input type="text" id="f-injuryother" placeholder="Describe..."/></div>
+        <div class="field"><label>Side affected</label>
+          <div class="radio-group">
+            <label><input type="radio" name="side" value="Left"/> Left</label>
+            <label><input type="radio" name="side" value="Right"/> Right</label>
+            <label><input type="radio" name="side" value="Both"/> Both</label>
+            <label><input type="radio" name="side" value="N/A"/> N/A</label>
+          </div>
+        </div>
+        <div class="field"><label>First aid given</label><textarea id="f-firstaid" placeholder="What was administered and by whom..."></textarea></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- E: WHAT HAPPENED -->
+  <div class="section">
+    <div class="section-title">E — What happened</div>
+    <div class="field">
+      <div class="hint">Describe the sequence of events in factual language.</div>
+      <textarea id="f-whathappened" style="min-height:70px;" placeholder="Describe what happened..."></textarea>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Witnesses (other than staff)</label>
+        <div class="radio-group" style="margin-bottom:5px;">
+          <label><input type="radio" name="witnesses" value="Yes"/> Yes</label>
+          <label><input type="radio" name="witnesses" value="No"/> No</label>
+        </div>
+      </div>
+      <div class="field"><label>Witness names (if yes)</label><input type="text" id="f-witnesses" placeholder="Names..."/></div>
+    </div>
+  </div>
+
+  <!-- F: ACTION TAKEN -->
+  <div class="section">
+    <div class="section-title">F — Action taken</div>
+    <div class="field"><label>Action taken</label><textarea id="f-action" placeholder="All steps taken in response..."></textarea></div>
+    <div class="field"><label>Anything requiring monitoring</label><textarea id="f-monitoring" style="min-height:44px;" placeholder="Ongoing monitoring notes..."></textarea></div>
+    <div class="field">
+      <label>Outcome checklist</label>
+      <div class="checklist">
+        <div class="checklist-item"><input type="checkbox" id="c1"/><label for="c1">Parent/carer informed</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c2"/><label for="c2">Camp Coordinator informed</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c3"/><label for="c3">Parent called to collect early</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c4"/><label for="c4">Child went to hospital</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c5"/><label for="c5">Child accompanied by staff</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c6"/><label for="c6">999 called</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c7"/><label for="c7">Further medical advice sought</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c8"/><label for="c8">artsdepot Duty Manager informed</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c9"/><label for="c9">Risk assessment review needed</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c10"/><label for="c10">Safeguarding concern raised</label></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- G: RIDDOR -->
+  <div class="section">
+    <div class="section-title">G — RIDDOR</div>
+    <div class="riddor-box">
+      <div class="riddor-title">⚠ Reporting of Injuries, Diseases and Dangerous Occurrences Regulations 2013</div>
+      <div style="font-size:11px;color:#666;margin-bottom:10px;line-height:1.5;">Applies to: over-7-day incapacitation, specified injuries (fractures, amputations, loss of sight, loss of consciousness, requiring resuscitation), dangerous occurrences and occupational diseases.</div>
+      <div class="field"><label>Reportable under RIDDOR?</label>
+        <div class="radio-group">
+          <label><input type="radio" name="riddorR" value="Yes" onchange="toggleRiddorDetails()"/> Yes</label>
+          <label><input type="radio" name="riddorR" value="No" onchange="toggleRiddorDetails()"/> No</label>
+          <label><input type="radio" name="riddorR" value="Unsure" onchange="toggleRiddorDetails()"/> Unsure</label>
+        </div>
+      </div>
+      <div id="riddorDetails">
+        <div class="two-col">
+          <div class="field"><label>Reported to RIDDOR?</label>
+            <div class="radio-group">
+              <label><input type="radio" name="riddorRep" value="Yes"/> Yes</label>
+              <label><input type="radio" name="riddorRep" value="No"/> No</label>
+              <label><input type="radio" name="riddorRep" value="N/A"/> N/A</label>
+            </div>
+          </div>
+          <div class="field"><label>RIDDOR reference number</label><input type="text" id="f-riddorref" placeholder="If reported..."/></div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Date reported</label><input type="date" id="f-riddordate"/></div>
+          <div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H: SIGN OFF -->
+  <div class="section">
+    <div class="section-title">H — Sign off</div>
+    <div style="font-size:11px;color:#777;font-style:italic;margin-bottom:14px;">Print and obtain parent/carer handwritten signature before filing. Keep original on child's file.</div>
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:8px;">Reported by</div>
+      <div class="signoff-row">
+        <div class="field" style="margin:0;"><label>Name</label><input type="text" id="f-reportedby" placeholder="Full name"/></div>
+        <div class="field" style="margin:0;"><label>Date</label><input type="date" id="f-reporteddate"/></div>
+        <div class="field" style="margin:0;"><label>Signature</label><div class="sig-line"></div><div class="sig-note">Sign on printed copy</div></div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px;padding-top:12px;border-top:1px solid #eee;">
+      <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:4px;">Parent / carer acknowledgement</div>
+      <div style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px;">To be completed by hand after printing.</div>
+      <div class="signoff-row">
+        <div class="field" style="margin:0;"><label>Name</label><div class="sig-line"></div><div class="sig-note">Print name</div></div>
+        <div class="field" style="margin:0;"><label>Date</label><div class="sig-line"></div><div class="sig-note">Date</div></div>
+        <div class="field" style="margin:0;"><label>Signature</label><div class="sig-line"></div><div class="sig-note">Sign</div></div>
+      </div>
+    </div>
+    <div style="padding-top:12px;border-top:1px solid #eee;">
+      <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:8px;">Camp Coordinator review</div>
+      <div class="signoff-row">
+        <div class="field" style="margin:0;"><label>Name</label><input type="text" value="Sam Brenner"/></div>
+        <div class="field" style="margin:0;"><label>Date reviewed</label><input type="date"/></div>
+        <div class="field" style="margin:0;"><label>Signature</label><div class="sig-line"></div><div class="sig-note">Sign on printed copy</div></div>
+      </div>
+      <div class="field" style="margin-top:10px;"><label>Further notes / actions</label><textarea id="f-furthernotes" style="min-height:44px;" placeholder="e.g. safeguarding referral, RIDDOR report, policy review..."></textarea></div>
+    </div>
+  </div>
+
+  <div class="saved-note" id="saved_note"></div>
+</div>
+
+<div class="action-bar">
+  <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear form</button>
+  <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Attach to Documents</button>
+  <button type="button" class="btn btn-secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <button type="button" class="btn btn-primary" onclick="saveForm()">💾 Save progress</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+  const STORAGE_KEY = 'ik_staff_visitor_incident_form'
+
+  function getFormData() {
+    const data = {}
+
+    document.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(el => {
+      if (el.id) data[el.id] = el.value
+    })
+
+    document.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+      data[`radio_${el.name}`] = el.value
+    })
+
+    const checkboxes = Array.from(document.querySelectorAll('input[type="checkbox"]'))
+    data.checkedCheckboxIndices = checkboxes
+      .map((el, index) => (el.checked ? index : -1))
+      .filter(index => index >= 0)
+
+    data.markedParts = Array.from(markedParts)
+    return data
+  }
+
+  function setFormData(data) {
+    Object.entries(data || {}).forEach(([key, val]) => {
+      if (key === 'checkedCheckboxIndices' && Array.isArray(val)) {
+        const checkboxes = Array.from(document.querySelectorAll('input[type="checkbox"]'))
+        val.forEach(index => {
+          if (checkboxes[index]) checkboxes[index].checked = true
+        })
+        return
+      }
+
+      if (key === 'markedParts' && Array.isArray(val)) {
+        clearMarks()
+        val.forEach(label => {
+          const part = document.querySelector(`.body-part[data-label="${label}"]`)
+          if (part) {
+            markedParts.add(label)
+            part.classList.add('marked')
+          }
+        })
+        const c = document.getElementById('markedAreas')
+        c.innerHTML = [...markedParts].map(p => `<span class="area-tag">${p}</span>`).join('')
+        return
+      }
+
+      if (key.startsWith('radio_')) {
+        const name = key.replace('radio_', '')
+        const radio = document.querySelector(`input[type="radio"][name="${name}"][value="${val}"]`)
+        if (radio) {
+          radio.checked = true
+          if (name === 'reporttype') toggleSectionD(radio)
+        }
+        return
+      }
+
+      const el = document.getElementById(key)
+      if (el) el.value = val
+    })
+  }
+
+  function saveForm() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getFormData()))
+    const note = document.getElementById('saved_note')
+    note.textContent = '✓ Progress saved — your data will be here when you reopen this file on this computer.'
+    setTimeout(() => { if (note.textContent.includes('Progress saved')) note.textContent = '' }, 4000)
+  }
+
+  function clearForm() {
+    if (!confirm('Are you sure you want to clear all fields? This cannot be undone.')) return
+    localStorage.removeItem(STORAGE_KEY)
+    document.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(el => {
+      el.value = ''
+    })
+    document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => {
+      el.checked = false
+    })
+    clearMarks()
+    const sectionD = document.getElementById('sectionD')
+    sectionD.style.display = 'none'
+    sectionD.style.setProperty('display', 'none', 'important')
+    const today = new Date().toISOString().split('T')[0]
+    document.getElementById('f-date').value = today
+    document.getElementById('f-reporteddate').value = today
+    document.getElementById('f-location').value = 'artsdepot, 5 Nether St, London N12 0GA'
+    const note = document.getElementById('saved_note')
+    note.textContent = ''
+  }
+
+  async function sendPdfToCampDb() {
+    try {
+      saveForm()
+
+      if (!window.parent || window.parent === window) {
+        alert('Open this form inside Camp DB to send PDF directly to incident log.')
+        return
+      }
+
+      if (!window.html2canvas || !window.jspdf) {
+        alert('PDF libraries failed to load. Please check internet access and try again.')
+        return
+      }
+
+      const formRoot = document.querySelector('.page')
+      if (!formRoot) {
+        alert('Could not find the form content to export.')
+        return
+      }
+
+      const canvas = await window.html2canvas(formRoot, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      })
+
+      const { jsPDF } = window.jspdf
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = 210
+      const pageHeight = 297
+      const margin = 8
+      const usableWidth = pageWidth - margin * 2
+      const usableHeight = pageHeight - margin * 2
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      const imgHeight = (canvas.height * usableWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let y = margin
+
+      pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
+      heightLeft -= usableHeight
+
+      while (heightLeft > 0) {
+        y = margin - (imgHeight - heightLeft)
+        pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
+        heightLeft -= usableHeight
+      }
+
+      const now = new Date().toISOString().slice(0, 10)
+      const titleName = (document.getElementById('f-name')?.value || 'participant').trim().replace(/\s+/g, '-').toLowerCase()
+      const fileName = `staff-visitor-incident-${titleName || 'person'}-${now}.pdf`
+
+      window.parent.postMessage(
+        {
+          type: 'campdb-document-form-pdf',
+          payload: {
+            base64Pdf: pdf.output('dataurlstring'),
+            fileName,
+            mimeType: 'application/pdf',
+          },
+        },
+        window.location.origin,
+      )
+
+      const note = document.getElementById('saved_note')
+      note.textContent = 'PDF sent to Documents. Return to Camp DB and confirm upload.'
+      setTimeout(() => { if (note.textContent.includes('PDF sent')) note.textContent = '' }, 5000)
+    } catch (error) {
+      alert('Failed to send PDF to Camp DB: ' + error.message)
+    }
+  }
+
+  // ── Body diagram ──
+  const markedParts = new Set();
+  document.querySelectorAll('.body-part').forEach(p => {
+    p.addEventListener('click', function() {
+      const label = this.getAttribute('data-label');
+      if (markedParts.has(label)) { markedParts.delete(label); this.classList.remove('marked'); }
+      else { markedParts.add(label); this.classList.add('marked'); }
+      const c = document.getElementById('markedAreas');
+      c.innerHTML = [...markedParts].map(p => `<span class="area-tag">${p}</span>`).join('');
+    });
+  });
+  function clearMarks() {
+    markedParts.clear();
+    document.querySelectorAll('.body-part.marked').forEach(p => p.classList.remove('marked'));
+    document.getElementById('markedAreas').innerHTML = '';
+  }
+
+  // ── Section D toggle ──
+  // Uses inline style with !important so print CSS cannot override it
+  function toggleSectionD(r) {
+    const sd = document.getElementById('sectionD');
+    if (r.value === 'Accident') {
+      sd.style.removeProperty('display');
+      sd.style.display = 'block';
+    } else {
+      sd.style.display = 'none';
+      sd.style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  function toggleRiddorDetails() {
+    const selected = document.querySelector('input[type="radio"][name="riddorR"]:checked')
+    const details = document.getElementById('riddorDetails')
+    if (!details) return
+
+    details.style.display = selected?.value === 'Yes' ? 'block' : 'none'
+  }
+
+  setInterval(saveForm, 30000)
+
+  function applyParticipantPrefillFromQuery() {
+    const params = new URLSearchParams(window.location.search)
+    const participantName = params.get('participantName') || ''
+    const participantAge = params.get('participantAge') || ''
+
+    const nameField = document.getElementById('f-name')
+    const ageField = document.getElementById('f-age')
+
+    if (nameField && participantName) {
+      nameField.value = participantName
+    }
+    if (ageField && participantAge) {
+      ageField.value = participantAge
+    }
+
+    if (participantName) {
+      const staffRoleRadio = document.querySelector('input[type="radio"][name="role"][value="Staff"]')
+      if (staffRoleRadio) {
+        staffRoleRadio.checked = true
+      }
+    }
+  }
+
+  window.addEventListener('load', () => {
+
+    const today = new Date().toISOString().split('T')[0]
+    const dateField = document.getElementById('f-date')
+    const reportedDateField = document.getElementById('f-reporteddate')
+    const locationField = document.getElementById('f-location')
+    if (dateField && !dateField.value) dateField.value = today
+    if (reportedDateField && !reportedDateField.value) reportedDateField.value = today
+    if (locationField) locationField.value = 'artsdepot, 5 Nether St, London N12 0GA'
+
+    toggleRiddorDetails()
+
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        setFormData(JSON.parse(saved))
+      } catch (e) {
+        // ignore malformed stored payloads
+      }
+    }
+
+    applyParticipantPrefillFromQuery()
+    toggleRiddorDetails()
+  })
+</script>
+</body>
+</html>

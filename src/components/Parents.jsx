@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { Users, Search, Mail } from 'lucide-react'
 
 function parseApprovedAdults(str) {
@@ -106,18 +106,18 @@ export default function Parents({ participants, onUpdateParticipant }) {
 
   return (
     <div className="fade-in space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Parents & Guardians</h2>
           <p className="text-stone-500 text-sm">{filtered.length} parent contacts</p>
         </div>
         {selectedParents.size > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <span className="text-sm text-stone-600">{selectedParents.size} selected</span>
-            <button onClick={emailSelectedParents} className="btn-primary flex items-center gap-2">
+            <button onClick={emailSelectedParents} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
               <Mail size={14} /> Email Selected
             </button>
-            <button onClick={clearSelection} className="btn-secondary text-sm">
+            <button onClick={clearSelection} className="btn-secondary text-sm w-full sm:w-auto">
               Clear
             </button>
           </div>
@@ -137,7 +137,7 @@ export default function Parents({ participants, onUpdateParticipant }) {
           <p className="text-stone-400 text-sm mt-1">Parent information is added when registering participants.</p>
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden px-0 sm:px-0">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-stone-50 border-b border-stone-200">
@@ -169,8 +169,8 @@ export default function Parents({ participants, onUpdateParticipant }) {
                   const adults = parseApprovedAdults(p.approvedAdults)
                   const isSelected = selectedParents.has(p.id)
                   return (
-                    <>
-                      <tr key={p.id} className={`border-b border-stone-100 hover:bg-stone-50 transition-colors ${isSelected ? 'bg-forest-50' : ''}`}>
+                    <Fragment key={p.id}>
+                      <tr className={`border-b border-stone-100 hover:bg-stone-50 transition-colors ${isSelected ? 'bg-forest-50' : ''}`}>
                       <td className="py-3 px-4">
                         <input
                           type="checkbox"
@@ -231,7 +231,7 @@ export default function Parents({ participants, onUpdateParticipant }) {
                       </td>
                     </tr>
                     {editingId === p.id && (
-                      <tr key={`${p.id}-edit`} className="bg-stone-50">
+                      <tr className="bg-stone-50">
                         <td colSpan="7" className="px-4 py-3">
                           <div className="rounded-2xl border border-stone-200 bg-white p-4">
                             <div className="flex gap-2 flex-col sm:flex-row items-stretch">
@@ -262,7 +262,7 @@ export default function Parents({ participants, onUpdateParticipant }) {
                         </td>
                       </tr>
                     )}
-                    </>
+                    </Fragment>
                   )
                 })}
               </tbody>

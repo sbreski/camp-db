@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
-import { Upload, FileText, Download, Trash2, Lock, Eye, EyeOff } from 'lucide-react'
+import { Upload, FileText, Download, Trash2, Lock, ShieldAlert } from 'lucide-react'
+import { toCsv } from '../utils/workflow'
 
-export default function Documents() {
+export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST' }) {
   const [section, setSection] = useState('policies') // 'policies' or 'other'
-  const [passwordInput, setPasswordInput] = useState('')
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -14,16 +13,21 @@ export default function Documents() {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [categories, setCategories] = useState([])
   const [showAddCategory, setShowAddCategory] = useState(false)
-
-  const STAFF_PASSWORD = 'shrek2021'
-  const currentSection = section === 'policies' ? 'Policies' : 'Other Docs'
-  const requiresAuth = section === 'other'
+  const [exporting, setExporting] = useState(false)
+  const [isReceivingDocumentFormPdf, setIsReceivingDocumentFormPdf] = useState(false)
+  const [uploadNotice, setUploadNotice] = useState('')
+  const [safeguardingReports, setSafeguardingReports] = useState([])
+  const [loadingSafeguarding, setLoadingSafeguarding] = useState(false)
+  const [safeguardingActionId, setSafeguardingActionId] = useState('')
 
   useEffect(() => {
-    if (!requiresAuth || isAuthenticated) {
-      loadDocuments()
-    }
-  }, [section, isAuthenticated])
+    loadDocuments()
+  }, [section])
+
+  useEffect(() => {
+    if (section !== 'other' || !canViewSafeguarding) return
+    loadSafeguardingReports()
+  }, [section, canViewSafeguarding])
 
   async function loadDocuments() {
     setLoading(true)
@@ -48,6 +52,173 @@ export default function Documents() {
     }
   }
 
+  async function uploadGeneratedFormPdf(file, fileDisplayName) {
+    const fileName = `${Date.now()}-${fileDisplayName}`
+    const filePath = `other/${fileName}`
+    const category = 'Staff & Visitor Incident Forms'
+
+    const { data } = await supabase.auth.getSession()
+    if (!data.session) {
+      throw new Error('You must be logged in to upload generated forms')
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file)
+
+    if (uploadError) throw uploadError
+
+    let { error: dbError } = await supabase.from('documents').insert({
+      section: 'other',
+      filename: fileDisplayName,
+      filepath: filePath,
+      category,
+      uploaded_by_initials: actorInitials,
+      created_at: new Date().toISOString(),
+    })
+
+    if (dbError && String(dbError.message || '').toLowerCase().includes('uploaded_by_initials') && String(dbError.message || '').toLowerCase().includes('does not exist')) {
+      const fallback = await supabase.from('documents').insert({
+        section: 'other',
+        filename: fileDisplayName,
+        filepath: filePath,
+        category,
+        created_at: new Date().toISOString(),
+      })
+      dbError = fallback.error
+    }
+
+    if (dbError) throw dbError
+  }
+
+  async function fetchSafeguarding(action, body = {}) {
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data.session?.access_token
+
+    if (!accessToken) {
+      throw new Error('You must be logged in to access safeguarding reports')
+    }
+
+    const response = await fetch('/.netlify/functions/safeguarding-reports', {
+      method: body && Object.keys(body).length > 0 ? 'POST' : 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: body && Object.keys(body).length > 0 ? JSON.stringify({ action, ...body }) : undefined,
+    })
+
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(result.error || 'Safeguarding request failed')
+    }
+    return result
+  }
+
+  async function loadSafeguardingReports() {
+    setLoadingSafeguarding(true)
+    try {
+      const result = await fetchSafeguarding()
+      setSafeguardingReports(result.reports || [])
+    } catch (error) {
+      console.error('Error loading safeguarding reports:', error)
+    } finally {
+      setLoadingSafeguarding(false)
+    }
+  }
+
+  async function downloadSafeguardingReport(report) {
+    setSafeguardingActionId(report.id)
+    try {
+      const result = await fetchSafeguarding('get_download_url', { reportId: report.id })
+      window.open(result.url, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      alert('Error downloading safeguarding report: ' + error.message)
+    } finally {
+      setSafeguardingActionId('')
+    }
+  }
+
+  async function closeSafeguardingReport(report) {
+    if (!window.confirm(`Mark safeguarding report for ${report.participantName} as closed?`)) return
+
+    setSafeguardingActionId(report.id)
+    try {
+      await fetchSafeguarding('close_report', { reportId: report.id })
+      await loadSafeguardingReports()
+    } catch (error) {
+      alert('Error closing safeguarding report: ' + error.message)
+    } finally {
+      setSafeguardingActionId('')
+    }
+  }
+
+  async function clearSafeguardingLogs(scope) {
+    if (!isOwnerUser) {
+      alert('Only the owner account can clear safeguarding logs.')
+      return
+    }
+
+    const isAll = scope === 'all'
+    const label = isAll ? 'all safeguarding logs' : 'closed safeguarding logs'
+    const expectedPhrase = isAll ? 'DELETE ALL SAFEGUARDING LOGS' : 'DELETE CLOSED SAFEGUARDING LOGS'
+
+    if (!window.confirm(`This will permanently delete ${label}. Continue?`)) return
+
+    const typedPhrase = window.prompt(`Type exactly to confirm:\n${expectedPhrase}`)
+    if (typedPhrase === null) return
+    if (typedPhrase !== expectedPhrase) {
+      alert('Confirmation text did not match. No records were deleted.')
+      return
+    }
+
+    const actionKey = isAll ? '__clear_all__' : '__clear_closed__'
+    setSafeguardingActionId(actionKey)
+    try {
+      const result = await fetchSafeguarding('clear_reports', {
+        scope,
+        confirmPhrase: typedPhrase,
+      })
+      await loadSafeguardingReports()
+      alert(`Deleted ${result.deletedCount || 0} safeguarding report(s).`)
+    } catch (error) {
+      alert('Error clearing safeguarding reports: ' + error.message)
+    } finally {
+      setSafeguardingActionId('')
+    }
+  }
+
+  async function deleteSafeguardingReport(report) {
+    if (!isOwnerUser) {
+      alert('Only the owner account can delete safeguarding reports.')
+      return
+    }
+
+    if (!window.confirm(`Delete safeguarding report for ${report.participantName}? This cannot be undone.`)) return
+
+    const expectedPhrase = 'DELETE SAFEGUARDING REPORT'
+    const typedPhrase = window.prompt(`Type exactly to confirm:\n${expectedPhrase}`)
+    if (typedPhrase === null) return
+    if (typedPhrase !== expectedPhrase) {
+      alert('Confirmation text did not match. No report was deleted.')
+      return
+    }
+
+    setSafeguardingActionId(report.id)
+    try {
+      await fetchSafeguarding('delete_report', {
+        reportId: report.id,
+        confirmPhrase: typedPhrase,
+      })
+      await loadSafeguardingReports()
+      alert('Safeguarding report deleted.')
+    } catch (error) {
+      alert('Error deleting safeguarding report: ' + error.message)
+    } finally {
+      setSafeguardingActionId('')
+    }
+  }
+
   async function handleUpload() {
     if (!selectedFile || !selectedCategory.trim()) {
       alert('Please select a file and category')
@@ -59,9 +230,8 @@ export default function Documents() {
       return
     }
 
-    // Check if user is authenticated using sessionStorage (same as main app)
-    const isLoggedIn = sessionStorage.getItem('camp_authed') === 'true'
-    if (!isLoggedIn) {
+    const { data } = await supabase.auth.getSession()
+    if (!data.session) {
       alert('You must be logged in to upload documents')
       return
     }
@@ -86,13 +256,25 @@ export default function Documents() {
       console.log('Storage upload successful')
 
       // Save metadata to database
-      const { error: dbError } = await supabase.from('documents').insert({
+      let { error: dbError } = await supabase.from('documents').insert({
         section,
         filename: selectedFile.name,
         filepath: filePath,
         category: selectedCategory.trim(),
+        uploaded_by_initials: actorInitials,
         created_at: new Date().toISOString(),
       })
+
+      if (dbError && String(dbError.message || '').toLowerCase().includes('uploaded_by_initials') && String(dbError.message || '').toLowerCase().includes('does not exist')) {
+        const fallback = await supabase.from('documents').insert({
+          section,
+          filename: selectedFile.name,
+          filepath: filePath,
+          category: selectedCategory.trim(),
+          created_at: new Date().toISOString(),
+        })
+        dbError = fallback.error
+      }
 
       if (dbError) {
         console.error('Database insert error:', dbError)
@@ -103,6 +285,7 @@ export default function Documents() {
 
       setSelectedFile(null)
       setNewCategory('')
+      setUploadNotice(`Upload complete: ${selectedFile.name}`)
       loadDocuments()
       alert('Document uploaded successfully!')
     } catch (error) {
@@ -138,67 +321,145 @@ export default function Documents() {
 
       if (error) throw error
 
-      // Create download link
       const url = URL.createObjectURL(data)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      const opened = window.open(url, '_blank', 'noopener,noreferrer')
+      if (!opened) {
+        URL.revokeObjectURL(url)
+        throw new Error('Popup blocked. Please allow popups for this site.')
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (error) {
       console.error('Error downloading document:', error)
       alert('Error downloading document')
     }
   }
 
-  function handlePasswordSubmit() {
-    if (passwordInput.trim() === STAFF_PASSWORD) {
-      setIsAuthenticated(true)
-      setPasswordInput('')
-    } else {
-      alert('Incorrect password')
-      setPasswordInput('')
+  function downloadBlob(content, filename, mimeType = 'text/plain') {
+    void filename
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      URL.revokeObjectURL(url)
+      alert('Popup blocked. Please allow popups for this site.')
+      return
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+
+  async function ensureLoggedIn() {
+    const { data } = await supabase.auth.getSession()
+    if (!data.session) {
+      alert('You must be logged in to export data')
+      return false
+    }
+    return true
+  }
+
+  async function exportTableCsv(tableName, filenamePrefix) {
+    if (!(await ensureLoggedIn())) return
+    setExporting(true)
+    try {
+      const { data, error } = await supabase.from(tableName).select('*')
+      if (error) throw error
+
+      const datePart = new Date().toISOString().slice(0, 10)
+      const csv = toCsv(data || [])
+      downloadBlob(csv, `${filenamePrefix}-${datePart}.csv`, 'text/csv;charset=utf-8')
+    } catch (error) {
+      console.error(`Error exporting ${tableName}:`, error)
+      alert(`Error exporting ${tableName}: ${error.message}`)
+    } finally {
+      setExporting(false)
     }
   }
 
-  if (requiresAuth && !isAuthenticated) {
-    return (
-      <div className="fade-in max-w-md mx-auto">
-        <div className="card border-2 border-amber-200">
-          <div className="flex items-center justify-center mb-4">
-            <Lock size={28} className="text-amber-600" />
-          </div>
-          <h2 className="text-2xl font-display font-bold text-center text-forest-950 mb-2">
-            Other Documents
-          </h2>
-          <p className="text-center text-stone-600 text-sm mb-6">
-            This section is password protected. Please enter the password to continue.
-          </p>
-          <div className="space-y-3">
-            <input
-              type="password"
-              value={passwordInput}
-              onChange={e => setPasswordInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
-              placeholder="Enter password"
-              className="input w-full"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button onClick={handlePasswordSubmit} className="btn-primary flex-1">
-                Unlock
-              </button>
-              <button onClick={() => { setSection('policies'); setPasswordInput(''); }} className="btn-secondary flex-1">
-                Back
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+  async function exportJsonBackup() {
+    if (!(await ensureLoggedIn())) return
+    setExporting(true)
+    try {
+      const [participantsRes, attendanceRes, incidentsRes, staffRes, documentsRes] = await Promise.all([
+        supabase.from('participants').select('*'),
+        supabase.from('attendance').select('*'),
+        supabase.from('incidents').select('*'),
+        supabase.from('staff').select('*'),
+        supabase.from('documents').select('*'),
+      ])
+
+      const errors = [participantsRes.error, attendanceRes.error, incidentsRes.error, staffRes.error, documentsRes.error].filter(Boolean)
+      if (errors.length > 0) {
+        throw errors[0]
+      }
+
+      const payload = {
+        generatedAt: new Date().toISOString(),
+        participants: participantsRes.data || [],
+        attendance: attendanceRes.data || [],
+        incidents: incidentsRes.data || [],
+        staff: staffRes.data || [],
+        documents: documentsRes.data || [],
+      }
+
+      const datePart = new Date().toISOString().slice(0, 10)
+      downloadBlob(JSON.stringify(payload, null, 2), `camp-db-backup-${datePart}.json`, 'application/json')
+    } catch (error) {
+      console.error('Error creating JSON backup:', error)
+      alert(`Error creating JSON backup: ${error.message}`)
+    } finally {
+      setExporting(false)
+    }
   }
+
+  useEffect(() => {
+    async function handleDocumentFormPdfMessage(event) {
+      if (event.origin !== window.location.origin) return
+      if (!event.data || typeof event.data !== 'object') return
+      if (event.data.type !== 'campdb-document-form-pdf') return
+
+      if (section !== 'other') {
+        alert('Open Other Docs first, then submit the form again.')
+        return
+      }
+
+      const payload = event.data.payload || {}
+      const rawBase64 = payload.base64Pdf || ''
+      const fileName = payload.fileName || `staff-visitor-incident-${Date.now()}.pdf`
+
+      if (!rawBase64) {
+        alert('The form did not return a PDF payload.')
+        return
+      }
+
+      setIsReceivingDocumentFormPdf(true)
+      try {
+        const cleanBase64 = rawBase64.includes(',') ? rawBase64.split(',')[1] : rawBase64
+        const binary = atob(cleanBase64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i)
+        }
+
+        const blob = new Blob([bytes], { type: payload.mimeType || 'application/pdf' })
+        const file = new File([blob], fileName, { type: 'application/pdf' })
+
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Generated PDF is over 5MB. Please reduce size and try again.')
+          return
+        }
+
+        await uploadGeneratedFormPdf(file, fileName)
+        await loadDocuments()
+        setUploadNotice(`Upload complete: ${fileName}`)
+      } catch (error) {
+        alert('Failed to receive PDF from staff/visitor form: ' + error.message)
+      } finally {
+        setIsReceivingDocumentFormPdf(false)
+      }
+    }
+
+    window.addEventListener('message', handleDocumentFormPdfMessage)
+    return () => window.removeEventListener('message', handleDocumentFormPdfMessage)
+  }, [section])
 
   const groupedByCategory = documents.reduce((acc, doc) => {
     const cat = doc.category || 'Uncategorized'
@@ -210,7 +471,7 @@ export default function Documents() {
   return (
     <div className="fade-in space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Documents</h2>
           <p className="text-stone-500 text-sm mt-1">
@@ -219,24 +480,15 @@ export default function Documents() {
               : 'Manage visitor logs, safeguarding concerns, and other sensitive documents'}
           </p>
         </div>
-        {section === 'other' && isAuthenticated && (
-          <button
-            onClick={() => { setIsAuthenticated(false); setSection('policies') }}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg text-sm text-stone-600 hover:bg-stone-100 transition-all"
-          >
-            <Lock size={14} /> Logout
-          </button>
-        )}
       </div>
 
       {/* Section tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => {
             setSection('policies')
-            setIsAuthenticated(false)
           }}
-          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all ${
+          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
             section === 'policies'
               ? 'bg-amber-500 text-white'
               : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
@@ -247,7 +499,7 @@ export default function Documents() {
         </button>
         <button
           onClick={() => setSection('other')}
-          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all flex items-center justify-center gap-2 w-full sm:w-auto ${
             section === 'other'
               ? 'bg-amber-500 text-white'
               : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
@@ -259,6 +511,134 @@ export default function Documents() {
       </div>
 
       {/* Upload section */}
+      {section === 'other' && (
+        <div className="card space-y-3">
+          <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
+          <p className="text-xs text-stone-500">
+            Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
+          </p>
+          <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
+            <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
+              {isReceivingDocumentFormPdf
+                ? 'Receiving PDF from staff/visitor form...'
+                : 'When submitted, PDFs are saved to Other Docs under Staff & Visitor Incident Forms.'}
+            </div>
+            <iframe
+              title="Staff and Visitor Incident Form"
+              src="/forms/staff-visitor-incident-reporting-form.html"
+              className="w-full h-[560px] border-0"
+            />
+          </div>
+          {uploadNotice && (
+            <p className="text-xs text-green-700">{uploadNotice}</p>
+          )}
+        </div>
+      )}
+
+      {section === 'other' && canViewSafeguarding && (
+        <div className="card space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-display font-semibold text-forest-950 flex items-center gap-2">
+                <ShieldAlert size={16} className="text-rose-700" /> Safeguarding Reports
+              </h3>
+              <p className="text-xs text-stone-500 mt-1">
+                Restricted to Camp Coordinator, Admins, Director, and the owner account.
+              </p>
+            </div>
+            {isOwnerUser ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => clearSafeguardingLogs('closed')}
+                  disabled={loadingSafeguarding || safeguardingActionId !== ''}
+                  className={`btn-secondary text-xs ${loadingSafeguarding || safeguardingActionId !== '' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  Clear Closed
+                </button>
+                <button
+                  onClick={() => clearSafeguardingLogs('all')}
+                  disabled={loadingSafeguarding || safeguardingActionId !== ''}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors ${loadingSafeguarding || safeguardingActionId !== '' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  Clear All
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-stone-500">Only the owner account can clear logs.</p>
+            )}
+          </div>
+
+          {loadingSafeguarding ? (
+            <p className="text-sm text-stone-500">Loading safeguarding reports...</p>
+          ) : safeguardingReports.length === 0 ? (
+            <p className="text-sm text-stone-500">No safeguarding reports logged.</p>
+          ) : (
+            <div className="space-y-2">
+              {safeguardingReports.map(report => (
+                <div key={report.id} className="rounded-xl border border-stone-200 px-4 py-3 bg-white">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-sm text-forest-950">{report.participantName}</p>
+                        <span className={report.status === 'open' ? 'badge-safeguarding' : 'badge-medical'}>
+                          {report.status === 'open' ? 'Open' : 'Closed'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone-500 mt-1">{report.reportName}</p>
+                      <p className="text-xs text-stone-400 mt-1">
+                        Raised {new Date(report.createdAt).toLocaleDateString('en-GB', {
+                          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                        })}
+                        {report.raisedByEmail ? ` by ${report.raisedByEmail}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      <button
+                        onClick={() => downloadSafeguardingReport(report)}
+                        disabled={safeguardingActionId === report.id}
+                        className={`btn-secondary text-xs ${safeguardingActionId === report.id ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      >
+                        Download
+                      </button>
+                      {isOwnerUser && (
+                        <button
+                          onClick={() => deleteSafeguardingReport(report)}
+                          disabled={safeguardingActionId === report.id}
+                          className={`text-xs px-3 py-1.5 rounded-lg font-medium border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors ${safeguardingActionId === report.id ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                          Delete
+                        </button>
+                      )}
+                      {report.status === 'open' && (
+                        <button
+                          onClick={() => closeSafeguardingReport(report)}
+                          disabled={safeguardingActionId === report.id}
+                          className={`btn-primary text-xs ${safeguardingActionId === report.id ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                          Close
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {section === 'other' && !canViewSafeguarding && (
+        <div className="card flex items-start gap-3 bg-rose-50 border-rose-100">
+          <ShieldAlert size={18} className="text-rose-700 mt-0.5 flex-shrink-0" />
+          <div>
+            <h3 className="font-display font-semibold text-forest-950">Safeguarding Reports</h3>
+            <p className="text-sm text-stone-600 mt-1">
+              Safeguarding flags remain visible across the app, but full reports are restricted to authorised roles.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="card space-y-4">
         <h3 className="font-display font-semibold text-forest-950">Upload New Document</h3>
         
@@ -310,7 +690,7 @@ export default function Documents() {
                   + Add new category
                 </button>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={newCategory}
@@ -328,7 +708,7 @@ export default function Documents() {
                         setShowAddCategory(false)
                       }
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                   >
                     Add
                   </button>
@@ -338,7 +718,7 @@ export default function Documents() {
                       setShowAddCategory(false)
                       setNewCategory('')
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                   >
                     Cancel
                   </button>
@@ -365,6 +745,36 @@ export default function Documents() {
             <Upload size={16} />
             {uploading ? 'Uploading...' : 'Upload Document'}
           </button>
+          {uploadNotice && (
+            <p className="text-xs text-green-700">{uploadNotice}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="card space-y-3">
+        <h3 className="font-display font-semibold text-forest-950">Data Backup & Export</h3>
+        <p className="text-xs text-stone-500">
+          Download regular backups for safekeeping. JSON contains all core tables in one file.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <button onClick={exportJsonBackup} disabled={exporting} className={`btn-secondary text-sm ${exporting ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            {exporting ? 'Working...' : 'Export JSON Backup'}
+          </button>
+          <button onClick={() => exportTableCsv('participants', 'participants')} disabled={exporting} className={`btn-secondary text-sm ${exporting ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            Export Participants CSV
+          </button>
+          <button onClick={() => exportTableCsv('attendance', 'attendance')} disabled={exporting} className={`btn-secondary text-sm ${exporting ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            Export Attendance CSV
+          </button>
+          <button onClick={() => exportTableCsv('incidents', 'incidents')} disabled={exporting} className={`btn-secondary text-sm ${exporting ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            Export Incidents CSV
+          </button>
+          <button onClick={() => exportTableCsv('staff', 'staff')} disabled={exporting} className={`btn-secondary text-sm ${exporting ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            Export Staff CSV
+          </button>
+          <button onClick={() => exportTableCsv('documents', 'documents')} disabled={exporting} className={`btn-secondary text-sm ${exporting ? 'opacity-60 cursor-not-allowed' : ''}`}>
+            Export Documents CSV
+          </button>
         </div>
       </div>
 
@@ -389,7 +799,7 @@ export default function Documents() {
                 {docs.map(doc => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-all"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg border border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-all"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <FileText size={18} className="text-red-600 flex-shrink-0" />
@@ -403,10 +813,11 @@ export default function Documents() {
                             month: 'short',
                             year: 'numeric'
                           })}
+                          {(doc.uploaded_by_initials || doc.uploadedByInitials) ? ` · Uploaded by ${doc.uploaded_by_initials || doc.uploadedByInitials}` : ''}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
                       <button
                         onClick={() => downloadDocument(doc.filepath, doc.filename)}
                         className="p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
@@ -427,41 +838,6 @@ export default function Documents() {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Password prompt modal */}
-      {requiresAuth && !isAuthenticated && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
-            <div className="p-5 border-b border-stone-100">
-              <h3 className="font-display font-bold text-forest-950">Unlock Other Documents</h3>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-sm text-stone-600">
-                Please enter the password to access other documents.
-              </p>
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={e => setPasswordInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handlePasswordSubmit()
-                }}
-                placeholder="Enter password"
-                className="input w-full"
-                autoFocus
-              />
-            </div>
-            <div className="p-5 pt-0 flex gap-2">
-              <button onClick={handlePasswordSubmit} className="btn-primary flex-1">
-                Unlock
-              </button>
-              <button onClick={() => { setSection('policies'); setPasswordInput('') }} className="btn-secondary">
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

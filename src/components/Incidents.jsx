@@ -1,25 +1,203 @@
 import { useState } from 'react'
-import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2, Mail } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2, Mail, Edit2 } from 'lucide-react'
 import IncidentForm from './IncidentForm'
+import { supabase } from '../supabase'
 
-export default function Incidents({ incidents, setIncidents, participants, staffList = [], onView }) {
+const REPORT_TYPE_ORDER = ['Incident/Accident', 'Safeguarding', 'Mid-Camp Assessment', 'SEND Assessment']
+
+function getNextDateKey(isoString) {
+  const date = new Date(isoString)
+  date.setDate(date.getDate() + 1)
+  return date.toISOString().slice(0, 10)
+}
+
+function normalizeInitials(value) {
+  return String(value || '').trim().toUpperCase()
+}
+
+function createdInitialsForIncident(incident) {
+  return normalizeInitials(incident.createdByInitials || incident.created_by_initials)
+}
+
+function createdUserIdForIncident(incident) {
+  return String(incident.createdByUserId || incident.created_by_user_id || '').trim()
+}
+
+export default function Incidents({ incidents, setIncidents, participants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onView }) {
   const [showForm, setShowForm] = useState(false)
   const [selectedParticipant, setSelectedParticipant] = useState('')
+  const [editingIncidentId, setEditingIncidentId] = useState(null)
   const [search, setSearch] = useState('')
+  const [openingIncidentId, setOpeningIncidentId] = useState('')
+  const [downloadingIncidentId, setDownloadingIncidentId] = useState('')
 
-  function addIncident(data) {
+  const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
+  const actorInitialsNormalized = normalizeInitials(actorInitials)
+
+  function canEditSafeguardingIncident(incident) {
+    if (incident.type !== 'Safeguarding') return true
+    if (canViewSafeguarding) return true
+
+    const createdByUserId = createdUserIdForIncident(incident)
+    if (createdByUserId && actorUserId) {
+      return createdByUserId === actorUserId
+    }
+
+    return createdInitialsForIncident(incident) === actorInitialsNormalized
+  }
+
+  async function saveIncident(data) {
     if (!selectedParticipant) return
-    setIncidents(prev => [
+
+    if (editingIncident) {
+      await setIncidents(prev => prev.map(inc => {
+        if (inc.id !== editingIncident.id) return inc
+
+        const followUpRequired = Boolean(data.followUpRequired)
+        return {
+          ...inc,
+          ...data,
+          updatedByInitials: actorInitials,
+          updatedByUserId: actorUserId || inc.updatedByUserId || null,
+          id: inc.id,
+          participantId: inc.participantId,
+          createdAt: inc.createdAt,
+          followUpRequired,
+          followUpDueDate: followUpRequired ? (inc.followUpDueDate || getNextDateKey(inc.createdAt)) : null,
+          followUpCompletedAt: followUpRequired ? inc.followUpCompletedAt : null,
+          followUpCompletedBy: followUpRequired ? inc.followUpCompletedBy : null,
+        }
+      }))
+      setShowForm(false)
+      setSelectedParticipant('')
+      setEditingIncidentId(null)
+      return
+    }
+
+    const createdAt = new Date().toISOString()
+    await setIncidents(prev => [
       ...prev,
-      { ...data, id: crypto.randomUUID(), participantId: selectedParticipant, createdAt: new Date().toISOString() },
+      {
+        ...data,
+        id: data.id || crypto.randomUUID(),
+        createdByInitials: actorInitials,
+        updatedByInitials: actorInitials,
+        createdByUserId: actorUserId || null,
+        updatedByUserId: actorUserId || null,
+        participantId: selectedParticipant,
+        createdAt,
+        followUpDueDate: data.followUpRequired ? getNextDateKey(createdAt) : null,
+        followUpCompletedAt: null,
+        followUpCompletedBy: null,
+      },
     ])
     setShowForm(false)
     setSelectedParticipant('')
   }
 
+  function startEditIncident(inc) {
+    if (!canEditSafeguardingIncident(inc)) {
+      alert('Only authorised users or the original submitter can edit safeguarding submissions.')
+      return
+    }
+
+    setSelectedParticipant(inc.participantId)
+    setEditingIncidentId(inc.id)
+    setShowForm(true)
+  }
+
   function deleteIncident(id) {
     if (window.confirm('Delete this incident? This cannot be undone.')) {
       setIncidents(prev => prev.filter(inc => inc.id !== id))
+    }
+  }
+
+  async function fetchSafeguardingDownloadUrlByIncidentId(incidentId) {
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data.session?.access_token
+
+    if (!accessToken) {
+      throw new Error('You must be logged in to access safeguarding reports')
+    }
+
+    const response = await fetch('/.netlify/functions/safeguarding-reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ action: 'get_download_url', incidentId }),
+    })
+
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to load safeguarding report')
+    }
+
+    return result.url
+  }
+
+  async function openIncidentReport(inc) {
+    setOpeningIncidentId(inc.id)
+    try {
+      if (inc.type === 'Safeguarding') {
+        if (!canViewSafeguarding) {
+          alert('Safeguarding report access is restricted.')
+          return
+        }
+
+        const url = await fetchSafeguardingDownloadUrlByIncidentId(inc.id)
+        window.open(url, '_blank', 'noopener,noreferrer')
+        return
+      }
+
+      if (!inc.pdfData) {
+        alert('No attached form found for this report.')
+        return
+      }
+
+      window.open(inc.pdfData, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      alert(error.message || 'Unable to open report')
+    } finally {
+      setOpeningIncidentId('')
+    }
+  }
+
+  async function downloadIncidentReport(inc) {
+    setDownloadingIncidentId(inc.id)
+    try {
+      let sourceUrl = ''
+
+      if (inc.type === 'Safeguarding') {
+        if (!canViewSafeguarding) {
+          alert('Safeguarding report access is restricted.')
+          return
+        }
+        sourceUrl = await fetchSafeguardingDownloadUrlByIncidentId(inc.id)
+      } else {
+        if (!inc.pdfData) {
+          alert('No attached form found for this report.')
+          return
+        }
+        sourceUrl = inc.pdfData
+      }
+
+      const response = await fetch(sourceUrl)
+      if (!response.ok) throw new Error('Failed to download report file')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = inc.pdfName || `${String(inc.type || 'report').replace(/\s+/g, '-').toLowerCase()}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (error) {
+      alert(error.message || 'Unable to download report')
+    } finally {
+      setDownloadingIncidentId('')
     }
   }
 
@@ -30,14 +208,44 @@ export default function Incidents({ incidents, setIncidents, participants, staff
     })
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
+  const groupedIncidents = filtered.reduce((groups, incident) => {
+    const type = incident.type || 'Other'
+    if (!groups[type]) groups[type] = []
+    groups[type].push(incident)
+    return groups
+  }, {})
+
+  const groupedTypes = Object.keys(groupedIncidents).sort((a, b) => {
+    const aIndex = REPORT_TYPE_ORDER.indexOf(a)
+    const bIndex = REPORT_TYPE_ORDER.indexOf(b)
+    const aRank = aIndex === -1 ? REPORT_TYPE_ORDER.length : aIndex
+    const bRank = bIndex === -1 ? REPORT_TYPE_ORDER.length : bIndex
+    if (aRank !== bRank) return aRank - bRank
+    return a.localeCompare(b)
+  })
+
   return (
     <div className="fade-in space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-display font-bold text-forest-950">Incidents & Accidents</h2>
+          <h2 className="text-2xl font-display font-bold text-forest-950">Reporting</h2>
           <p className="text-stone-500 text-sm">{incidents.length} total logged</p>
+          {canViewSafeguarding && (
+            <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+              Safeguarding Access Enabled
+            </p>
+          )}
         </div>
-        <button onClick={() => setShowForm(s => !s)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => {
+          setShowForm(s => {
+            const next = !s
+            if (!next) {
+              setSelectedParticipant('')
+              setEditingIncidentId(null)
+            }
+            return next
+          })
+        }} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
           <Plus size={15} strokeWidth={2.5} /> Log Incident
         </button>
       </div>
@@ -45,10 +253,12 @@ export default function Incidents({ incidents, setIncidents, participants, staff
       {/* New incident form */}
       {showForm && (
         <div className="card border-2 border-amber-200 fade-in">
-          <h3 className="font-display font-semibold text-forest-950 mb-3">Select Participant</h3>
+          <h3 className="font-display font-semibold text-forest-950 mb-3">
+            {editingIncident ? 'Edit Submission' : 'Select Participant'}
+          </h3>
           <div className="mb-4">
             <label className="label">Participant *</label>
-            <select className="input" value={selectedParticipant} onChange={e => setSelectedParticipant(e.target.value)}>
+            <select className="input" value={selectedParticipant} disabled={Boolean(editingIncident)} onChange={e => setSelectedParticipant(e.target.value)}>
               <option value="">— Choose participant —</option>
               {[...participants].sort((a, b) => a.name.localeCompare(b.name)).map(p => (
                 <option key={p.id} value={p.id}>{p.name}{p.age ? ` (Age ${p.age})` : ''}</option>
@@ -58,13 +268,18 @@ export default function Incidents({ incidents, setIncidents, participants, staff
           {selectedParticipant && (
             <IncidentForm
               participantId={selectedParticipant}
+              participantName={participants.find(p => p.id === selectedParticipant)?.name || ''}
+              participantAge={participants.find(p => p.id === selectedParticipant)?.age || ''}
+              defaultStaffMember={currentStaffName}
+              initial={editingIncident && editingIncident.participantId === selectedParticipant ? editingIncident : null}
+              canEditSafeguarding={!editingIncident || canEditSafeguardingIncident(editingIncident)}
               staffList={staffList}
-              onSave={addIncident}
-              onCancel={() => { setShowForm(false); setSelectedParticipant('') }}
+              onSave={saveIncident}
+              onCancel={() => { setShowForm(false); setSelectedParticipant(''); setEditingIncidentId(null) }}
             />
           )}
           {!selectedParticipant && (
-            <button onClick={() => setShowForm(false)} className="btn-secondary text-sm">Cancel</button>
+            <button onClick={() => { setShowForm(false); setEditingIncidentId(null) }} className="btn-secondary text-sm">Cancel</button>
           )}
         </div>
       )}
@@ -87,12 +302,28 @@ export default function Incidents({ incidents, setIncidents, participants, staff
           <p className="text-stone-400 text-sm">No incidents match your search.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map(inc => {
+        <div className="space-y-4">
+          {groupedTypes.map(type => (
+            <section key={type} className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <h3 className="text-sm font-display font-semibold text-forest-900">{type}</h3>
+                <span className="text-xs text-stone-500">{groupedIncidents[type].length} logged</span>
+              </div>
+              <div className="space-y-3">
+                {groupedIncidents[type].map(inc => {
             const p = participants.find(x => x.id === inc.participantId)
+            const createdTime = new Date(inc.createdAt).getTime()
+            const updatedRaw = inc.updatedAt || inc.updated_at || null
+            const updatedTime = updatedRaw ? new Date(updatedRaw).getTime() : 0
+            const isEdited = Boolean(updatedRaw) && updatedTime - createdTime > 1000
+            const createdByInitials = inc.createdByInitials || inc.created_by_initials || null
+            const updatedByInitials = inc.updatedByInitials || inc.updated_by_initials || null
+            const canEditSafeguarding = canEditSafeguardingIncident(inc)
+            const isOpeningReport = openingIncidentId === inc.id
+            const isDownloadingReport = downloadingIncidentId === inc.id
             return (
               <div key={inc.id} className="card hover:shadow-sm transition-shadow group cursor-pointer"
-                onClick={() => p && onView(p.id)}>
+                onClick={() => openIncidentReport(inc)}>
                 <div className="flex items-start gap-4">
                   <div className="mt-1 w-2.5 h-2.5 rounded-full flex-shrink-0 bg-amber-400" />
                   <div className="flex-1 min-w-0">
@@ -101,6 +332,12 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                         {p?.name || 'Unknown Participant'}
                       </span>
                       <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">{inc.type}</span>
+                      {inc.followUpRequired && !inc.followUpCompletedAt && (
+                        <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Follow Up due</span>
+                      )}
+                      {inc.followUpCompletedAt && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Followed up</span>
+                      )}
                       {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
                     </div>
                     <div className="flex items-center gap-3">
@@ -110,14 +347,39 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                           hour: '2-digit', minute: '2-digit',
                         })}
                       </span>
+                      {isEdited && (
+                        <span className="text-xs text-forest-700">
+                          Updated {new Date(updatedRaw).toLocaleDateString('en-GB', {
+                            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}{updatedByInitials ? ` by ${updatedByInitials}` : ''}
+                        </span>
+                      )}
+                      {!isEdited && createdByInitials && (
+                        <span className="text-xs text-stone-500">Logged by {createdByInitials}</span>
+                      )}
+                      {inc.followUpRequired && (
+                        <span className="text-xs text-stone-500">
+                          {inc.followUpCompletedAt
+                            ? `Followed up ${new Date(inc.followUpCompletedAt).toLocaleDateString('en-GB')}`
+                            : `Follow up due ${new Date((inc.followUpDueDate || inc.createdAt) + 'T12:00:00').toLocaleDateString('en-GB')}`}
+                        </span>
+                      )}
                       {inc.pdfName && (
                         <span className="flex items-center gap-1 text-xs text-forest-700 font-medium">
                           <FileText size={11} /> {inc.pdfName}
-                          {inc.pdfData && (
-                            <a href={inc.pdfData} download={inc.pdfName}
-                              onClick={e => e.stopPropagation()} className="ml-1 underline hover:text-forest-900">
-                              Download
-                            </a>
+                          {inc.type === 'Safeguarding' && !canViewSafeguarding ? (
+                            <span className="ml-1 text-stone-500">Restricted</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                downloadIncidentReport(inc)
+                              }}
+                              className="ml-1 underline hover:text-forest-900"
+                            >
+                              {isDownloadingReport ? 'Downloading...' : 'Download'}
+                            </button>
                           )}
                         </span>
                       )}
@@ -139,21 +401,48 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                         const mailtoLink = `mailto:?bcc=${encodeURIComponent(p.parentEmail)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
                         window.open(mailtoLink, '_blank')
                       }}
-                        className="p-1.5 text-stone-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-1.5 text-stone-400 hover:text-blue-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                         title="Email parent">
                         <Mail size={15} />
                       </button>
                     )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startEditIncident(inc)
+                      }}
+                      className="p-1.5 text-stone-400 hover:text-forest-700 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                      title={inc.type === 'Safeguarding' && !canEditSafeguarding
+                        ? 'Safeguarding edits require authorised access or original submitter'
+                        : 'Edit submission'}
+                    >
+                      <Edit2 size={15} />
+                    </button>
                     <button onClick={(e) => { e.stopPropagation(); deleteIncident(inc.id) }}
-                      className="p-1.5 text-stone-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                      className="p-1.5 text-stone-400 hover:text-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                       <Trash2 size={15} />
                     </button>
+                    {canViewParticipant && p && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onView(p.id)
+                        }}
+                        className="text-xs px-2 py-1 rounded-md border border-stone-200 text-stone-700 hover:text-forest-900 hover:border-forest-300 bg-white"
+                      >
+                        View Participant
+                      </button>
+                    )}
                     <ChevronRight size={16} className="text-stone-300 group-hover:text-stone-500 mt-1" />
                   </div>
                 </div>
               </div>
             )
-          })}
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </div>

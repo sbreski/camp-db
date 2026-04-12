@@ -54,6 +54,10 @@
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
       bg-purple-100 text-purple-700 border border-purple-200;
   }
+  .badge-safeguarding {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold
+      bg-rose-100 text-rose-800 border border-rose-200;
+  }
 }
 
 /* Scrollbar */

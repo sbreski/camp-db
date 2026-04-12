@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Clock, TrendingUp, AlertCircle, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, TrendingUp, AlertCircle, User, X } from 'lucide-react'
+import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 
 function fmtTime(ts) {
   if (!ts) return '—'
@@ -34,7 +35,7 @@ function duration(signIn, signOut) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
-function lateMinutes(signIn, threshold = '10:00') {
+function lateMinutes(signIn, threshold = '10:15') {
   if (!signIn) return null
   const t = new Date(signIn)
   const [h, m] = threshold.split(':').map(Number)
@@ -44,8 +45,37 @@ function lateMinutes(signIn, threshold = '10:00') {
   return diff > 0 ? diff : 0
 }
 
+function parseCollectionDetails(collectedBy) {
+  if (!collectedBy) {
+    return { summary: '—', hasReason: false, fullName: '', reason: '' }
+  }
+  const otherMatch = collectedBy.match(/^Other \(not approved\):\s*(.+?)\s*-\s*Reason:\s*(.+)$/i)
+  if (!otherMatch) {
+    return { summary: collectedBy, hasReason: false, fullName: '', reason: '' }
+  }
+  return {
+    summary: `Other: ${otherMatch[1].trim()}`,
+    hasReason: true,
+    fullName: otherMatch[1].trim(),
+    reason: otherMatch[2].trim(),
+  }
+}
+
+const ATTENDANCE_REASON_LABELS = {
+  illness: 'Illness',
+  holiday: 'Holiday',
+  no_show: 'No-show',
+  late_arrival: 'Late arrival',
+  early_leave: 'Early leave',
+  other: 'Other',
+}
+
+function attendanceReasonLabel(value) {
+  return ATTENDANCE_REASON_LABELS[value] || null
+}
+
 // ─── Daily Overview ───────────────────────────────────────────────────────────
-function DailyOverview({ participants, attendance }) {
+function DailyOverview({ participants, attendance, startEditTime, openCollectionDetail }) {
   const [date, setDate] = useState(todayKey())
   const records = attendance.filter(a => a.date === date)
 
@@ -71,7 +101,7 @@ function DailyOverview({ participants, attendance }) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'Present', value: present, color: 'text-green-600' },
           { label: 'Absent', value: absent, color: 'text-red-500' },
@@ -86,7 +116,7 @@ function DailyOverview({ participants, attendance }) {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-4 py-2.5 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
+        <div className="hidden sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-4 py-2.5 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
           <span>Participant</span>
           <span className="w-20 text-right">Sign In</span>
           <span className="w-20 text-right">Sign Out</span>
@@ -96,21 +126,57 @@ function DailyOverview({ participants, attendance }) {
         <div className="divide-y divide-stone-50">
           {rows.map(({ p, rec }) => {
             const late = lateMinutes(rec?.signIn)
+            const collection = parseCollectionDetails(rec?.collectedBy)
+            const reasonLabel = attendanceReasonLabel(rec?.exceptionReason || rec?.exception_reason)
+            const reasonNotes = rec?.exceptionNotes || rec?.exception_notes || ''
             return (
-              <div key={p.id} className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center px-4 py-2.5 ${!rec?.signIn ? 'opacity-50 bg-red-50/30' : ''}`}>
+              <div key={p.id} className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] sm:gap-2 sm:items-center px-4 py-2.5 ${!rec?.signIn ? 'opacity-50 bg-red-50/30' : ''}`}>
                 <div>
-                  <p className="text-sm font-medium text-forest-950">{p.name}</p>
+                  <ParticipantNameText participant={p} className="text-sm font-medium text-forest-950" />
                   {late > 0 && (
                     <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
                       <AlertCircle size={10} /> {late} min late
                     </p>
                   )}
                   {!rec?.signIn && <p className="text-xs text-red-500">Absent</p>}
+                  {reasonLabel && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Reason: <span className="font-medium">{reasonLabel}</span>{reasonNotes ? ` - ${reasonNotes}` : ''}
+                    </p>
+                  )}
                 </div>
-                <span className={`w-20 text-right text-xs font-mono ${rec?.signIn ? 'text-green-700 font-semibold' : 'text-stone-300'}`}>{fmtTime(rec?.signIn)}</span>
-                <span className={`w-20 text-right text-xs font-mono ${rec?.signOut ? 'text-blue-700 font-semibold' : 'text-stone-300'}`}>{fmtTime(rec?.signOut)}</span>
-                <span className="w-20 text-right text-xs text-stone-500">{duration(rec?.signIn, rec?.signOut) || (rec?.signIn ? <span className="text-amber-600">On site</span> : '—')}</span>
-                <span className="w-28 text-right text-xs text-stone-600 truncate">{rec?.collectedBy || '—'}</span>
+                {rec?.signIn ? (
+                  <button
+                    className="w-full sm:w-20 text-right text-xs font-mono text-green-700 font-semibold cursor-pointer hover:bg-green-50 px-1 rounded transition-colors mt-2 sm:mt-0"
+                    onClick={() => startEditTime(rec.id, 'signIn', rec.signIn, date)}
+                  >
+                    {fmtTime(rec.signIn)}
+                  </button>
+                ) : (
+                  <span className="w-full sm:w-20 text-right text-xs font-mono text-stone-300 mt-2 sm:mt-0 block">{fmtTime(rec?.signIn)}</span>
+                )}
+                {rec?.signOut ? (
+                  <button
+                    className="w-full sm:w-20 text-right text-xs font-mono text-blue-700 font-semibold cursor-pointer hover:bg-blue-50 px-1 rounded transition-colors mt-1 sm:mt-0"
+                    onClick={() => startEditTime(rec.id, 'signOut', rec.signOut, date)}
+                  >
+                    {fmtTime(rec.signOut)}
+                  </button>
+                ) : (
+                  <span className="w-full sm:w-20 text-right text-xs font-mono text-stone-300 mt-1 sm:mt-0 block">{fmtTime(rec?.signOut)}</span>
+                )}
+                <span className="w-full sm:w-20 text-right text-xs text-stone-500 mt-1 sm:mt-0 block">{duration(rec?.signIn, rec?.signOut) || (rec?.signIn ? <span className="text-amber-600">On site</span> : '—')}</span>
+                {collection.hasReason ? (
+                  <button
+                    className="w-full sm:w-28 text-right text-xs text-stone-600 hover:bg-stone-100 px-1 rounded transition-colors truncate mt-1 sm:mt-0 block"
+                    onClick={() => openCollectionDetail({ fullName: collection.fullName, reason: collection.reason, participantName: participantDisplayName(p), date })}
+                    title="View collector reason"
+                  >
+                    {collection.summary} (view)
+                  </button>
+                ) : (
+                  <span className="w-full sm:w-28 text-right text-xs text-stone-600 truncate mt-1 sm:mt-0 block">{collection.summary}</span>
+                )}
               </div>
             )
           })}
@@ -121,9 +187,9 @@ function DailyOverview({ participants, attendance }) {
 }
 
 // ─── Weekly Overview ──────────────────────────────────────────────────────────
-function WeeklyOverview({ participants, attendance }) {
+function WeeklyOverview({ participants, attendance, startEditTime, markPresent, markAbsent }) {
   const [weekOf, setWeekOf] = useState(weekStart(todayKey()))
-  const days = Array.from({ length: 5 }, (_, i) => addDays(weekOf, i)) // Mon–Fri
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekOf, i)) // Mon–Sun
 
   function prevWeek() { setWeekOf(addDays(weekOf, -7)) }
   function nextWeek() { setWeekOf(addDays(weekOf, 7)) }
@@ -153,7 +219,7 @@ function WeeklyOverview({ participants, attendance }) {
       </div>
 
       {/* Weekly summary stats */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
         {stats.map(({ day, present, late }) => (
           <div key={day} className={`card text-center py-2 px-1 ${day === todayKey() ? 'ring-2 ring-amber-400' : ''}`}>
             <p className="text-xs font-semibold text-stone-500">{new Date(day + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short' })}</p>
@@ -186,7 +252,7 @@ function WeeklyOverview({ participants, attendance }) {
               let totalDays = 0, totalLate = 0
               return (
                 <tr key={p.id} className="hover:bg-stone-50">
-                  <td className="px-4 py-2 font-medium text-forest-950 whitespace-nowrap">{p.name}</td>
+                  <td className="px-4 py-2 font-medium text-forest-950 whitespace-nowrap"><ParticipantNameText participant={p} className="font-medium text-forest-950" /></td>
                   {days.map(day => {
                     const rec = attendance.find(a => a.participantId === p.id && a.date === day)
                     const late = lateMinutes(rec?.signIn)
@@ -196,18 +262,33 @@ function WeeklyOverview({ participants, attendance }) {
                       <td key={day} className={`px-2 py-2 text-center ${day === todayKey() ? 'bg-amber-50' : ''}`}>
                         {rec?.signIn ? (
                           <div>
-                            <span className={`inline-block w-6 h-6 rounded-full text-xs font-bold leading-6 ${late > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                            <button
+                              className={`inline-block w-6 h-6 rounded-full text-xs font-bold leading-6 transition-colors ${late > 0 ? 'bg-amber-100 text-amber-700 hover:bg-red-100 hover:text-red-600' : 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-600'}`}
+                              onClick={() => markAbsent(p.id, day)}
+                              title="Mark absent"
+                            >
                               {late > 0 ? 'L' : '✓'}
-                            </span>
-                            <div className="text-stone-400 mt-0.5 font-mono">{fmtTime(rec.signIn)}</div>
+                            </button>
+                            <button
+                              className="text-stone-400 mt-0.5 font-mono text-xs hover:bg-stone-100 px-1 rounded cursor-pointer transition-colors"
+                              onClick={() => startEditTime(rec.id, 'signIn', rec.signIn, day)}
+                            >
+                              {fmtTime(rec.signIn)}
+                            </button>
                           </div>
                         ) : (
-                          <span className="inline-block w-6 h-6 rounded-full bg-red-50 text-red-400 text-xs font-bold leading-6">✗</span>
+                          <button
+                            className="inline-flex flex-col items-center gap-0.5"
+                            onClick={() => markPresent(p.id, day)}
+                            title="Mark present"
+                          >
+                            <span className="inline-block w-6 h-6 rounded-full bg-red-50 text-red-400 text-xs font-bold leading-6 hover:bg-green-100 hover:text-green-700 transition-colors">✗</span>
+                          </button>
                         )}
                       </td>
                     )
                   })}
-                  <td className="px-3 py-2 text-center font-semibold text-forest-900">{totalDays}/5</td>
+                  <td className="px-3 py-2 text-center font-semibold text-forest-900">{totalDays}/7</td>
                   <td className="px-3 py-2 text-center">
                     {totalLate > 0
                       ? <span className="font-semibold text-amber-600">{totalLate}</span>
@@ -221,7 +302,7 @@ function WeeklyOverview({ participants, attendance }) {
       </div>
       <div className="flex gap-4 text-xs text-stone-500 flex-wrap">
         <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-xs">✓</span> Present on time</span>
-        <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">L</span> Late (&gt;10:00)</span>
+        <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">L</span> Late (&gt;10:15)</span>
         <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-red-50 text-red-400 flex items-center justify-center font-bold text-xs">✗</span> Absent</span>
       </div>
     </div>
@@ -229,7 +310,7 @@ function WeeklyOverview({ participants, attendance }) {
 }
 
 // ─── Participant Overview ─────────────────────────────────────────────────────
-function ParticipantOverview({ participants, attendance }) {
+function ParticipantOverview({ participants, attendance, startEditTime, openCollectionDetail }) {
   const [selectedId, setSelectedId] = useState(participants[0]?.id || '')
   const participant = participants.find(p => p.id === selectedId)
 
@@ -256,7 +337,7 @@ function ParticipantOverview({ participants, attendance }) {
         <label className="label">Select Participant</label>
         <select className="input max-w-xs" value={selectedId} onChange={e => setSelectedId(e.target.value)}>
           {[...participants].sort((a, b) => a.name.localeCompare(b.name)).map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+            <option key={p.id} value={p.id}>{participantDisplayName(p)}</option>
           ))}
         </select>
       </div>
@@ -290,9 +371,18 @@ function ParticipantOverview({ participants, attendance }) {
                   return (
                     <div key={r.id} className="flex items-center gap-3">
                       <span className="text-xs text-stone-500 w-20 flex-shrink-0">{fmtDate(r.date)}</span>
-                      <span className={`text-xs font-mono font-semibold w-12 flex-shrink-0 ${late > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                        {fmtTime(r.signIn)}
-                      </span>
+                      {r.signIn ? (
+                        <button
+                          className={`text-xs font-mono font-semibold w-12 flex-shrink-0 cursor-pointer hover:bg-stone-100 px-1 rounded transition-colors ${late > 0 ? 'text-amber-600' : 'text-green-600'}`}
+                          onClick={() => startEditTime(r.id, 'signIn', r.signIn, r.date)}
+                        >
+                          {fmtTime(r.signIn)}
+                        </button>
+                      ) : (
+                        <span className="text-xs font-mono font-semibold w-12 flex-shrink-0 text-stone-300">
+                          {fmtTime(r.signIn)}
+                        </span>
+                      )}
                       <div className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
                         {late > 0 ? (
                           <div className="h-full bg-amber-400 rounded-full" style={{ width: `${barWidth}%` }} />
@@ -310,7 +400,7 @@ function ParticipantOverview({ participants, attendance }) {
 
           {/* Full history table */}
           <div className="card p-0 overflow-hidden">
-            <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr] gap-2 px-4 py-2.5 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
+            <div className="hidden sm:grid sm:grid-cols-[auto_1fr_1fr_1fr_1fr] gap-2 px-4 py-2.5 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
               <span className="w-28">Date</span>
               <span>In</span><span>Out</span><span>Duration</span><span>Collected by</span>
             </div>
@@ -319,17 +409,53 @@ function ParticipantOverview({ participants, attendance }) {
                 <p className="text-center text-stone-400 text-sm py-6">No attendance recorded.</p>
               ) : records.map(r => {
                 const late = lateMinutes(r.signIn)
+                const collection = parseCollectionDetails(r.collectedBy)
+                const reasonLabel = attendanceReasonLabel(r?.exceptionReason || r?.exception_reason)
+                const reasonNotes = r?.exceptionNotes || r?.exception_notes || ''
                 return (
-                  <div key={r.id} className="grid grid-cols-[auto_1fr_1fr_1fr_1fr] gap-2 items-center px-4 py-2.5">
+                  <div key={r.id} className="sm:grid sm:grid-cols-[auto_1fr_1fr_1fr_1fr] sm:gap-2 sm:items-center px-4 py-2.5">
                     <div className="w-28">
                       <p className="text-xs font-medium text-forest-950">{fmtDate(r.date)}</p>
                       {late > 0 && <p className="text-xs text-amber-600">{late}m late</p>}
                       {!r.signIn && <p className="text-xs text-red-500">Absent</p>}
+                      {reasonLabel && (
+                        <p className="text-xs text-amber-700 mt-1">
+                          {reasonLabel}{reasonNotes ? ` - ${reasonNotes}` : ''}
+                        </p>
+                      )}
                     </div>
-                    <span className={`text-xs font-mono ${r.signIn ? 'text-green-700 font-semibold' : 'text-stone-300'}`}>{fmtTime(r.signIn)}</span>
-                    <span className={`text-xs font-mono ${r.signOut ? 'text-blue-700 font-semibold' : 'text-stone-300'}`}>{fmtTime(r.signOut)}</span>
-                    <span className="text-xs text-stone-500">{duration(r.signIn, r.signOut) || '—'}</span>
-                    <span className="text-xs text-stone-600 truncate">{r.collectedBy || '—'}</span>
+                    {r.signIn ? (
+                      <button
+                        className="text-xs font-mono text-green-700 font-semibold cursor-pointer hover:bg-green-50 px-1 rounded transition-colors mt-2 sm:mt-0 block"
+                        onClick={() => startEditTime(r.id, 'signIn', r.signIn, r.date)}
+                      >
+                        {fmtTime(r.signIn)}
+                      </button>
+                    ) : (
+                      <span className="text-xs font-mono text-stone-300 mt-2 sm:mt-0 block">{fmtTime(r.signIn)}</span>
+                    )}
+                    {r.signOut ? (
+                      <button
+                        className="text-xs font-mono text-blue-700 font-semibold cursor-pointer hover:bg-blue-50 px-1 rounded transition-colors mt-1 sm:mt-0 block"
+                        onClick={() => startEditTime(r.id, 'signOut', r.signOut, r.date)}
+                      >
+                        {fmtTime(r.signOut)}
+                      </button>
+                    ) : (
+                      <span className="text-xs font-mono text-stone-300 mt-1 sm:mt-0 block">{fmtTime(r.signOut)}</span>
+                    )}
+                    <span className="text-xs text-stone-500 mt-1 sm:mt-0 block">{duration(r.signIn, r.signOut) || '—'}</span>
+                    {collection.hasReason ? (
+                      <button
+                        className="text-xs text-stone-600 hover:bg-stone-100 px-1 rounded transition-colors truncate mt-1 sm:mt-0 block text-left"
+                        onClick={() => openCollectionDetail({ fullName: collection.fullName, reason: collection.reason, participantName: participantDisplayName(participant), date: r.date })}
+                        title="View collector reason"
+                      >
+                        {collection.summary} (view)
+                      </button>
+                    ) : (
+                      <span className="text-xs text-stone-600 truncate mt-1 sm:mt-0 block">{collection.summary}</span>
+                    )}
                   </div>
                 )
               })}
@@ -349,29 +475,169 @@ function ParticipantOverview({ participants, attendance }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 const TABS = ['Daily', 'Weekly', 'Participant']
 
-export default function AttendanceOverview({ participants, attendance }) {
+export default function AttendanceOverview({ participants, attendance, setAttendance }) {
   const [tab, setTab] = useState('Daily')
+  const [editingTime, setEditingTime] = useState(null) // { recordId, type: 'signIn' | 'signOut', currentTime, date }
+  const [timeInput, setTimeInput] = useState('')
+  const [collectionDetail, setCollectionDetail] = useState(null)
+
+  function startEditTime(recordId, type, currentTime, date) {
+    const record = attendance.find(r => r.id === recordId)
+    if (!record) return
+
+    const timeString = `${new Date(currentTime).getHours().toString().padStart(2, '0')}:${new Date(currentTime).getMinutes().toString().padStart(2, '0')}`
+    setEditingTime({ recordId, type, currentTime, date })
+    setTimeInput(timeString)
+  }
+
+  function saveTime() {
+    if (!editingTime) return
+
+    const [hours, minutes] = timeInput.split(':').map(Number)
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      alert('Please enter a valid time in HH:MM format')
+      return
+    }
+
+    const record = attendance.find(r => r.id === editingTime.recordId)
+    if (!record) return
+
+    const dateTime = new Date(`${editingTime.date}T${timeInput}:00`)
+    const updatedRecord = {
+      ...record,
+      [editingTime.type]: dateTime.toISOString()
+    }
+
+    setAttendance(prev => prev.map(r => r.id === record.id ? updatedRecord : r))
+    setEditingTime(null)
+    setTimeInput('')
+  }
+
+  function cancelEditTime() {
+    setEditingTime(null)
+    setTimeInput('')
+  }
+
+  function openCollectionDetail(detail) {
+    setCollectionDetail(detail)
+  }
+
+  function markPresent(participantId, date) {
+    const existing = attendance.find(a => a.participantId === participantId && a.date === date)
+    const signInIso = new Date(`${date}T10:00:00`).toISOString()
+
+    if (existing) {
+      setAttendance(prev => prev.map(r => r.id === existing.id ? { ...r, signIn: signInIso } : r))
+      return
+    }
+
+    setAttendance(prev => [
+      ...prev,
+      {
+        id: `${participantId}-${date}`,
+        participantId,
+        date,
+        signIn: signInIso,
+        signOut: null,
+        collectedBy: null,
+      },
+    ])
+  }
+
+  function markAbsent(participantId, date) {
+    const existing = attendance.find(a => a.participantId === participantId && a.date === date)
+    if (!existing) return
+
+    setAttendance(prev => prev.map(r => (
+      r.id === existing.id
+        ? { ...r, signIn: null, signOut: null, collectedBy: null }
+        : r
+    )))
+  }
 
   return (
     <div className="fade-in space-y-5">
+      {editingTime && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
+            <div className="flex items-center justify-between p-5 border-b border-stone-100">
+              <div>
+                <h3 className="font-display font-bold text-forest-950">
+                  Edit {editingTime.type === 'signIn' ? 'Sign In' : 'Sign Out'} Time
+                </h3>
+                <ParticipantNameText
+                  participant={participants.find(p => p.id === attendance.find(r => r.id === editingTime.recordId)?.participantId)}
+                  className="text-sm text-stone-500 mt-0.5"
+                />
+              </div>
+              <button onClick={cancelEditTime} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="label">Time (HH:MM)</label>
+                <input
+                  type="text"
+                  value={timeInput}
+                  onChange={e => setTimeInput(e.target.value)}
+                  className="input w-full"
+                  placeholder="HH:MM"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="p-5 pt-0 flex gap-2">
+              <button onClick={saveTime} className="btn-primary flex-1">Save Time</button>
+              <button onClick={cancelEditTime} className="btn-secondary">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {collectionDetail && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
+            <div className="flex items-center justify-between p-5 border-b border-stone-100">
+              <div>
+                <h3 className="font-display font-bold text-forest-950">Collection Details</h3>
+                <p className="text-sm text-stone-500 mt-0.5">{collectionDetail.participantName} · {fmtDate(collectionDetail.date)}</p>
+              </div>
+              <button onClick={() => setCollectionDetail(null)} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Collector name</p>
+                <p className="text-sm text-stone-800 mt-1">{collectionDetail.fullName}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Reason for change</p>
+                <p className="text-sm text-stone-800 mt-1 whitespace-pre-wrap">{collectionDetail.reason}</p>
+              </div>
+            </div>
+            <div className="p-5 pt-0">
+              <button onClick={() => setCollectionDetail(null)} className="btn-primary w-full">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h2 className="text-2xl font-display font-bold text-forest-950">Attendance Overview</h2>
         <p className="text-stone-500 text-sm">{attendance.length} records total</p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-xl text-sm font-display font-medium transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-display font-medium transition-all w-full sm:w-auto ${
               tab === t ? 'bg-forest-900 text-white' : 'bg-white text-stone-600 border border-stone-200 hover:border-stone-400'
             }`}>{t}</button>
         ))}
       </div>
 
       <div className="fade-in" key={tab}>
-        {tab === 'Daily' && <DailyOverview participants={participants} attendance={attendance} />}
-        {tab === 'Weekly' && <WeeklyOverview participants={participants} attendance={attendance} />}
-        {tab === 'Participant' && <ParticipantOverview participants={participants} attendance={attendance} />}
+        {tab === 'Daily' && <DailyOverview participants={participants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
+        {tab === 'Weekly' && <WeeklyOverview participants={participants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} />}
+        {tab === 'Participant' && <ParticipantOverview participants={participants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
       </div>
     </div>
   )

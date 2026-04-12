@@ -5,13 +5,26 @@ const EMPTY = {
   name: '', pronouns: '', age: '',
   parentName: '', parentEmail: '', parentPhone: '',
   approvedAdults: '',
+  photoConsent: 'yes', otcConsent: false,
+  otcAllowedItems: [], otcNotes: '',
+  dietaryType: '', allergyDetails: '', mealAdjustments: '',
   medicalType: [], medicalDetails: '',
-  sendNeeds: '', sendDiagnosed: false,
+  sendNeeds: '', sendDiagnosed: false, sendDiagnosis: '',
   notes: '',
 }
 
 export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
-  const [form, setForm] = useState({ ...EMPTY, ...initial })
+  const [form, setForm] = useState({
+    ...EMPTY,
+    ...initial,
+    photoConsent: initial.photoConsent || 'yes',
+    otcConsent: Boolean(initial.otcConsent),
+  })
+  const [otcAllowedItemsInput, setOtcAllowedItemsInput] = useState(() => {
+    if (Array.isArray(initial.otcAllowedItems)) return initial.otcAllowedItems.join(', ')
+    if (typeof initial.otcAllowedItems === 'string') return initial.otcAllowedItems
+    return ''
+  })
   const [approvedAdultsList, setApprovedAdultsList] = useState(() => (
     initial.approvedAdults?.split(',').map(a => a.trim()).filter(Boolean) || []
   ))
@@ -71,6 +84,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     onSave({
       ...form,
       approvedAdults: normalizedAdults.join(', '),
+      otcAllowedItems: otcAllowedItemsInput.split(',').map(item => item.trim()).filter(Boolean),
     })
   }
 
@@ -161,7 +175,50 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
         {/* Medical */}
         <section>
           <h4 className="font-display font-semibold text-sm text-forest-700 mb-3 pb-1 border-b border-stone-100">
-            Medical / Dietary
+            Consents
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="label">Photo Consent</label>
+              <select className="input" value={form.photoConsent || ''} onChange={e => set('photoConsent', e.target.value)}>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="internal">For internal use only</option>
+              </select>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-7">
+              <input
+                type="checkbox"
+                checked={Boolean(form.otcConsent)}
+                onChange={e => set('otcConsent', e.target.checked)}
+                className="rounded"
+              />
+              OTC meds consent
+            </label>
+            <div className="sm:col-span-2">
+              <label className="label">OTC Allowed Items</label>
+              <input
+                className="input"
+                value={otcAllowedItemsInput}
+                onChange={e => setOtcAllowedItemsInput(e.target.value)}
+                placeholder="Calpol, antiseptic cream, antihistamine"
+              />
+              <p className="text-xs text-stone-500 mt-1">Comma-separated list.</p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">OTC Notes</label>
+              <textarea
+                className="input resize-none"
+                rows={2}
+                value={form.otcNotes}
+                onChange={e => set('otcNotes', e.target.value)}
+                placeholder="Any restrictions or dosage notes"
+              />
+            </div>
+          </div>
+
+          <h4 className="font-display font-semibold text-sm text-forest-700 mb-3 pb-1 border-b border-stone-100">
+            Medical / Allergy / Dietary
           </h4>
           <div className="space-y-3">
             <div>
@@ -176,7 +233,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
                       form.medicalType.includes(type)
                         ? type === 'Allergy' ? 'bg-red-600 text-white border-red-600'
                           : type === 'Medical' ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-green-600 text-white border-green-600'
+                          : 'bg-emerald-600 text-white border-emerald-600'
                         : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
                     }`}
                   >
@@ -185,16 +242,53 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
                 ))}
               </div>
             </div>
-            <div>
-              <label className="label">Details</label>
-              <textarea
-                className="input resize-none"
-                rows={3}
-                value={form.medicalDetails}
-                onChange={e => set('medicalDetails', e.target.value)}
-                placeholder="Describe allergies, conditions, medications, dietary requirements..."
-              />
-            </div>
+            {form.medicalType.includes('Dietary') && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Dietary Type</label>
+                  <input
+                    className="input"
+                    value={form.dietaryType || ''}
+                    onChange={e => set('dietaryType', e.target.value)}
+                    placeholder="Vegetarian, halal, no dairy"
+                  />
+                </div>
+                <div>
+                  <label className="label">Dietary Details</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={form.mealAdjustments || ''}
+                    onChange={e => set('mealAdjustments', e.target.value)}
+                    placeholder="Specific dietary requirements, substitutions, portions, timings"
+                  />
+                </div>
+              </div>
+            )}
+            {form.medicalType.includes('Medical') && (
+              <div>
+                <label className="label">Medical Details</label>
+                <textarea
+                  className="input resize-none"
+                  rows={3}
+                  value={form.medicalDetails}
+                  onChange={e => set('medicalDetails', e.target.value)}
+                  placeholder="Describe medical conditions, medications, symptoms, treatment guidance"
+                />
+              </div>
+            )}
+            {form.medicalType.includes('Allergy') && (
+              <div>
+                <label className="label">Allergy Details</label>
+                <textarea
+                  className="input resize-none"
+                  rows={2}
+                  value={form.allergyDetails || ''}
+                  onChange={e => set('allergyDetails', e.target.value)}
+                  placeholder="Allergen list and reaction severity"
+                />
+              </div>
+            )}
           </div>
         </section>
 
@@ -214,6 +308,18 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
               />
               <label htmlFor="sendDiagnosed" className="text-sm text-stone-700 font-body">Formally diagnosed</label>
             </div>
+            {form.sendDiagnosed && (
+              <div>
+                <label className="label">Diagnosis</label>
+                <textarea
+                  className="input resize-none"
+                  rows={2}
+                  value={form.sendDiagnosis || ''}
+                  onChange={e => set('sendDiagnosis', e.target.value)}
+                  placeholder="e.g., ADHD, Autism, Dyslexia..."
+                />
+              </div>
+            )}
             <div>
               <label className="label">Support Needs Details</label>
               <textarea
