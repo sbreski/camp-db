@@ -1097,11 +1097,6 @@ export default function Timetable({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="label">Time window</label>
-            <p className="text-sm text-stone-700">Grid uses fixed reference blocks; sessions can be any time from 09:45 to 16:30</p>
-          </div>
-
           {canSeeOverview && (
             <div>
               <label className="label">Overview mode</label>
