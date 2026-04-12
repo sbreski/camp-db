@@ -1,0 +1,32 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Daily at 09:15 UTC
+    - cron: '15 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping keepalive endpoint
+        env:
+          KEEPALIVE_URL: ${{ secrets.KEEPALIVE_URL }}
+        run: |
+          if [ -z "$KEEPALIVE_URL" ]; then
+            echo "Missing GitHub secret KEEPALIVE_URL"
+            exit 1
+          fi
+
+          echo "Pinging keepalive endpoint..."
+          http_code=$(curl -sS -o response.json -w "%{http_code}" "$KEEPALIVE_URL")
+
+          echo "HTTP status: $http_code"
+          cat response.json
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Keepalive ping failed"
+            exit 1
+          fi
