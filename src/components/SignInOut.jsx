@@ -195,7 +195,11 @@ export default function SignInOut({ participants, attendance, setAttendance, act
   const [reasonInput, setReasonInput] = useState('')
   const [reasonNotesInput, setReasonNotesInput] = useState('')
   const today = todayKey()
-  const seasonParticipants = participants.filter(p => p.isActiveThisSeason !== false)
+  const seasonParticipants = participants.filter(p => {
+    const seasonFlag = p.isActiveThisSeason ?? p.is_active_this_season
+    if (typeof seasonFlag === 'string') return seasonFlag.toLowerCase() !== 'false'
+    return seasonFlag !== false
+  })
   const selectedRecords = attendance.filter(a => a.date === selectedDate)
 
   function getPendingFollowUps(participantId) {

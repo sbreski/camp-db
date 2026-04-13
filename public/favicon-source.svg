@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Impact Kidz">
+  <rect x="0" y="0" width="64" height="64" rx="12" ry="12" fill="#1a3a2a"/>
+  <text x="17" y="44" font-family="Outfit, Arial, sans-serif" font-size="28" font-weight="800" letter-spacing="-1" fill="#ffffff">IK</text>
+  <polygon points="47,16 49,21 54,21 50,24 52,30 47,26.5 42,30 44,24 40,21 45,21" fill="#fbbf24"/>
+</svg>

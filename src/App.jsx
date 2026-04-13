@@ -1157,6 +1157,18 @@ export default function App() {
           columns: 'id,uploaded_by_initials',
           label: 'Document uploader initials column is missing (uploaded_by_initials).',
         },
+        {
+          key: 'participants_seasonal_assignment',
+          table: 'participants',
+          columns: 'id,is_active_this_season',
+          label: 'Seasonal participant toggle column is missing (is_active_this_season). Run db/23_seasonal_signin_assignments.sql.',
+        },
+        {
+          key: 'staff_seasonal_assignment',
+          table: 'staff',
+          columns: 'id,is_assigned_this_season',
+          label: 'Seasonal staff toggle column is missing (is_assigned_this_season). Run db/23_seasonal_signin_assignments.sql.',
+        },
       ]
 
       for (const check of checks) {

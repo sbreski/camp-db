@@ -20,7 +20,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     ...initial,
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
-    isActiveThisSeason: initial.isActiveThisSeason !== false,
+    isActiveThisSeason: (initial.isActiveThisSeason ?? initial.is_active_this_season) !== false,
   })
   const [otcAllowedItemsInput, setOtcAllowedItemsInput] = useState(() => {
     if (Array.isArray(initial.otcAllowedItems)) return initial.otcAllowedItems.join(', ')

@@ -70,7 +70,7 @@ function StaffForm({ initial, onSave, onCancel }) {
     safeguardingTrained: Boolean(initial?.safeguardingTrained),
     firstAidExpiresOn: initial?.firstAidExpiresOn || '',
     safeguardingExpiresOn: initial?.safeguardingExpiresOn || '',
-    isAssignedThisSeason: initial?.isAssignedThisSeason !== false,
+    isAssignedThisSeason: (initial?.isAssignedThisSeason ?? initial?.is_assigned_this_season) !== false,
   })
   function set(k, v) { setForm(p => ({ ...p, [k]: v })) }
   async function submit(e) {
