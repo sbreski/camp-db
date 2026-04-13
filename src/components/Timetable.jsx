@@ -942,93 +942,29 @@ export default function Timetable({
   }
 
   function printDaySchedule() {
-    const sorted = [...dayEntries].sort((a, b) => String(a.startTime || a.start_time || '').localeCompare(String(b.startTime || b.start_time || '')))
-    const rows = sorted.map(entry => {
-      const assigned = normalizeAssignedEmails(entry)
-        .map(email => allStaffOptions.find(option => option.email === email)?.label || email)
-        .join(', ')
+    const isOverviewPrint = canSeeOverview
+    const printableWidthPx = isOverviewPrint ? 1500 : 760
+    const estimatedTableWidth = 110 + (columns.length * 220)
+    const scale = Math.min(1, printableWidthPx / Math.max(estimatedTableWidth, 1))
 
-      return `
-        <tr>
-          <td>${escapeHtml(entry.startTime || entry.start_time || '')} - ${escapeHtml(entry.endTime || entry.end_time || '')}</td>
-          <td>${escapeHtml(entry.activityName || entry.activity_name || '')}</td>
-          <td>${escapeHtml(entry.groupName || entry.group_name || '')}</td>
-          <td>${escapeHtml(entrySpaceName(entry))}</td>
-          <td>${escapeHtml(assigned)}</td>
-          <td>${escapeHtml(entry.notes || '').replaceAll('\n', '<br />')}</td>
-        </tr>
-      `
-    }).join('')
+    const pageStyle = document.createElement('style')
+    pageStyle.id = 'timetable-print-page-style'
+    pageStyle.textContent = `@page { size: ${isOverviewPrint ? 'A3 landscape' : 'A4 portrait'}; margin: 8mm; }`
+    document.head.appendChild(pageStyle)
 
-    const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Schedule ${escapeHtml(selectedDate)}</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; color: #1f2937; }
-    h1 { font-size: 20px; margin: 0 0 4px 0; }
-    p { margin: 0 0 16px 0; color: #4b5563; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #d1d5db; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; }
-    th { background: #f3f4f6; }
-  </style>
-</head>
-<body>
-  <h1>Staff Schedule</h1>
-  <p>${escapeHtml(fmtDateLabel(selectedDate))} (${escapeHtml(viewMode === 'space' ? 'By Space' : 'By Staff')})</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Activity</th>
-        <th>Group</th>
-        <th>Space</th>
-        <th>Staff</th>
-        <th>Notes</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows || '<tr><td colspan="6">No schedule entries for this day.</td></tr>'}
-    </tbody>
-  </table>
-</body>
-</html>`
+    document.body.classList.add('timetable-printing')
+    document.documentElement.style.setProperty('--timetable-print-scale', String(scale))
 
-    const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760')
-    if (popup) {
-      popup.document.write(html)
-      popup.document.close()
-      popup.focus()
-      popup.print()
-      return
+    const cleanup = () => {
+      document.body.classList.remove('timetable-printing')
+      document.documentElement.style.removeProperty('--timetable-print-scale')
+      const existing = document.getElementById('timetable-print-page-style')
+      if (existing) existing.remove()
+      window.removeEventListener('afterprint', cleanup)
     }
 
-    const iframe = document.createElement('iframe')
-    iframe.style.position = 'fixed'
-    iframe.style.right = '0'
-    iframe.style.bottom = '0'
-    iframe.style.width = '0'
-    iframe.style.height = '0'
-    iframe.style.border = '0'
-    document.body.appendChild(iframe)
-
-    const iframeDoc = iframe.contentWindow?.document
-    if (!iframeDoc || !iframe.contentWindow) {
-      iframe.remove()
-      alert('Unable to print schedule right now. Please try again.')
-      return
-    }
-
-    iframeDoc.open()
-    iframeDoc.write(html)
-    iframeDoc.close()
-
-    iframe.onload = () => {
-      iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
-      window.setTimeout(() => iframe.remove(), 1000)
-    }
+    window.addEventListener('afterprint', cleanup)
+    window.print()
   }
 
   function renderEntryCard(entry) {
@@ -1097,9 +1033,23 @@ export default function Timetable({
   }
 
   return (
-    <div className="fade-in space-y-5">
+    <div className="fade-in space-y-5 timetable-root">
+      <style>{`
+        @media print {
+          body.timetable-printing .timetable-no-print { display: none !important; }
+          body.timetable-printing .timetable-root { margin: 0 !important; padding: 0 !important; }
+          body.timetable-printing .timetable-print-target {
+            transform-origin: top left;
+            transform: scale(var(--timetable-print-scale, 1));
+            width: calc(100% / var(--timetable-print-scale, 1));
+          }
+          body.timetable-printing .timetable-print-target table { min-width: 0 !important; width: 100% !important; }
+          body.timetable-printing .timetable-print-target th,
+          body.timetable-printing .timetable-print-target td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      `}</style>
       {editingEntry && (
-        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4 timetable-no-print">
           <div className="bg-white rounded-2xl shadow-xl border border-stone-200 w-full max-w-3xl fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -1233,7 +1183,7 @@ export default function Timetable({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 timetable-no-print">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Staff Schedule</h2>
           <p className="text-stone-500 text-sm">
@@ -1256,7 +1206,7 @@ export default function Timetable({
         </div>
       </div>
 
-      <div className="card space-y-3">
+      <div className="card space-y-3 timetable-no-print">
         <div className="flex items-center gap-2">
           <button onClick={() => setSelectedDate(prev => addDays(prev, -1))} className="btn-secondary px-2 py-2"><ChevronLeft size={16} /></button>
           <div className="flex-1 text-center">
@@ -1382,7 +1332,7 @@ export default function Timetable({
       </div>
 
       {conflictSummary.slotAlerts.length > 0 && (
-        <div className="card border border-rose-200 bg-rose-50">
+        <div className="card border border-rose-200 bg-rose-50 timetable-no-print">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle size={16} className="text-rose-700" />
             <h3 className="font-semibold text-rose-900">Double-booked staff alerts</h3>
@@ -1400,7 +1350,7 @@ export default function Timetable({
           <p className="text-stone-500 text-sm">No timetable columns available for this view/filter.</p>
         </div>
       ) : (
-        <div className="card overflow-auto p-0">
+        <div className="card overflow-auto p-0 timetable-print-target">
           <table className="min-w-[960px] w-full border-separate border-spacing-0">
             <thead>
               <tr>
@@ -1444,8 +1394,12 @@ export default function Timetable({
                           if (entryEnd > timeRows[i].startMinutes) rowSpan++
                           else break
                         }
+                        const endRow = timeRows[Math.min(timeRows.length - 1, rowIdx + rowSpan - 1)]
+                        const endRowMinutes = Math.max(1, endRow.endMinutes - endRow.startMinutes)
+                        const endOffsetMinutes = Math.max(0, endRow.endMinutes - (entryEnd ?? endRow.endMinutes))
+                        const endOffsetPx = Math.round((endOffsetMinutes / endRowMinutes) * 56)
                         renderedEntries.add(entry.id)
-                        return { entry, rowSpan, startOffsetPx }
+                        return { entry, rowSpan, startOffsetPx, endOffsetPx }
                       })
 
                       if (entriesWithSpan.length === 0 && allEntriesInColumn.length === 0) {
@@ -1478,8 +1432,8 @@ export default function Timetable({
                             title={canEdit ? 'Double-click to add/edit' : ''}
                           >
                             <div className="grid gap-1" style={{ gridTemplateColumns: gridCols }}>
-                              {entriesWithSpan.map(({ entry, startOffsetPx }) => (
-                                <div key={entry.id} style={{ marginTop: `${startOffsetPx}px` }}>
+                              {entriesWithSpan.map(({ entry, startOffsetPx, endOffsetPx }) => (
+                                <div key={entry.id} style={{ marginTop: `${startOffsetPx}px`, marginBottom: `${endOffsetPx}px` }}>
                                   {renderEntryCard(entry)}
                                 </div>
                               ))}
