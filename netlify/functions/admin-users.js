@@ -162,6 +162,7 @@ export async function handler(event) {
             isArchived: archivedByMetadata || archivedByBan,
             isAdmin: !!row?.is_admin,
             canViewTimetableOverview: !!row?.can_view_timetable_overview,
+            canEditTimetable: !!row?.can_edit_timetable,
             allowedTabs: sanitizeAllowedTabs(row?.allowed_tabs),
           }
         })
@@ -191,6 +192,7 @@ export async function handler(event) {
       const password = String(body.password || '')
       const isAdminInput = !!body.isAdmin
       const canViewTimetableOverviewInput = !!body.canViewTimetableOverview
+      const canEditTimetableInput = !!body.canEditTimetable
       const allowedTabs = sanitizeAllowedTabs(body.allowedTabs)
 
       if (!email || !email.includes('@')) return json(400, { error: 'Valid email is required' })
@@ -216,6 +218,7 @@ export async function handler(event) {
           user_id: createdUser.id,
           is_admin: isAdminInput,
           can_view_timetable_overview: canViewTimetableOverviewInput,
+          can_edit_timetable: canEditTimetableInput,
           allowed_tabs: allowedTabs,
         },
         { onConflict: 'user_id' }
@@ -232,6 +235,7 @@ export async function handler(event) {
           email: createdUser.email || '',
           isAdmin: isAdminInput,
           canViewTimetableOverview: canViewTimetableOverviewInput,
+          canEditTimetable: canEditTimetableInput,
           allowedTabs,
         },
       })
@@ -241,6 +245,7 @@ export async function handler(event) {
       const userId = String(body.userId || '')
       const isAdminInput = !!body.isAdmin
       const canViewTimetableOverviewInput = !!body.canViewTimetableOverview
+      const canEditTimetableInput = !!body.canEditTimetable
       const allowedTabs = sanitizeAllowedTabs(body.allowedTabs)
 
       if (!userId) return json(400, { error: 'userId is required' })
@@ -250,6 +255,7 @@ export async function handler(event) {
           user_id: userId,
           is_admin: isAdminInput,
           can_view_timetable_overview: canViewTimetableOverviewInput,
+          can_edit_timetable: canEditTimetableInput,
           allowed_tabs: allowedTabs,
         },
         { onConflict: 'user_id' }

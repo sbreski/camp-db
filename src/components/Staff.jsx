@@ -225,6 +225,7 @@ function CreateAccountForm({ onSubmit, loading }) {
     role: '',
     isAdmin: false,
     canViewTimetableOverview: false,
+    canEditTimetable: false,
     allowedTabs: ['dashboard', 'signin'],
   })
 
@@ -291,6 +292,17 @@ function CreateAccountForm({ onSubmit, loading }) {
           disabled={form.isAdmin}
         />
         Can view timetable overviews
+      </label>
+
+      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={form.canEditTimetable}
+          onChange={e => updateField('canEditTimetable', e.target.checked)}
+          disabled={form.isAdmin}
+        />
+        Can edit timetable
       </label>
 
       <div>
@@ -434,6 +446,7 @@ export default function Staff({ staffList, setStaffList }) {
           email: user.email || '',
           isAdmin: !!user.isAdmin,
           canViewTimetableOverview: !!user.canViewTimetableOverview,
+          canEditTimetable: !!user.canEditTimetable,
           allowedTabs: sanitizeAllowedTabs(user.allowedTabs),
           newPassword: '',
           deleteConfirmed: false,
@@ -531,6 +544,7 @@ export default function Staff({ staffList, setStaffList }) {
           userId,
           isAdmin: !!edit.isAdmin,
           canViewTimetableOverview: !!edit.canViewTimetableOverview,
+          canEditTimetable: !!edit.canEditTimetable,
           allowedTabs: sanitizeAllowedTabs(edit.allowedTabs),
         }),
       })
@@ -989,6 +1003,17 @@ export default function Staff({ staffList, setStaffList }) {
                         disabled={!!edit.isAdmin}
                       />
                       Can view timetable overviews
+                    </label>
+
+                    <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={!!edit.canEditTimetable}
+                        onChange={e => setEdit(user.id, { canEditTimetable: e.target.checked })}
+                        disabled={!!edit.isAdmin}
+                      />
+                      Can edit timetable
                     </label>
 
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
