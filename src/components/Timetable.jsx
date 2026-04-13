@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Copy, Pencil, Plus, Printer, Trash2, X } from 'lucide-react'
 
 const DEFAULT_SPACE_OPTIONS = ['Drama Space', 'Art Space', 'bardepot', 'Studio Theatre']
@@ -235,6 +235,7 @@ export default function Timetable({
   const [newSpaceName, setNewSpaceName] = useState('')
   const [duplicateTargetDate, setDuplicateTargetDate] = useState(addDays(todayKey(), 1))
   const [dragState, setDragState] = useState(null)
+  const autoStaffFilterAppliedRef = useRef(false)
   const [spaceColors, setSpaceColors] = useState(() => {
     const fromStorage = colorMapFromStorage()
     return { ...DEFAULT_SPACE_COLORS, ...fromStorage }
@@ -297,6 +298,20 @@ export default function Timetable({
     }
     return [...merged.values()]
   }, [staffOptions, staffFromEntries])
+
+  useEffect(() => {
+    if (autoStaffFilterAppliedRef.current) return
+    if (!canSeeOverview) return
+
+    const myEmail = normalizeText(currentUserEmail)
+    if (!myEmail) return
+
+    const hasOption = allStaffOptions.some(option => option.email === myEmail)
+    if (!hasOption) return
+
+    autoStaffFilterAppliedRef.current = true
+    setStaffFilter(myEmail)
+  }, [canSeeOverview, currentUserEmail, allStaffOptions])
 
   const myStaffOption = useMemo(() => {
     const email = normalizeText(currentUserEmail)

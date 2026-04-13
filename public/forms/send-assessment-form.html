@@ -457,6 +457,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   const STORAGE_KEY = 'ik_send_assessment';
+  const params = new URLSearchParams(window.location.search)
 
   async function sendPdfToCampDb() {
     try {
@@ -562,8 +563,9 @@
   function clearForm() {
     if (!confirm('Are you sure you want to clear all fields? This cannot be undone.')) return;
     localStorage.removeItem(STORAGE_KEY);
+    const staffMember = params.get('staffMember') || ''
     document.querySelectorAll('input[type="text"], input[type="date"], textarea').forEach(el => {
-      if (el.id === 'coordinator' || el.id === 'sign_name') { el.value = 'Sam Brenner'; return; }
+      if (el.id === 'coordinator' || el.id === 'sign_name') { el.value = staffMember; return; }
       el.value = '';
     });
     document.querySelectorAll('input[type="radio"]').forEach(el => el.checked = false);
@@ -575,15 +577,19 @@
   setInterval(saveForm, 30000);
 
   function applyParticipantPrefillFromQuery() {
-    const params = new URLSearchParams(window.location.search)
     const participantName = params.get('participantName') || ''
     const participantAge = params.get('participantAge') || ''
+    const staffMember = params.get('staffMember') || ''
 
     const nameField = document.getElementById('child_name')
     const ageField = document.getElementById('child_age')
+    const coordinatorField = document.getElementById('coordinator')
+    const signNameField = document.getElementById('sign_name')
 
     if (nameField && participantName) nameField.value = participantName
     if (ageField && participantAge) ageField.value = participantAge
+    if (coordinatorField && staffMember && (!coordinatorField.value || coordinatorField.value === 'Sam Brenner')) coordinatorField.value = staffMember
+    if (signNameField && staffMember && (!signNameField.value || signNameField.value === 'Sam Brenner')) signNameField.value = staffMember
   }
 
   // Load saved data on open

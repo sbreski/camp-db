@@ -62,7 +62,7 @@ const TABS = ['Overview', 'Medical', 'SEND / Support', 'Attendance', 'Incidents'
 
 export default function ParticipantDetail({
   participant, participants, setParticipants,
-  attendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, onBack
+  attendance, setAttendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, onBack
 }) {
   const [editing, setEditing] = useState(false)
   const [showIncident, setShowIncident] = useState(false)
@@ -107,6 +107,48 @@ export default function ParticipantDetail({
     setEditing(false)
   }
 
+  function dateKeyFromIso(isoString) {
+    if (!isoString) return new Date().toISOString().slice(0, 10)
+    return String(isoString).slice(0, 10)
+  }
+
+  function addPickupFollowUpNote(dateKey, message) {
+    if (typeof setAttendance !== 'function' || !participant?.id || !message) return
+
+    setAttendance(prev => {
+      const existing = prev.find(item => item.participantId === participant.id && item.date === dateKey)
+      const existingNote = String(existing?.exceptionNotes || existing?.exception_notes || '').trim()
+      const hasMessageAlready = existingNote.toLowerCase().includes(message.toLowerCase())
+      const combinedNote = hasMessageAlready
+        ? existingNote
+        : (existingNote ? `${existingNote}\n${message}` : message)
+
+      if (existing) {
+        return prev.map(item => (
+          item.id === existing.id
+            ? { ...item, exceptionNotes: combinedNote }
+            : item
+        ))
+      }
+
+      return [
+        ...prev,
+        {
+          id: `${participant.id}-${dateKey}`,
+          participantId: participant.id,
+          date: dateKey,
+          signIn: null,
+          signOut: null,
+          signInBy: null,
+          signOutBy: null,
+          collectedBy: null,
+          exceptionReason: null,
+          exceptionNotes: combinedNote,
+        },
+      ]
+    })
+  }
+
   async function saveIncident(data) {
     if (editingIncident) {
       await setIncidents(prev => prev.map(inc => {
@@ -145,6 +187,15 @@ export default function ParticipantDetail({
       followUpCompletedAt: null,
       followUpCompletedBy: null,
     }])
+
+    const hasUploadedForm = Boolean(String(data?.pdfName || '').trim() || String(data?.pdfData || '').trim())
+    if (hasUploadedForm) {
+      addPickupFollowUpNote(
+        dateKeyFromIso(createdAt),
+        `${data.type || 'Incident'} form uploaded - discuss with pickup parent.`
+      )
+    }
+
     setShowIncident(false)
   }
 

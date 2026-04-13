@@ -414,6 +414,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   const STORAGE_KEY = 'ik_staff_visitor_incident_form'
+  const params = new URLSearchParams(window.location.search)
 
   function getFormData() {
     const data = {}
@@ -498,6 +499,13 @@
     document.getElementById('f-date').value = today
     document.getElementById('f-reporteddate').value = today
     document.getElementById('f-location').value = 'artsdepot, 5 Nether St, London N12 0GA'
+    const staffMember = params.get('staffMember') || ''
+    if (staffMember) {
+      const reportedByField = document.getElementById('f-reportedby')
+      const staffPresentField = document.getElementById('f-staff')
+      if (reportedByField) reportedByField.value = staffMember
+      if (staffPresentField) staffPresentField.value = staffMember
+    }
     const note = document.getElementById('saved_note')
     note.textContent = ''
   }
@@ -617,18 +625,26 @@
   setInterval(saveForm, 30000)
 
   function applyParticipantPrefillFromQuery() {
-    const params = new URLSearchParams(window.location.search)
     const participantName = params.get('participantName') || ''
     const participantAge = params.get('participantAge') || ''
+    const staffMember = params.get('staffMember') || ''
 
     const nameField = document.getElementById('f-name')
     const ageField = document.getElementById('f-age')
+    const reportedByField = document.getElementById('f-reportedby')
+    const staffPresentField = document.getElementById('f-staff')
 
     if (nameField && participantName) {
       nameField.value = participantName
     }
     if (ageField && participantAge) {
       ageField.value = participantAge
+    }
+    if (reportedByField && staffMember && !reportedByField.value) {
+      reportedByField.value = staffMember
+    }
+    if (staffPresentField && staffMember && !staffPresentField.value) {
+      staffPresentField.value = staffMember
     }
 
     if (participantName) {

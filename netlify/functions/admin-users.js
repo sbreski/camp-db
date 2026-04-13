@@ -202,6 +202,9 @@ export async function handler(event) {
         email,
         password,
         email_confirm: true,
+        user_metadata: {
+          must_change_password: true,
+        },
       })
 
       if (createError) {

@@ -871,7 +871,7 @@ export default function App() {
       const primary = await Promise.race([
         supabase
           .from('user_tab_permissions')
-          .select('is_admin, allowed_tabs, can_view_timetable_overview')
+          .select('is_admin, allowed_tabs, can_view_timetable_overview, can_edit_timetable')
           .eq('user_id', user.id)
           .maybeSingle(),
         new Promise((_, reject) => {
@@ -882,7 +882,13 @@ export default function App() {
       data = primary.data
       error = primary.error
 
-      if (error && isMissingColumnError(error, 'can_view_timetable_overview')) {
+      if (
+        error
+        && (
+          isMissingColumnError(error, 'can_view_timetable_overview')
+          || isMissingColumnError(error, 'can_edit_timetable')
+        )
+      ) {
         const fallback = await supabase
           .from('user_tab_permissions')
           .select('is_admin, allowed_tabs')
@@ -1428,6 +1434,7 @@ export default function App() {
           participants={participants}
           setParticipants={setParticipants}
           attendance={attendance}
+          setAttendance={setAttendance}
           incidents={incidents}
           setIncidents={setIncidents}
           staffList={staffList}

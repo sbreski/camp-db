@@ -285,6 +285,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   const STORAGE_KEY = 'ik_safeguarding_assessment';
+  const params = new URLSearchParams(window.location.search);
 
   function getFormData() {
     const data = {};
@@ -332,8 +333,9 @@
   function clearForm() {
     if (!confirm('Are you sure you want to clear all fields? This cannot be undone.')) return;
     localStorage.removeItem(STORAGE_KEY);
+    const staffMember = params.get('staffMember') || '';
     document.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(el => {
-      if (el.id === 'recorded_by') { el.value = 'Sam Brenner'; return; }
+      if (el.id === 'recorded_by') { el.value = staffMember; return; }
       el.value = '';
     });
     document.getElementById('location').value = 'artsdepot, 5 Nether St, London N12 0GA';
@@ -342,15 +344,17 @@
   }
 
   function applyParticipantPrefillFromQuery() {
-    const params = new URLSearchParams(window.location.search)
     const participantName = params.get('participantName') || ''
     const participantAge = params.get('participantAge') || ''
+    const staffMember = params.get('staffMember') || ''
 
     const nameField = document.getElementById('child_name')
     const ageField = document.getElementById('child_age')
+    const recordedByField = document.getElementById('recorded_by')
 
     if (nameField && participantName) nameField.value = participantName
     if (ageField && participantAge) ageField.value = participantAge
+    if (recordedByField && staffMember && (!recordedByField.value || recordedByField.value === 'Sam Brenner')) recordedByField.value = staffMember
   }
 
   async function sendPdfToCampDb() {
