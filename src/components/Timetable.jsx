@@ -385,6 +385,11 @@ export default function Timetable({
   }, [visibleEntries, selectedDate, viewMode, canSeeOverview, staffFilter, spaceFilter])
 
   const columns = useMemo(() => {
+    if (viewMode === 'whereabouts') {
+      if (!canSeeOverview) return []
+      return allStaffOptions
+    }
+
     if (viewMode === 'space') {
       if (!canSeeOverview) return []
       if (spaceFilter !== 'all') return [spaceFilter]
@@ -933,6 +938,11 @@ export default function Timetable({
   }
 
   function entriesForColumnAtSlot(column, slotStart, slotEnd) {
+    if (viewMode === 'whereabouts') {
+      const email = column.email
+      return dayEntries.filter(entry => normalizeAssignedEmails(entry).includes(email) && isActiveInRange(entry, slotStart, slotEnd))
+    }
+
     if (viewMode === 'space') {
       return dayEntries.filter(entry => normalizeText(entrySpaceName(entry)) === normalizeText(column) && isActiveInRange(entry, slotStart, slotEnd))
     }
@@ -1235,6 +1245,7 @@ export default function Timetable({
               <div className="flex gap-2">
                 <button onClick={() => setViewMode('staff')} className={`btn-secondary text-sm ${viewMode === 'staff' ? 'bg-forest-900 text-white border-forest-900' : ''}`}>By Staff</button>
                 <button onClick={() => setViewMode('space')} className={`btn-secondary text-sm ${viewMode === 'space' ? 'bg-forest-900 text-white border-forest-900' : ''}`}>By Space</button>
+                <button onClick={() => setViewMode('whereabouts')} className={`btn-secondary text-sm ${viewMode === 'whereabouts' ? 'bg-forest-900 text-white border-forest-900' : ''}`}>Whereabouts</button>
               </div>
             </div>
           )}
@@ -1365,7 +1376,35 @@ export default function Timetable({
               </tr>
             </thead>
             <tbody>
-              {(() => {
+              {viewMode === 'whereabouts' ? (
+                timeRows.map(row => (
+                  <tr key={row.startLabel} className="h-16">
+                    <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
+                      {row.startLabel} - {row.endLabel}
+                    </td>
+                    {columns.map(column => {
+                      const key = column.email
+                      const activeEntries = entriesForColumnAtSlot(column, row.startMinutes, row.endMinutes)
+                      const spaces = [...new Set(activeEntries.map(entry => entrySpaceName(entry)).filter(Boolean))]
+                      return (
+                        <td key={`${row.startLabel}-${key}`} className="border-b border-stone-200 px-2 py-1 align-top h-16">
+                          {spaces.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {spaces.map(space => (
+                                <span key={space} className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900">
+                                  {space}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-stone-400">-</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))
+              ) : (() => {
                 const renderedEntries = new Set()
                 return timeRows.map((row, rowIdx) => (
                   <tr key={row.startLabel} className="h-16">
