@@ -364,7 +364,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       if (inc.id !== incidentId) return inc
 
       const updatedNotes = incidentNotesForIncident(inc).map(note => (
-        note.id === noteId
+        note.id === noteId && !note.deletedAt
           ? {
               ...note,
               text,
@@ -424,13 +424,21 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function deleteIncidentNote(incident, noteId) {
-    if (!window.confirm('Delete this note?')) return
+    if (!window.confirm('Delete this note? You can recover it later.')) return
 
     await setIncidents(prev => prev.map(inc => {
       if (inc.id !== incident.id) return inc
       return {
         ...inc,
-        incidentNotes: incidentNotesForIncident(inc).filter(note => note.id !== noteId),
+        incidentNotes: incidentNotesForIncident(inc).map(note => (
+          note.id === noteId
+            ? {
+                ...note,
+                deletedAt: new Date().toISOString(),
+                deletedBy: actorInitials,
+              }
+            : note
+        )),
         updatedByInitials: actorInitials,
         updatedByUserId: actorUserId || inc.updatedByUserId || null,
       }
@@ -442,13 +450,53 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function deleteIncidentDocument(incident, docId) {
-    if (!window.confirm('Delete this document from the report updates list?')) return
+    if (!window.confirm('Delete this document from the report updates list? You can recover it later.')) return
 
     await setIncidents(prev => prev.map(inc => {
       if (inc.id !== incident.id) return inc
       return {
         ...inc,
-        incidentDocuments: incidentDocumentsForIncident(inc).filter(doc => doc.id !== docId),
+        incidentDocuments: incidentDocumentsForIncident(inc).map(doc => (
+          doc.id === docId
+            ? {
+                ...doc,
+                deletedAt: new Date().toISOString(),
+                deletedBy: actorInitials,
+              }
+            : doc
+        )),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+  }
+
+  async function recoverIncidentNote(incident, noteId) {
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentNotes: incidentNotesForIncident(inc).map(note => (
+          note.id === noteId
+            ? { ...note, deletedAt: null, deletedBy: null }
+            : note
+        )),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+  }
+
+  async function recoverIncidentDocument(incident, docId) {
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentDocuments: incidentDocumentsForIncident(inc).map(doc => (
+          doc.id === docId
+            ? { ...doc, deletedAt: null, deletedBy: null }
+            : doc
+        )),
         updatedByInitials: actorInitials,
         updatedByUserId: actorUserId || inc.updatedByUserId || null,
       }
@@ -598,6 +646,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             const isDownloadingReport = downloadingIncidentId === inc.id
             const incidentNotes = incidentNotesForIncident(inc)
             const incidentDocuments = incidentDocumentsForIncident(inc)
+            const activeIncidentNotes = incidentNotes.filter(note => !note.deletedAt)
+            const activeIncidentDocuments = incidentDocuments.filter(doc => !doc.deletedAt)
             const isUpdatesOpen = expandedIncidentId === inc.id
             const noteDraft = noteDraftByIncident[inc.id] || ''
             const isUploadingExtra = uploadingExtraIncidentId === inc.id
@@ -621,11 +671,11 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                       {resolvedAtForIncident(inc) && (
                         <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Resolved</span>
                       )}
-                      {incidentNotes.length > 0 && (
-                        <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{incidentNotes.length} notes</span>
+                      {activeIncidentNotes.length > 0 && (
+                        <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{activeIncidentNotes.length} notes</span>
                       )}
-                      {incidentDocuments.length > 0 && (
-                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{incidentDocuments.length} docs</span>
+                      {activeIncidentDocuments.length > 0 && (
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{activeIncidentDocuments.length} docs</span>
                       )}
                       {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
                     </div>
@@ -782,9 +832,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         <div className="space-y-2">
                           {incidentNotes.map(note => {
                             const isEditingThisNote = editingNote?.incidentId === inc.id && editingNote?.noteId === note.id
+                            const isDeleted = Boolean(note.deletedAt)
                             return (
-                              <div key={note.id} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
-                                {isEditingThisNote ? (
+                              <div key={note.id} className={`rounded-lg border px-3 py-2 ${isDeleted ? 'border-stone-200 bg-stone-100 opacity-75' : 'border-stone-200 bg-stone-50'}`}>
+                                {isEditingThisNote && !isDeleted ? (
                                   <div className="space-y-2">
                                     <textarea
                                       className="input min-h-[84px]"
@@ -810,7 +861,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                                   </div>
                                 ) : (
                                   <>
-                                    <p className="text-sm text-stone-800 whitespace-pre-wrap">{note.text}</p>
+                                    <p className={`text-sm whitespace-pre-wrap ${isDeleted ? 'text-stone-500 line-through' : 'text-stone-800'}`}>{note.text}</p>
                                     <div className="mt-1 flex items-center gap-3 text-[11px] text-stone-500 flex-wrap">
                                       <span>
                                         Added {new Date(note.createdAt).toLocaleDateString('en-GB', {
@@ -826,20 +877,33 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                                           {note.updatedBy ? ` by ${note.updatedBy}` : ''}
                                         </span>
                                       )}
-                                      <button
-                                        type="button"
-                                        onClick={() => beginEditIncidentNote(inc.id, note)}
-                                        className="underline text-forest-700 hover:text-forest-900"
-                                      >
-                                        Edit note
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => deleteIncidentNote(inc, note.id)}
-                                        className="underline text-red-700 hover:text-red-900"
-                                      >
-                                        Delete note
-                                      </button>
+                                      {!isDeleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() => beginEditIncidentNote(inc.id, note)}
+                                          className="underline text-forest-700 hover:text-forest-900"
+                                        >
+                                          Edit note
+                                        </button>
+                                      )}
+                                      {!isDeleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteIncidentNote(inc, note.id)}
+                                          className="underline text-red-700 hover:text-red-900"
+                                        >
+                                          Delete note
+                                        </button>
+                                      )}
+                                      {isDeleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() => recoverIncidentNote(inc, note.id)}
+                                          className="underline text-emerald-700 hover:text-emerald-900"
+                                        >
+                                          Recover
+                                        </button>
+                                      )}
                                     </div>
                                   </>
                                 )}
@@ -877,20 +941,35 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         <div className="space-y-1">
                           {incidentDocuments.map(doc => (
                             <div key={doc.id} className="text-xs text-stone-700 flex items-center gap-2 flex-wrap">
-                              <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                              {doc.deletedAt ? (
+                                <span className="text-stone-500 line-through">{doc.name}</span>
+                              ) : (
+                                <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                              )}
                               <span className="text-stone-500">
                                 Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
                                   day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                                 })}
                                 {doc.uploadedBy ? ` by ${doc.uploadedBy}` : ''}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => deleteIncidentDocument(inc, doc.id)}
-                                className="underline text-red-700 hover:text-red-900"
-                              >
-                                Delete
-                              </button>
+                              {!doc.deletedAt && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteIncidentDocument(inc, doc.id)}
+                                  className="underline text-red-700 hover:text-red-900"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                              {doc.deletedAt && (
+                                <button
+                                  type="button"
+                                  onClick={() => recoverIncidentDocument(inc, doc.id)}
+                                  className="underline text-emerald-700 hover:text-emerald-900"
+                                >
+                                  Recover
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>

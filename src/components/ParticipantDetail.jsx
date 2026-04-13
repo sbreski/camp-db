@@ -230,6 +230,8 @@ export default function ParticipantDetail({
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   const participantNoteHistory = participantNotesForParticipant(participant)
   const participantDocuments = participantDocumentsForParticipant(participant)
+  const activeParticipantNotes = participantNoteHistory.filter(note => !note.deletedAt)
+  const activeParticipantDocuments = participantDocuments.filter(doc => !doc.deletedAt)
 
   const hasMedical = participant.medicalType?.length > 0 || participant.medicalDetails
   const hasConsents = Boolean(
@@ -324,7 +326,7 @@ export default function ParticipantDetail({
     updateParticipantRecord(current => ({
       ...current,
       participantNotesHistory: participantNotesForParticipant(current).map(note => (
-        note.id === editingParticipantNote.noteId
+        note.id === editingParticipantNote.noteId && !note.deletedAt
           ? {
               ...note,
               text,
@@ -339,11 +341,19 @@ export default function ParticipantDetail({
   }
 
   function deleteParticipantNote(noteId) {
-    if (!window.confirm('Delete this participant note?')) return
+    if (!window.confirm('Delete this participant note? You can recover it later.')) return
 
     updateParticipantRecord(current => ({
       ...current,
-      participantNotesHistory: participantNotesForParticipant(current).filter(note => note.id !== noteId),
+      participantNotesHistory: participantNotesForParticipant(current).map(note => (
+        note.id === noteId
+          ? {
+              ...note,
+              deletedAt: new Date().toISOString(),
+              deletedBy: actorInitials,
+            }
+          : note
+      )),
     }))
 
     if (editingParticipantNote?.noteId === noteId) {
@@ -382,11 +392,41 @@ export default function ParticipantDetail({
   }
 
   function deleteParticipantDocument(docId) {
-    if (!window.confirm('Delete this participant document?')) return
+    if (!window.confirm('Delete this participant document? You can recover it later.')) return
 
     updateParticipantRecord(current => ({
       ...current,
-      participantDocuments: participantDocumentsForParticipant(current).filter(doc => doc.id !== docId),
+      participantDocuments: participantDocumentsForParticipant(current).map(doc => (
+        doc.id === docId
+          ? {
+              ...doc,
+              deletedAt: new Date().toISOString(),
+              deletedBy: actorInitials,
+            }
+          : doc
+      )),
+    }))
+  }
+
+  function recoverParticipantNote(noteId) {
+    updateParticipantRecord(current => ({
+      ...current,
+      participantNotesHistory: participantNotesForParticipant(current).map(note => (
+        note.id === noteId
+          ? { ...note, deletedAt: null, deletedBy: null }
+          : note
+      )),
+    }))
+  }
+
+  function recoverParticipantDocument(docId) {
+    updateParticipantRecord(current => ({
+      ...current,
+      participantDocuments: participantDocumentsForParticipant(current).map(doc => (
+        doc.id === docId
+          ? { ...doc, deletedAt: null, deletedBy: null }
+          : doc
+      )),
     }))
   }
 
@@ -697,15 +737,19 @@ export default function ParticipantDetail({
                 <h4 className="font-display font-semibold text-forest-900 flex items-center gap-2">
                   <MessageSquare size={14} className="text-forest-600" /> Participant Notes
                 </h4>
+                {activeParticipantNotes.length > 0 && (
+                  <p className="text-xs text-stone-500">{activeParticipantNotes.length} active note(s)</p>
+                )}
                 {participantNoteHistory.length === 0 ? (
                   <p className="text-xs text-stone-500">No participant notes yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {participantNoteHistory.map(note => {
                       const isEditing = editingParticipantNote?.noteId === note.id
+                      const isDeleted = Boolean(note.deletedAt)
                       return (
-                        <div key={note.id} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
-                          {isEditing ? (
+                        <div key={note.id} className={`rounded-lg border px-3 py-2 ${isDeleted ? 'border-stone-200 bg-stone-100 opacity-75' : 'border-stone-200 bg-stone-50'}`}>
+                          {isEditing && !isDeleted ? (
                             <div className="space-y-2">
                               <textarea
                                 className="input min-h-[84px]"
@@ -731,7 +775,7 @@ export default function ParticipantDetail({
                             </div>
                           ) : (
                             <>
-                              <p className="text-sm text-stone-800 whitespace-pre-wrap">{note.text}</p>
+                              <p className={`text-sm whitespace-pre-wrap ${isDeleted ? 'text-stone-500 line-through' : 'text-stone-800'}`}>{note.text}</p>
                               <div className="mt-1 flex items-center gap-3 text-[11px] text-stone-500 flex-wrap">
                                 <span>
                                   Added {new Date(note.createdAt).toLocaleDateString('en-GB', {
@@ -747,20 +791,33 @@ export default function ParticipantDetail({
                                     {note.updatedBy ? ` by ${note.updatedBy}` : ''}
                                   </span>
                                 )}
-                                <button
-                                  type="button"
-                                  onClick={() => beginEditParticipantNote(note)}
-                                  className="underline text-forest-700 hover:text-forest-900"
-                                >
-                                  Edit note
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => deleteParticipantNote(note.id)}
-                                  className="underline text-red-700 hover:text-red-900"
-                                >
-                                  Delete note
-                                </button>
+                                {!isDeleted && (
+                                  <button
+                                    type="button"
+                                    onClick={() => beginEditParticipantNote(note)}
+                                    className="underline text-forest-700 hover:text-forest-900"
+                                  >
+                                    Edit note
+                                  </button>
+                                )}
+                                {!isDeleted && (
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteParticipantNote(note.id)}
+                                    className="underline text-red-700 hover:text-red-900"
+                                  >
+                                    Delete note
+                                  </button>
+                                )}
+                                {isDeleted && (
+                                  <button
+                                    type="button"
+                                    onClick={() => recoverParticipantNote(note.id)}
+                                    className="underline text-emerald-700 hover:text-emerald-900"
+                                  >
+                                    Recover
+                                  </button>
+                                )}
                               </div>
                             </>
                           )}
@@ -792,26 +849,44 @@ export default function ParticipantDetail({
                 <h4 className="font-display font-semibold text-forest-900 flex items-center gap-2">
                   <Paperclip size={14} className="text-forest-600" /> Participant Documents
                 </h4>
+                {activeParticipantDocuments.length > 0 && (
+                  <p className="text-xs text-stone-500">{activeParticipantDocuments.length} active document(s)</p>
+                )}
                 {participantDocuments.length === 0 ? (
                   <p className="text-xs text-stone-500">No participant documents uploaded.</p>
                 ) : (
                   <div className="space-y-1">
                     {participantDocuments.map(doc => (
                       <div key={doc.id} className="text-xs text-stone-700 flex items-center gap-2 flex-wrap">
-                        <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                        {doc.deletedAt ? (
+                          <span className="text-stone-500 line-through">{doc.name}</span>
+                        ) : (
+                          <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                        )}
                         <span className="text-stone-500">
                           Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
                             day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                           })}
                           {doc.uploadedBy ? ` by ${doc.uploadedBy}` : ''}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => deleteParticipantDocument(doc.id)}
-                          className="underline text-red-700 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
+                        {!doc.deletedAt && (
+                          <button
+                            type="button"
+                            onClick={() => deleteParticipantDocument(doc.id)}
+                            className="underline text-red-700 hover:text-red-900"
+                          >
+                            Delete
+                          </button>
+                        )}
+                        {doc.deletedAt && (
+                          <button
+                            type="button"
+                            onClick={() => recoverParticipantDocument(doc.id)}
+                            className="underline text-emerald-700 hover:text-emerald-900"
+                          >
+                            Recover
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
