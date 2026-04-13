@@ -202,21 +202,22 @@ export async function handler(event) {
       const incidentMap = new Map((incidents || []).map(row => [row.id, row]))
 
       return json(200, {
-        reports: (data || []).map(row => ({
+        reports: (data || []).map(row => {
           const incident = incidentMap.get(row.incident_id)
           const isResolved = row.status === 'closed' || Boolean(incident?.resolved_at)
+
           return {
-          id: row.id,
-          participantId: row.participant_id,
-          participantName: participantMap.get(row.participant_id) || 'Unknown participant',
-          incidentId: row.incident_id,
-          status: isResolved ? 'closed' : 'open',
-          reportName: row.report_name,
-          raisedByEmail: row.raised_by_email,
-          createdAt: row.created_at,
-          closedAt: row.closed_at || incident?.resolved_at || null,
-          resolvedBy: incident?.resolved_by || null,
-        }
+            id: row.id,
+            participantId: row.participant_id,
+            participantName: participantMap.get(row.participant_id) || 'Unknown participant',
+            incidentId: row.incident_id,
+            status: isResolved ? 'closed' : 'open',
+            reportName: row.report_name,
+            raisedByEmail: row.raised_by_email,
+            createdAt: row.created_at,
+            closedAt: row.closed_at || incident?.resolved_at || null,
+            resolvedBy: incident?.resolved_by || null,
+          }
         }),
       })
     }
