@@ -405,7 +405,7 @@
 
 <div class="action-bar">
   <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear form</button>
-  <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Attach to Incident Log</button>
+  <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Send PDF back to Camp DB</button>
   <button type="button" class="btn btn-secondary" onclick="window.print()">🖨 Print / Save as PDF</button>
   <button type="button" class="btn btn-primary" onclick="saveForm()">💾 Save progress</button>
 </div>
@@ -577,7 +577,7 @@
       )
 
       const note = document.getElementById('saved_note')
-      note.textContent = 'PDF sent to Camp DB. Return to reporting and save the record.'
+      note.textContent = 'PDF sent back to Camp DB. Return to reporting and click Save report.'
       setTimeout(() => { if (note.textContent.includes('PDF sent')) note.textContent = '' }, 5000)
     } catch (error) {
       alert('Failed to send PDF to Camp DB: ' + error.message)

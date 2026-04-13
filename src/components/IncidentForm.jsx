@@ -247,6 +247,7 @@ export default function IncidentForm({
   }, [])
 
   const selectedTemplate = templates.find(t => t.key === selectedTemplateKey)
+  const hasAttachment = Boolean(form.pdfName || form.pdfData || form.pdfPayload)
   const iframeSrc = selectedTemplate
     ? `${selectedTemplate.path}?participantId=${encodeURIComponent(participantId)}&participantName=${encodeURIComponent(participantName || '')}&participantAge=${encodeURIComponent(participantAge === null || participantAge === undefined ? '' : String(participantAge))}&staffMember=${encodeURIComponent(form.staffMember || '')}`
     : ''
@@ -268,8 +269,8 @@ export default function IncidentForm({
       pdfPayload: undefined,
     }
 
-    if (nextForm.type === 'Safeguarding' && !nextForm.pdfPayload && !isEditing) {
-      alert('Attach the completed safeguarding form before saving.')
+    if (!hasAttachment) {
+      alert('Attach the completed form before saving this report.')
       return
     }
 
@@ -294,6 +295,21 @@ export default function IncidentForm({
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-display font-semibold text-forest-950">{initial?.id ? 'Edit Submission' : 'Log Incident / Accident'}</h4>
         <button onClick={onCancel} className="text-stone-400 hover:text-stone-600"><X size={18} /></button>
+      </div>
+      <div className="mb-3 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700">
+        <p className="font-semibold text-forest-900 mb-1">How this works</p>
+        <p>1) Complete a form, 2) confirm attachment, 3) save report. A pickup handover note is added automatically for today.</p>
+      </div>
+      <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className={`rounded-lg border px-2.5 py-2 text-xs ${selectedTemplate ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-white text-stone-600'}`}>
+          <span className="font-semibold">Step 1:</span> Form selected
+        </div>
+        <div className={`rounded-lg border px-2.5 py-2 text-xs ${hasAttachment ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-white text-stone-600'}`}>
+          <span className="font-semibold">Step 2:</span> Attachment ready
+        </div>
+        <div className={`rounded-lg border px-2.5 py-2 text-xs ${hasAttachment ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-white text-stone-600'}`}>
+          <span className="font-semibold">Step 3:</span> Save report
+        </div>
       </div>
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
@@ -337,7 +353,7 @@ export default function IncidentForm({
         </label>
 
         <div>
-          <label className="label">Complete One Of Your Interactive Forms</label>
+          <label className="label">Step 1: Complete an interactive form</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
             {templates.map(template => (
               <button
@@ -365,7 +381,7 @@ export default function IncidentForm({
               <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
                 {isReceivingPdf
                   ? 'Receiving PDF from form...'
-                  : 'Complete the form, then use its "Save/Send to Camp DB" action to attach the PDF automatically.'}
+                  : 'Complete the form, then use its "Send PDF back to Camp DB" button to attach it automatically.'}
               </div>
               <iframe
                 title={selectedTemplate.label}
@@ -375,7 +391,7 @@ export default function IncidentForm({
             </div>
           )}
 
-          <label className="label">Attach Completed Form (PDF or image)</label>
+          <label className="label">Step 2: Confirm attachment (or upload manually)</label>
           <label className={`flex items-center gap-3 cursor-pointer border-2 border-dashed rounded-xl p-3 transition-colors bg-white ${
             form.pdfName ? 'border-green-400 bg-green-50' : 'border-stone-200 hover:border-forest-400'
           }`}>
@@ -391,13 +407,16 @@ export default function IncidentForm({
           {uploadNotice && (
             <p className="text-xs text-green-700 mt-1">{uploadNotice}</p>
           )}
+          {!hasAttachment && (
+            <p className="text-xs text-amber-700 mt-1">No attachment yet. Complete the embedded form and send it back, or upload manually.</p>
+          )}
         </div>
 
         <div className="flex gap-2 pt-1">
-          <button type="submit" className="btn-primary flex-1">
+          <button type="submit" className={`btn-primary flex-1 ${!hasAttachment ? 'opacity-60 cursor-not-allowed' : ''}`} disabled={!hasAttachment}>
             {initial?.id
-              ? (form.type === 'Safeguarding' ? 'Update Safeguarding Submission' : 'Update Submission')
-              : (form.type === 'Safeguarding' ? 'Save Safeguarding Report' : 'Save Incident')}
+              ? (form.type === 'Safeguarding' ? 'Step 3: Save Safeguarding Report' : 'Step 3: Save Updated Report')
+              : (form.type === 'Safeguarding' ? 'Step 3: Save Safeguarding Report' : 'Step 3: Save Report to Participant')}
           </button>
           <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
         </div>
