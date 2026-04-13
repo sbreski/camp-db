@@ -17,6 +17,7 @@ export default function Participants({ participants, setParticipants, onView }) 
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([])
+  const [subTab, setSubTab] = useState('included')
 
   function addParticipant(data) {
     setParticipants(prev => [...prev, { ...data, id: crypto.randomUUID() }])
@@ -33,12 +34,17 @@ export default function Participants({ participants, setParticipants, onView }) 
     }
   }
 
-  const filtered = [...participants]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+  const filteredBySearch = [...participants]
+    .sort((a, b) => participantDisplayName(a).localeCompare(participantDisplayName(b)))
+    .filter(p => participantDisplayName(p).toLowerCase().includes(search.toLowerCase()))
+
+  const includedParticipants = filteredBySearch.filter(isIncludedThisSeason)
+  const notIncludedParticipants = filteredBySearch.filter(p => !isIncludedThisSeason(p))
+  const visibleParticipants = subTab === 'included' ? includedParticipants : notIncludedParticipants
 
   const selectedSet = new Set(selectedParticipantIds)
-  const allFilteredSelected = filtered.length > 0 && filtered.every(p => selectedSet.has(p.id))
+  const selectedVisibleParticipantIds = visibleParticipants.filter(p => selectedSet.has(p.id)).map(p => p.id)
+  const allVisibleSelected = visibleParticipants.length > 0 && visibleParticipants.every(p => selectedSet.has(p.id))
 
   function isIncludedThisSeason(participant) {
     const flag = participant.isActiveThisSeason ?? participant.is_active_this_season
@@ -55,12 +61,12 @@ export default function Participants({ participants, setParticipants, onView }) 
   }
 
   function toggleSelectAllFiltered() {
-    if (allFilteredSelected) {
-      const filteredIds = new Set(filtered.map(p => p.id))
-      setSelectedParticipantIds(prev => prev.filter(id => !filteredIds.has(id)))
+    if (allVisibleSelected) {
+      const visibleIds = new Set(visibleParticipants.map(p => p.id))
+      setSelectedParticipantIds(prev => prev.filter(id => !visibleIds.has(id)))
       return
     }
-    setSelectedParticipantIds(prev => [...new Set([...prev, ...filtered.map(p => p.id)])])
+    setSelectedParticipantIds(prev => [...new Set([...prev, ...visibleParticipants.map(p => p.id)])])
   }
 
   function clearSelection() {
@@ -68,16 +74,20 @@ export default function Participants({ participants, setParticipants, onView }) 
   }
 
   function setIncludedForSelected(isIncluded) {
-    if (selectedParticipantIds.length === 0) {
+    if (selectedVisibleParticipantIds.length === 0) {
       alert('Select at least one participant first.')
       return
     }
 
+    const targetIds = new Set(selectedVisibleParticipantIds)
+
     setParticipants(prev => prev.map(participant => (
-      selectedSet.has(participant.id)
+      targetIds.has(participant.id)
         ? { ...participant, isActiveThisSeason: isIncluded }
         : participant
     )))
+
+    setSelectedParticipantIds(prev => prev.filter(id => !targetIds.has(id)))
   }
 
   return (
@@ -115,20 +125,45 @@ export default function Participants({ participants, setParticipants, onView }) 
       </div>
 
       {participants.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setSubTab('included')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-display font-semibold border transition-colors ${
+              subTab === 'included'
+                ? 'bg-forest-900 text-white border-forest-900'
+                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+            }`}
+          >
+            Included ({includedParticipants.length})
+          </button>
+          <button
+            onClick={() => setSubTab('not-included')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-display font-semibold border transition-colors ${
+              subTab === 'not-included'
+                ? 'bg-stone-700 text-white border-stone-700'
+                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+            }`}
+          >
+            Not Included ({notIncludedParticipants.length})
+          </button>
+        </div>
+      )}
+
+      {participants.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={toggleSelectAllFiltered} className="btn-secondary text-xs py-1.5">
-            {allFilteredSelected ? 'Unselect All' : 'Select All'}
+            {allVisibleSelected ? 'Unselect All' : 'Select All'}
           </button>
-          <button onClick={() => setIncludedForSelected(true)} className="btn-primary text-xs py-1.5" disabled={selectedParticipantIds.length === 0}>
+          <button onClick={() => setIncludedForSelected(true)} className="btn-primary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
             Included
           </button>
-          <button onClick={() => setIncludedForSelected(false)} className="btn-secondary text-xs py-1.5" disabled={selectedParticipantIds.length === 0}>
+          <button onClick={() => setIncludedForSelected(false)} className="btn-secondary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
             Not Included
           </button>
-          <button onClick={clearSelection} className="btn-secondary text-xs py-1.5" disabled={selectedParticipantIds.length === 0}>
+          <button onClick={clearSelection} className="btn-secondary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
             Clear
           </button>
-          <span className="text-xs text-stone-500">{selectedParticipantIds.length} selected</span>
+          <span className="text-xs text-stone-500">{selectedVisibleParticipantIds.length} highlighted</span>
         </div>
       )}
 
@@ -140,8 +175,8 @@ export default function Participants({ participants, setParticipants, onView }) 
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(p => (
-            <div key={p.id} className="card flex items-center gap-4 hover:shadow-sm transition-shadow group">
+          {visibleParticipants.map(p => (
+            <div key={p.id} className={`card flex items-center gap-4 hover:shadow-sm transition-shadow group ${selectedSet.has(p.id) ? 'ring-2 ring-forest-300 border-forest-300 bg-forest-50/40' : ''}`}>
               <input
                 type="checkbox"
                 checked={selectedSet.has(p.id)}
@@ -151,7 +186,7 @@ export default function Participants({ participants, setParticipants, onView }) 
               />
               <div onClick={() => onView(p.id)}
                 className="w-10 h-10 rounded-full bg-forest-900 flex items-center justify-center text-white font-display font-bold text-sm flex-shrink-0 cursor-pointer">
-                {p.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                {participantDisplayName(p).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onView(p.id)}>
                 <div className="flex items-center gap-1.5">
@@ -187,6 +222,16 @@ export default function Participants({ participants, setParticipants, onView }) 
               </button>
             </div>
           ))}
+          {visibleParticipants.length === 0 && (
+            <div className="card text-center py-10">
+              <p className="text-stone-500 font-medium">No participants in this list</p>
+              <p className="text-stone-400 text-sm mt-1">
+                {subTab === 'included'
+                  ? 'Everyone is currently marked Not Included.'
+                  : 'Everyone is currently marked Included.'}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
+
+function isIncludedThisSeason(participant) {
+  const flag = participant?.isActiveThisSeason ?? participant?.is_active_this_season
+  if (typeof flag === 'string') return flag.toLowerCase() !== 'false'
+  return flag !== false
+}
 
 function fmtTime(ts) {
   if (!ts) return '—'
@@ -314,6 +320,16 @@ function ParticipantOverview({ participants, attendance, startEditTime, openColl
   const [selectedId, setSelectedId] = useState(participants[0]?.id || '')
   const participant = participants.find(p => p.id === selectedId)
 
+  useEffect(() => {
+    if (!participants.length) {
+      setSelectedId('')
+      return
+    }
+    if (!participants.some(p => p.id === selectedId)) {
+      setSelectedId(participants[0].id)
+    }
+  }, [participants, selectedId])
+
   const records = attendance
     .filter(a => a.participantId === selectedId)
     .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -480,6 +496,8 @@ export default function AttendanceOverview({ participants, attendance, setAttend
   const [editingTime, setEditingTime] = useState(null) // { recordId, type: 'signIn' | 'signOut', currentTime, date }
   const [timeInput, setTimeInput] = useState('')
   const [collectionDetail, setCollectionDetail] = useState(null)
+  const includedParticipants = participants.filter(isIncludedThisSeason)
+  const excludedCount = participants.length - includedParticipants.length
 
   function startEditTime(recordId, type, currentTime, date) {
     const record = attendance.find(r => r.id === recordId)
@@ -623,6 +641,11 @@ export default function AttendanceOverview({ participants, attendance, setAttend
       <div>
         <h2 className="text-2xl font-display font-bold text-forest-950">Attendance Overview</h2>
         <p className="text-stone-500 text-sm">{attendance.length} records total</p>
+        {excludedCount > 0 && (
+          <p className="text-xs text-stone-500 mt-1">
+            {includedParticipants.length} included · {excludedCount} not included (hidden from attendance)
+          </p>
+        )}
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -635,9 +658,18 @@ export default function AttendanceOverview({ participants, attendance, setAttend
       </div>
 
       <div className="fade-in" key={tab}>
-        {tab === 'Daily' && <DailyOverview participants={participants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
-        {tab === 'Weekly' && <WeeklyOverview participants={participants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} />}
-        {tab === 'Participant' && <ParticipantOverview participants={participants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
+        {includedParticipants.length === 0 ? (
+          <div className="card text-center py-10">
+            <p className="text-stone-500 font-medium">No Included participants for attendance</p>
+            <p className="text-stone-400 text-sm mt-1">Mark at least one participant as Included in Participants tab.</p>
+          </div>
+        ) : (
+          <>
+            {tab === 'Daily' && <DailyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
+            {tab === 'Weekly' && <WeeklyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} />}
+            {tab === 'Participant' && <ParticipantOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
+          </>
+        )}
       </div>
     </div>
   )
