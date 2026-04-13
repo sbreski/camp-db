@@ -159,6 +159,31 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }
   }
 
+  async function reopenSafeguardingIncident(incident) {
+    if (incident.type !== 'Safeguarding') return
+    if (!isSafeguardingResolved(incident)) return
+
+    await setIncidents(prev => prev.map(inc => (
+      inc.id === incident.id
+        ? {
+            ...inc,
+            resolvedAt: null,
+            resolvedBy: null,
+            updatedByInitials: actorInitials,
+            updatedByUserId: actorUserId || inc.updatedByUserId || null,
+          }
+        : inc
+    )))
+
+    if (typeof setParticipants !== 'function') return
+
+    await setParticipants(prev => prev.map(p => (
+      p.id === incident.participantId
+        ? { ...p, safeguardingFlag: true }
+        : p
+    )))
+  }
+
   async function fetchSafeguardingDownloadUrlByIncidentId(incidentId) {
     const { data } = await supabase.auth.getSession()
     const accessToken = data.session?.access_token
@@ -504,6 +529,18 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         className="text-xs px-2 py-1 rounded-md border border-emerald-200 text-emerald-800 hover:text-emerald-900 hover:border-emerald-300 bg-white"
                       >
                         Mark as Resolved
+                      </button>
+                    )}
+                    {inc.type === 'Safeguarding' && isSafeguardingResolved(inc) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          reopenSafeguardingIncident(inc)
+                        }}
+                        className="text-xs px-2 py-1 rounded-md border border-amber-200 text-amber-800 hover:text-amber-900 hover:border-amber-300 bg-white"
+                      >
+                        Reopen
                       </button>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); deleteIncident(inc.id) }}
