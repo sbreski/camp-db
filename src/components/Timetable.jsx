@@ -1234,40 +1234,58 @@ export default function Timetable({
               </tr>
             </thead>
             <tbody>
-              {timeRows.map(row => (
-                <tr key={row.startLabel}>
-                  <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
-                    {row.startLabel} - {row.endLabel}
-                  </td>
-                  {columns.map(column => {
-                    const key = viewMode === 'space' ? column : column.email
-                    const activeEntries = entriesForColumnAtSlot(column, row.startMinutes, row.endMinutes)
-                    return (
-                      <td
-                        key={`${row.startLabel}-${key}`}
-                        onDoubleClick={() => {
-                          if (!canEdit) return
-                          if (activeEntries.length > 0) {
-                            openEdit(activeEntries[0])
-                          } else {
-                            openCreateAtSlot(column, row.startLabel, row.endLabel)
-                          }
-                        }}
-                        className="border-b border-stone-200 px-2 py-1 align-top h-14 cursor-pointer"
-                        title={canEdit ? 'Double-click to add/edit this slot' : ''}
-                      >
-                        {activeEntries.length > 0 ? (
-                          <div className="space-y-1">
-                            {activeEntries.map(renderEntryCard)}
-                          </div>
-                        ) : (
-                          <div className="h-full min-h-8 rounded border border-dashed border-stone-200 hover:border-forest-300" />
-                        )}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
+              {(() => {
+                const renderedEntries = new Set()
+                return timeRows.map((row, rowIdx) => (
+                  <tr key={row.startLabel}>
+                    <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
+                      {row.startLabel} - {row.endLabel}
+                    </td>
+                    {columns.map(column => {
+                      const key = viewMode === 'space' ? column : column.email
+                      const allEntriesInColumn = dayEntries.filter(entry => 
+                        (viewMode === 'space' 
+                          ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
+                          : normalizeAssignedEmails(entry).includes(column.email)
+                        ) && isActiveInRange(entry, row.startMinutes, row.endMinutes)
+                      )
+                      const entriesToRender = allEntriesInColumn.filter(entry => {
+                        if (renderedEntries.has(entry.id)) return false
+                        const entryStart = timeToMinutes(entry.startTime || entry.start_time)
+                        return entryStart >= row.startMinutes && entryStart < row.endMinutes
+                      })
+                      const entriesWithSpan = entriesToRender.map(entry => {
+                        const entryStart = timeToMinutes(entry.startTime || entry.start_time)
+                        const entryEnd = timeToMinutes(entry.endTime || entry.end_time)
+                        let rowSpan = 1
+                        for (let i = rowIdx + 1; i < timeRows.length; i++) {
+                          if (entryEnd > timeRows[i].startMinutes) rowSpan++
+                          else break
+                        }
+                        renderedEntries.add(entry.id)
+                        return { entry, rowSpan }
+                      })
+                      if (entriesWithSpan.length === 0 && allEntriesInColumn.length === 0) {
+                        return (
+                          <td key={`${row.startLabel}-${key}`} onDoubleClick={() => { if (!canEdit) return; openCreateAtSlot(column, row.startLabel, row.endLabel) }} className="border-b border-stone-200 px-2 py-1 align-top h-14 cursor-pointer" title={canEdit ? 'Double-click to add/edit this slot' : ''}>
+                            <div className="h-full min-h-8 rounded border border-dashed border-stone-200 hover:border-forest-300" />
+                          </td>
+                        )
+                      }
+                      if (entriesWithSpan.length > 0) {
+                        return (
+                          <td key={`${row.startLabel}-${key}`} rowSpan={Math.max(...entriesWithSpan.map(e => e.rowSpan))} onDoubleClick={() => { if (!canEdit) return; entriesWithSpan.length > 0 ? openEdit(entriesWithSpan[0].entry) : openCreateAtSlot(column, row.startLabel, row.endLabel) }} className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer hover:bg-stone-50 transition-colors" title={canEdit ? 'Double-click to add/edit' : ''}>
+                            <div className="space-y-1">
+                              {entriesWithSpan.map(({ entry }) => renderEntryCard(entry))}
+                            </div>
+                          </td>
+                        )
+                      }
+                      return null
+                    }).filter(Boolean)}
+                  </tr>
+                ))
+              })()}
             </tbody>
           </table>
         </div>
