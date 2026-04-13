@@ -27,6 +27,11 @@ function resolvedAtForIncident(incident) {
   return incident.resolvedAt || incident.resolved_at || null
 }
 
+function canAccessIncidentUpdates(incident, canViewSafeguarding) {
+  if (incident.type !== 'Safeguarding') return true
+  return Boolean(canViewSafeguarding)
+}
+
 function incidentNotesForIncident(incident) {
   const notes = incident.incidentNotes || incident.incident_notes
   return Array.isArray(notes) ? notes : []
@@ -316,6 +321,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function addIncidentNote(incident) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
     const noteText = String(noteDraftByIncident[incident.id] || '').trim()
     if (!noteText) return
 
@@ -346,6 +352,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   function beginEditIncidentNote(incidentId, note) {
     setEditingNote({
       incidentId,
+      incidentType: note.incidentType || '',
       noteId: note.id,
       text: String(note.text || ''),
     })
@@ -353,6 +360,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
   async function saveEditedIncidentNote() {
     if (!editingNote) return
+    if (editingNote.incidentType === 'Safeguarding' && !canViewSafeguarding) return
 
     const text = String(editingNote.text || '').trim()
     if (!text) return
@@ -386,6 +394,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function uploadIncidentDocument(incident, file) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
     if (!file) return
     if (file.size > 8 * 1024 * 1024) {
       alert('File must be under 8MB.')
@@ -424,6 +433,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function deleteIncidentNote(incident, noteId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
     if (!window.confirm('Delete this note? You can recover it later.')) return
 
     await setIncidents(prev => prev.map(inc => {
@@ -450,6 +460,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function deleteIncidentDocument(incident, docId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
     if (!window.confirm('Delete this document from the report updates list? You can recover it later.')) return
 
     await setIncidents(prev => prev.map(inc => {
@@ -472,6 +483,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function recoverIncidentNote(incident, noteId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
     await setIncidents(prev => prev.map(inc => {
       if (inc.id !== incident.id) return inc
       return {
@@ -488,6 +500,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function recoverIncidentDocument(incident, docId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
     await setIncidents(prev => prev.map(inc => {
       if (inc.id !== incident.id) return inc
       return {
@@ -648,7 +661,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             const incidentDocuments = incidentDocumentsForIncident(inc)
             const activeIncidentNotes = incidentNotes.filter(note => !note.deletedAt)
             const activeIncidentDocuments = incidentDocuments.filter(doc => !doc.deletedAt)
-            const isUpdatesOpen = expandedIncidentId === inc.id
+            const isUpdatesAllowed = canAccessIncidentUpdates(inc, canViewSafeguarding)
+            const isUpdatesOpen = isUpdatesAllowed && expandedIncidentId === inc.id
             const noteDraft = noteDraftByIncident[inc.id] || ''
             const isUploadingExtra = uploadingExtraIncidentId === inc.id
             return (
@@ -671,10 +685,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                       {resolvedAtForIncident(inc) && (
                         <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Resolved</span>
                       )}
-                      {activeIncidentNotes.length > 0 && (
+                      {isUpdatesAllowed && activeIncidentNotes.length > 0 && (
                         <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{activeIncidentNotes.length} notes</span>
                       )}
-                      {activeIncidentDocuments.length > 0 && (
+                      {isUpdatesAllowed && activeIncidentDocuments.length > 0 && (
                         <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{activeIncidentDocuments.length} docs</span>
                       )}
                       {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
@@ -750,17 +764,19 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         <Mail size={15} />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setExpandedIncidentId(prev => (prev === inc.id ? '' : inc.id))
-                        setEditingNote(null)
-                      }}
-                      className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
-                    >
-                      Updates
-                    </button>
+                    {isUpdatesAllowed && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedIncidentId(prev => (prev === inc.id ? '' : inc.id))
+                          setEditingNote(null)
+                        }}
+                        className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                      >
+                        Updates
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -880,7 +896,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                                       {!isDeleted && (
                                         <button
                                           type="button"
-                                          onClick={() => beginEditIncidentNote(inc.id, note)}
+                                          onClick={() => beginEditIncidentNote(inc.id, { ...note, incidentType: inc.type })}
                                           className="underline text-forest-700 hover:text-forest-900"
                                         >
                                           Edit note
