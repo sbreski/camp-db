@@ -489,6 +489,10 @@
             cloneRoot.style.paddingBottom = '16px'
             cloneRoot.style.boxSizing = 'border-box'
           }
+          doc.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(function(el) {
+            el.style.paddingBottom = '6px'
+            el.style.overflow = 'visible'
+          })
         },
       })
 
@@ -630,8 +634,10 @@
   window.addEventListener('load', () => {
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
     document.getElementById('sign_date').value = new Date().toISOString().split('T')[0];
+    const isNew = params.get('new') === '1';
+    if (isNew) localStorage.removeItem(STORAGE_KEY);
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
+    if (saved && !isNew) {
       try { setFormData(JSON.parse(saved)); } catch(e) {}
     }
 

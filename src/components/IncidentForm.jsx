@@ -260,8 +260,9 @@ export default function IncidentForm({
 
   const selectedTemplate = templates.find(t => t.key === selectedTemplateKey)
   const hasAttachment = Boolean(form.pdfName || form.pdfData || form.pdfPayload)
+  const isNewIncident = !initial?.id
   const iframeSrc = selectedTemplate
-    ? `${selectedTemplate.path}?participantId=${encodeURIComponent(participantId)}&participantName=${encodeURIComponent(participantName || '')}&participantAge=${encodeURIComponent(participantAge === null || participantAge === undefined ? '' : String(participantAge))}&staffMember=${encodeURIComponent(form.staffMember || '')}`
+    ? `${selectedTemplate.path}?participantId=${encodeURIComponent(participantId)}&participantName=${encodeURIComponent(participantName || '')}&participantAge=${encodeURIComponent(participantAge === null || participantAge === undefined ? '' : String(participantAge))}&staffMember=${encodeURIComponent(form.staffMember || '')}&new=${isNewIncident ? '1' : '0'}`
     : ''
 
   async function handleSubmit(e) {

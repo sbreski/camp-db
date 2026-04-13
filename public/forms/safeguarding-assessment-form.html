@@ -183,7 +183,6 @@
           <label>Recorded by</label>
           <input type="text" id="recorded_by" value="Sam Brenner"/>
         </div>
-        <div class="field"><label>Site address</label><input type="text" id="location" value="artsdepot, 5 Nether St, London N12 0GA" readonly/></div>
       </div>
       <div class="field">
         <label>Room / Area in building</label>
@@ -336,7 +335,6 @@
       if (el.id === 'recorded_by') { el.value = staffMember; return; }
       el.value = '';
     });
-    document.getElementById('location').value = 'artsdepot, 5 Nether St, London N12 0GA';
     document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => { el.checked = false; });
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
   }
@@ -387,6 +385,10 @@
             cloneRoot.style.paddingBottom = '16px';
             cloneRoot.style.boxSizing = 'border-box';
           }
+          doc.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(function(el) {
+            el.style.paddingBottom = '6px';
+            el.style.overflow = 'visible';
+          });
         }
       });
 
@@ -469,9 +471,10 @@
 
   window.addEventListener('load', () => {
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('location').value = 'artsdepot, 5 Nether St, London N12 0GA';
+    const isNew = params.get('new') === '1';
+    if (isNew) localStorage.removeItem(STORAGE_KEY);
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
+    if (saved && !isNew) {
       try { setFormData(JSON.parse(saved)); } catch (e) {}
     }
     applyParticipantPrefillFromQuery();

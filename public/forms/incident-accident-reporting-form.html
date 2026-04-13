@@ -224,10 +224,7 @@
         </div>
       </div>
     </div>
-    <div class="two-col">
-      <div class="field"><label>Site address</label><input type="text" id="f-location" value="artsdepot, 5 Nether St, London N12 0GA" readonly/></div>
-      <div class="field"><label>Room / Area in building</label><input type="text" id="f-location-detail" placeholder="e.g. Dance Space, Level 3"/></div>
-    </div>
+    <div class="field"><label>Room / Area in building</label><input type="text" id="f-location-detail" placeholder="e.g. Dance Space, Level 3"/></div>
     <div class="two-col">
       <div class="field"><label>Activity at time of incident</label><input type="text" id="f-activity" placeholder="e.g. dance warm-up, lunch break..."/></div>
       <div class="field"><label>Staff present</label><input type="text" id="f-staff" placeholder="Names of staff / volunteers present"/></div>
@@ -496,7 +493,6 @@
     const today = new Date().toISOString().split('T')[0]
     document.getElementById('f-date').value = today
     document.getElementById('f-reporteddate').value = today
-    document.getElementById('f-location').value = 'artsdepot, 5 Nether St, London N12 0GA'
     const staffMember = params.get('staffMember') || ''
     if (staffMember) {
       const reportedByField = document.getElementById('f-reportedby')
@@ -540,6 +536,10 @@
             cloneRoot.style.paddingBottom = '16px'
             cloneRoot.style.boxSizing = 'border-box'
           }
+          doc.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(function(el) {
+            el.style.paddingBottom = '6px'
+            el.style.overflow = 'visible'
+          })
         },
       })
 
@@ -694,15 +694,15 @@
     const today = new Date().toISOString().split('T')[0]
     const dateField = document.getElementById('f-date')
     const reportedDateField = document.getElementById('f-reporteddate')
-    const locationField = document.getElementById('f-location')
     if (dateField && !dateField.value) dateField.value = today
     if (reportedDateField && !reportedDateField.value) reportedDateField.value = today
-    if (locationField) locationField.value = 'artsdepot, 5 Nether St, London N12 0GA'
 
     toggleRiddorDetails()
 
+    const isNew = params.get('new') === '1'
+    if (isNew) localStorage.removeItem(STORAGE_KEY)
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
+    if (saved && !isNew) {
       try {
         setFormData(JSON.parse(saved))
       } catch (e) {
