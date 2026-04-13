@@ -1264,55 +1264,78 @@ export default function Timetable({
               </tr>
             </thead>
             <tbody>
-              {timeRows.map(row => (
-                <tr key={row.startLabel}>
-                  <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
-                    {row.startLabel} - {row.endLabel}
-                  </td>
-                  {columns.map(column => {
-                    const key = viewMode === 'space' ? column : column.email
-                    const activeEntries = dayEntries.filter(entry =>
-                      (viewMode === 'space'
-                        ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
-                        : normalizeAssignedEmails(entry).includes(column.email)
-                      ) && isActiveInRange(entry, row.startMinutes, row.endMinutes)
-                    )
-
-                    if (activeEntries.length === 0) {
-                      return (
-                        <td
-                          key={`${row.startLabel}-${key}`}
-                          onDoubleClick={() => {
-                            if (!canEdit) return
-                            openCreateAtSlot(column, row.startLabel, row.endLabel)
-                          }}
-                          className="border-b border-stone-200 px-2 py-1 align-top h-16 cursor-pointer"
-                          title={canEdit ? 'Double-click to add/edit this slot' : ''}
-                        >
-                          <div className="h-full min-h-10 rounded border border-dashed border-stone-200 hover:border-forest-300" />
-                        </td>
+              {(() => {
+                const renderedEntries = new Set()
+                return timeRows.map((row, rowIdx) => (
+                  <tr key={row.startLabel}>
+                    <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
+                      {row.startLabel} - {row.endLabel}
+                    </td>
+                    {columns.map(column => {
+                      const key = viewMode === 'space' ? column : column.email
+                      const allEntriesInColumn = dayEntries.filter(entry => 
+                        (viewMode === 'space' 
+                          ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
+                          : normalizeAssignedEmails(entry).includes(column.email)
+                        ) && isActiveInRange(entry, row.startMinutes, row.endMinutes)
                       )
-                    }
+                      const entriesToRender = allEntriesInColumn.filter(entry => {
+                        if (renderedEntries.has(entry.id)) return false
+                        const entryStart = timeToMinutes(entry.startTime || entry.start_time)
+                        return entryStart >= row.startMinutes && entryStart < row.endMinutes
+                      })
+                      const entriesWithSpan = entriesToRender.map(entry => {
+                        const entryEnd = timeToMinutes(entry.endTime || entry.end_time)
+                        let rowSpan = 1
+                        for (let i = rowIdx + 1; i < timeRows.length; i++) {
+                          if (entryEnd > timeRows[i].startMinutes) rowSpan++
+                          else break
+                        }
+                        renderedEntries.add(entry.id)
+                        return { entry, rowSpan }
+                      })
 
-                    const gridCols = `repeat(${activeEntries.length}, minmax(0, 1fr))`
-                    return (
-                      <td
-                        key={`${row.startLabel}-${key}`}
-                        onDoubleClick={() => {
-                          if (!canEdit) return
-                          openEdit(activeEntries[0])
-                        }}
-                        className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer hover:bg-stone-50 transition-colors"
-                        title={canEdit ? 'Double-click to add/edit' : ''}
-                      >
-                        <div className="grid gap-1" style={{ gridTemplateColumns: gridCols }}>
-                          {activeEntries.map(entry => renderEntryCard(entry))}
-                        </div>
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
+                      if (entriesWithSpan.length === 0 && allEntriesInColumn.length === 0) {
+                        return (
+                          <td
+                            key={`${row.startLabel}-${key}`}
+                            onDoubleClick={() => {
+                              if (!canEdit) return
+                              openCreateAtSlot(column, row.startLabel, row.endLabel)
+                            }}
+                            className="border-b border-stone-200 px-2 py-1 align-top h-16 cursor-pointer"
+                            title={canEdit ? 'Double-click to add/edit this slot' : ''}
+                          >
+                            <div className="h-full min-h-10 rounded border border-dashed border-stone-200 hover:border-forest-300" />
+                          </td>
+                        )
+                      }
+
+                      if (entriesWithSpan.length > 0) {
+                        const gridCols = `repeat(${entriesWithSpan.length}, minmax(0, 1fr))`
+                        return (
+                          <td
+                            key={`${row.startLabel}-${key}`}
+                            rowSpan={Math.max(...entriesWithSpan.map(e => e.rowSpan))}
+                            onDoubleClick={() => {
+                              if (!canEdit) return
+                              openEdit(entriesWithSpan[0].entry)
+                            }}
+                            className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer hover:bg-stone-50 transition-colors"
+                            title={canEdit ? 'Double-click to add/edit' : ''}
+                          >
+                            <div className="grid gap-1" style={{ gridTemplateColumns: gridCols }}>
+                              {entriesWithSpan.map(({ entry }) => renderEntryCard(entry))}
+                            </div>
+                          </td>
+                        )
+                      }
+
+                      return null
+                    }).filter(Boolean)}
+                  </tr>
+                ))
+              })()}
             </tbody>
           </table>
         </div>
