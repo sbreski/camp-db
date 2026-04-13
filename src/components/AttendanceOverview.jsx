@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X, Printer } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 
 function isIncludedThisSeason(participant) {
@@ -29,6 +29,22 @@ function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T12:00:00')
   d.setDate(d.getDate() + n)
   return d.toISOString().slice(0, 10)
+}
+
+function monthStart(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00')
+  d.setDate(1)
+  return d.toISOString().slice(0, 10)
+}
+
+function listDateKeys(startKey, endKey) {
+  const keys = []
+  let current = startKey
+  while (current <= endKey) {
+    keys.push(current)
+    current = addDays(current, 1)
+  }
+  return keys
 }
 
 function todayKey() {
@@ -138,7 +154,10 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
             return (
               <div key={p.id} className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] sm:gap-2 sm:items-center px-4 py-2.5 ${!rec?.signIn ? 'opacity-50 bg-red-50/30' : ''}`}>
                 <div>
-                  <ParticipantNameText participant={p} className="text-sm font-medium text-forest-950" />
+                  <div className="flex items-center gap-2">
+                    <ParticipantNameText participant={p} className="text-sm font-medium text-forest-950" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">Included</span>
+                  </div>
                   {late > 0 && (
                     <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
                       <AlertCircle size={10} /> {late} min late
@@ -193,12 +212,54 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
 }
 
 // ─── Weekly Overview ──────────────────────────────────────────────────────────
-function WeeklyOverview({ participants, attendance, startEditTime, markPresent, markAbsent }) {
+function WeeklyOverview({ participants, attendance, startEditTime, markPresent, markAbsent, campPeriod }) {
   const [weekOf, setWeekOf] = useState(weekStart(todayKey()))
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekOf, i)) // Mon–Sun
+  const [rangeKey, setRangeKey] = useState('week')
+
+  const campStart = String(campPeriod?.startDate || campPeriod?.start_date || '').trim()
+  const campEnd = String(campPeriod?.endDate || campPeriod?.end_date || '').trim()
+  const hasCampPeriod = Boolean(campStart && campEnd)
+  const today = todayKey()
+
+  const days = (() => {
+    if (rangeKey === 'week') {
+      return Array.from({ length: 7 }, (_, i) => addDays(weekOf, i))
+    }
+    if (rangeKey === '14d') {
+      return listDateKeys(addDays(today, -13), today)
+    }
+    if (rangeKey === '30d') {
+      return listDateKeys(addDays(today, -29), today)
+    }
+    if (rangeKey === 'month') {
+      return listDateKeys(monthStart(today), today)
+    }
+    if (rangeKey === 'all') {
+      const earliest = [...attendance]
+        .map(entry => String(entry.date || '').trim())
+        .filter(Boolean)
+        .sort()[0]
+      return listDateKeys(earliest || weekStart(today), today)
+    }
+    if (rangeKey === 'custom' && hasCampPeriod) {
+      const start = campStart <= campEnd ? campStart : campEnd
+      const end = campStart <= campEnd ? campEnd : campStart
+      return listDateKeys(start, end)
+    }
+    return []
+  })()
 
   function prevWeek() { setWeekOf(addDays(weekOf, -7)) }
   function nextWeek() { setWeekOf(addDays(weekOf, 7)) }
+
+  const canMoveWeek = rangeKey === 'week'
+
+  const visibleLabel = (() => {
+    if (!days.length) return 'No dates'
+    if (rangeKey === 'custom' && hasCampPeriod) return 'Camp Period'
+    if (rangeKey === 'week') return `Week of ${fmtDate(weekOf)}`
+    return `${fmtDate(days[0])} - ${fmtDate(days[days.length - 1])}`
+  })()
 
   const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name))
 
@@ -215,19 +276,51 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
     <div className="space-y-4">
       {/* Week nav */}
       <div className="flex items-center gap-3">
-        <button onClick={prevWeek} className="btn-secondary px-2 py-2"><ChevronLeft size={16} /></button>
+        <button onClick={prevWeek} disabled={!canMoveWeek} className="btn-secondary px-2 py-2 disabled:opacity-40"><ChevronLeft size={16} /></button>
         <div className="flex-1 text-center">
-          <p className="font-display font-semibold text-forest-950">
-            Week of {fmtDate(weekOf)}
-          </p>
+          <p className="font-display font-semibold text-forest-950">{visibleLabel}</p>
+          {rangeKey === 'custom' && hasCampPeriod && (
+            <p className="text-xs text-emerald-700">{fmtDate(days[0])} - {fmtDate(days[days.length - 1])}</p>
+          )}
         </div>
-        <button onClick={nextWeek} className="btn-secondary px-2 py-2"><ChevronRight size={16} /></button>
+        <button onClick={nextWeek} disabled={!canMoveWeek} className="btn-secondary px-2 py-2 disabled:opacity-40"><ChevronRight size={16} /></button>
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { id: 'week', label: 'This Week' },
+          { id: '14d', label: '14 Days' },
+          { id: '30d', label: '30 Days' },
+          { id: 'month', label: 'This Month' },
+          { id: 'all', label: 'All Time' },
+          { id: 'custom', label: 'Camp Period' },
+        ].map(option => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => setRangeKey(option.id)}
+            disabled={option.id === 'custom' && !hasCampPeriod}
+            className={`px-3 py-1.5 rounded-full text-xs font-display font-medium border ${rangeKey === option.id ? 'bg-forest-900 text-white border-forest-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'} disabled:opacity-40`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {!hasCampPeriod && (
+        <p className="text-xs text-stone-500">Camp Period can be set by owner/admin in Staff tab.</p>
+      )}
+
+      {days.length === 0 ? (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">
+          No dates selected for this range.
+        </div>
+      ) : (
+        <>
 
       {/* Weekly summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
         {stats.map(({ day, present, late }) => (
-          <div key={day} className={`card text-center py-2 px-1 ${day === todayKey() ? 'ring-2 ring-amber-400' : ''}`}>
+          <div key={day} className={`card text-center py-2 px-1 ${day === today ? 'ring-2 ring-amber-400' : ''}`}>
             <p className="text-xs font-semibold text-stone-500">{new Date(day + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short' })}</p>
             <p className="text-xs text-stone-400">{new Date(day + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
             <p className="text-lg font-display font-bold text-forest-900 mt-1">{present}</p>
@@ -244,7 +337,7 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
             <tr className="bg-stone-50 border-b border-stone-100">
               <th className="text-left px-4 py-2.5 text-stone-500 font-semibold uppercase tracking-wide w-36">Participant</th>
               {days.map(day => (
-                <th key={day} className={`px-2 py-2.5 text-center text-stone-500 font-semibold uppercase tracking-wide min-w-[80px] ${day === todayKey() ? 'bg-amber-50' : ''}`}>
+                <th key={day} className={`px-2 py-2.5 text-center text-stone-500 font-semibold uppercase tracking-wide min-w-[80px] ${day === today ? 'bg-amber-50' : ''}`}>
                   <div>{new Date(day + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short' })}</div>
                   <div className="font-normal text-stone-400">{new Date(day + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
                 </th>
@@ -258,14 +351,19 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
               let totalDays = 0, totalLate = 0
               return (
                 <tr key={p.id} className="hover:bg-stone-50">
-                  <td className="px-4 py-2 font-medium text-forest-950 whitespace-nowrap"><ParticipantNameText participant={p} className="font-medium text-forest-950" /></td>
+                  <td className="px-4 py-2 font-medium text-forest-950 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <ParticipantNameText participant={p} className="font-medium text-forest-950" />
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">Included</span>
+                    </div>
+                  </td>
                   {days.map(day => {
                     const rec = attendance.find(a => a.participantId === p.id && a.date === day)
                     const late = lateMinutes(rec?.signIn)
                     if (rec?.signIn) totalDays++
                     if (late > 0) totalLate++
                     return (
-                      <td key={day} className={`px-2 py-2 text-center ${day === todayKey() ? 'bg-amber-50' : ''}`}>
+                      <td key={day} className={`px-2 py-2 text-center ${day === today ? 'bg-amber-50' : ''}`}>
                         {rec?.signIn ? (
                           <div>
                             <button
@@ -294,7 +392,7 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
                       </td>
                     )
                   })}
-                  <td className="px-3 py-2 text-center font-semibold text-forest-900">{totalDays}/7</td>
+                  <td className="px-3 py-2 text-center font-semibold text-forest-900">{totalDays}/{days.length}</td>
                   <td className="px-3 py-2 text-center">
                     {totalLate > 0
                       ? <span className="font-semibold text-amber-600">{totalLate}</span>
@@ -311,6 +409,8 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
         <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">L</span> Late (&gt;10:15)</span>
         <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-red-50 text-red-400 flex items-center justify-center font-bold text-xs">✗</span> Absent</span>
       </div>
+        </>
+      )}
     </div>
   )
 }
@@ -491,7 +591,7 @@ function ParticipantOverview({ participants, attendance, startEditTime, openColl
 // ─── Main component ───────────────────────────────────────────────────────────
 const TABS = ['Daily', 'Weekly', 'Participant']
 
-export default function AttendanceOverview({ participants, attendance, setAttendance }) {
+export default function AttendanceOverview({ participants, attendance, setAttendance, campPeriod }) {
   const [tab, setTab] = useState('Daily')
   const [editingTime, setEditingTime] = useState(null) // { recordId, type: 'signIn' | 'signOut', currentTime, date }
   const [timeInput, setTimeInput] = useState('')
@@ -648,6 +748,16 @@ export default function AttendanceOverview({ participants, attendance, setAttend
         )}
       </div>
 
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="btn-secondary text-xs py-1.5 inline-flex items-center gap-1.5"
+        >
+          <Printer size={13} /> Print
+        </button>
+      </div>
+
       <div className="flex gap-2 flex-wrap">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
@@ -666,7 +776,7 @@ export default function AttendanceOverview({ participants, attendance, setAttend
         ) : (
           <>
             {tab === 'Daily' && <DailyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
-            {tab === 'Weekly' && <WeeklyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} />}
+            {tab === 'Weekly' && <WeeklyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} campPeriod={campPeriod} />}
             {tab === 'Participant' && <ParticipantOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
           </>
         )}

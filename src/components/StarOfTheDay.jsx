@@ -44,10 +44,10 @@ const RANGE_OPTIONS = [
   { id: '30d', label: '30 Days' },
   { id: 'month', label: 'This Month' },
   { id: 'all', label: 'All Time' },
-  { id: 'custom', label: 'Custom' },
+  { id: 'custom', label: 'Camp Period' },
 ]
 
-export default function StarOfTheDay({ participants, starAwards, setStarAwards }) {
+export default function StarOfTheDay({ participants, starAwards, setStarAwards, campPeriod }) {
   const [search, setSearch] = useState('')
   const [rangeKey, setRangeKey] = useState('week')
   const [customRanges, setCustomRanges] = useState(() => defaultCustomRanges(todayKey()))
@@ -57,6 +57,9 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const today = todayKey()
+  const campStart = String(campPeriod?.startDate || campPeriod?.start_date || '').trim()
+  const campEnd = String(campPeriod?.endDate || campPeriod?.end_date || '').trim()
+  const hasCampPeriod = Boolean(campStart && campEnd)
 
   const inSeasonParticipants = useMemo(() => (
     [...participants]
@@ -72,10 +75,13 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
 
   const dateKeys = useMemo(() => {
     if (rangeKey === 'custom') {
+      if (hasCampPeriod) {
+        return buildDatesFromRanges([{ id: 'camp-period', startKey: campStart, endKey: campEnd }])
+      }
       return buildDatesFromRanges(customRanges)
     }
     return buildStarRangeDates(rangeKey, today, starAwards)
-  }, [rangeKey, today, starAwards, customRanges])
+  }, [rangeKey, today, starAwards, customRanges, hasCampPeriod, campStart, campEnd])
   const dateSet = useMemo(() => new Set(dateKeys), [dateKeys])
 
   const awardsInRange = useMemo(() => (
@@ -104,13 +110,16 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
 
   const visiblePeriodLabel = useMemo(() => {
     if (rangeKey !== 'custom') return formatRangeLabel(dateKeys)
+    if (hasCampPeriod) {
+      return `Camp Period: ${formatRangeLabel(buildDatesFromRanges([{ id: 'camp-period', startKey: campStart, endKey: campEnd }]))}`
+    }
     if (customRanges.length === 0) return 'No dates'
     return customRanges
       .map(range => range.startKey === range.endKey
         ? formatShortDate(range.startKey)
         : `${formatShortDate(range.startKey)} - ${formatShortDate(range.endKey)}`)
       .join(', ')
-  }, [rangeKey, dateKeys, customRanges])
+  }, [rangeKey, dateKeys, customRanges, hasCampPeriod, campStart, campEnd])
 
   function selectRange(optionId) {
     setRangeKey(optionId)
@@ -274,7 +283,16 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
           </div>
         </div>
 
-        {rangeKey === 'custom' && (
+        {rangeKey === 'custom' && hasCampPeriod && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-1">
+            <p className="text-xs font-semibold text-emerald-900">Camp Period (shared)</p>
+            <p className="text-sm text-emerald-800">
+              {formatShortDate(campStart)} - {formatShortDate(campEnd)}
+            </p>
+          </div>
+        )}
+
+        {rangeKey === 'custom' && !hasCampPeriod && (
           <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-end">
               <div>

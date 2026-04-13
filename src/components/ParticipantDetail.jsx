@@ -23,6 +23,25 @@ function createdUserIdForIncident(incident) {
   return String(incident.createdByUserId || incident.created_by_user_id || '').trim()
 }
 
+function resolvedAtForIncident(incident) {
+  return incident.resolvedAt || incident.resolved_at || null
+}
+
+function canAccessIncidentUpdates(incident, canViewSafeguarding) {
+  if (incident.type !== 'Safeguarding') return true
+  return Boolean(canViewSafeguarding)
+}
+
+function incidentNotesForIncident(incident) {
+  const notes = incident.incidentNotes || incident.incident_notes
+  return Array.isArray(notes) ? notes : []
+}
+
+function incidentDocumentsForIncident(incident) {
+  const docs = incident.incidentDocuments || incident.incident_documents
+  return Array.isArray(docs) ? docs : []
+}
+
 function participantNotesForParticipant(value) {
   const notes = value?.participantNotesHistory || value?.participant_notes_history
   return Array.isArray(notes) ? notes : []
@@ -61,6 +80,10 @@ export default function ParticipantDetail({
   const [participantNoteDraft, setParticipantNoteDraft] = useState('')
   const [editingParticipantNote, setEditingParticipantNote] = useState(null)
   const [uploadingParticipantDocument, setUploadingParticipantDocument] = useState(false)
+  const [expandedIncidentId, setExpandedIncidentId] = useState('')
+  const [noteDraftByIncident, setNoteDraftByIncident] = useState({})
+  const [editingNote, setEditingNote] = useState(null)
+  const [uploadingExtraIncidentId, setUploadingExtraIncidentId] = useState('')
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const participantId = participant?.id || null
@@ -131,6 +154,66 @@ export default function ParticipantDetail({
     }
     setEditingIncidentId(inc.id)
     setShowIncident(true)
+  }
+
+  function isSafeguardingResolved(incident) {
+    return Boolean(resolvedAtForIncident(incident))
+  }
+
+  async function markSafeguardingResolved(incident) {
+    if (incident.type !== 'Safeguarding') return
+    if (!canViewSafeguarding) {
+      alert('Only authorised safeguarding users can resolve safeguarding incidents.')
+      return
+    }
+    if (isSafeguardingResolved(incident)) return
+
+    const resolvedAt = new Date().toISOString()
+
+    await setIncidents(prev => prev.map(inc => (
+      inc.id === incident.id
+        ? {
+            ...inc,
+            resolvedAt,
+            resolvedBy: actorInitials,
+            updatedByInitials: actorInitials,
+            updatedByUserId: actorUserId || inc.updatedByUserId || null,
+          }
+        : inc
+    )))
+
+    await setParticipants(prev => prev.map(p => (
+      p.id === incident.participantId
+        ? { ...p, safeguardingFlag: false }
+        : p
+    )))
+  }
+
+  async function reopenSafeguardingIncident(incident) {
+    if (incident.type !== 'Safeguarding') return
+    if (!canViewSafeguarding) {
+      alert('Only authorised safeguarding users can reopen safeguarding incidents.')
+      return
+    }
+    if (!isSafeguardingResolved(incident)) return
+
+    await setIncidents(prev => prev.map(inc => (
+      inc.id === incident.id
+        ? {
+            ...inc,
+            resolvedAt: null,
+            resolvedBy: null,
+            updatedByInitials: actorInitials,
+            updatedByUserId: actorUserId || inc.updatedByUserId || null,
+          }
+        : inc
+    )))
+
+    await setParticipants(prev => prev.map(p => (
+      p.id === incident.participantId
+        ? { ...p, safeguardingFlag: true }
+        : p
+    )))
   }
 
   async function fetchSafeguardingDownloadUrlByIncidentId(incidentId) {
@@ -219,6 +302,202 @@ export default function ParticipantDetail({
     } finally {
       setDownloadingIncidentId('')
     }
+  }
+
+  async function addIncidentNote(incident) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    const noteText = String(noteDraftByIncident[incident.id] || '').trim()
+    if (!noteText) return
+
+    const createdAt = new Date().toISOString()
+    const nextNote = {
+      id: crypto.randomUUID(),
+      text: noteText,
+      createdAt,
+      createdBy: actorInitials,
+      updatedAt: null,
+      updatedBy: null,
+    }
+
+    await setIncidents(prev => prev.map(inc => (
+      inc.id === incident.id
+        ? {
+            ...inc,
+            incidentNotes: [...incidentNotesForIncident(inc), nextNote],
+            updatedByInitials: actorInitials,
+            updatedByUserId: actorUserId || inc.updatedByUserId || null,
+          }
+        : inc
+    )))
+
+    setNoteDraftByIncident(prev => ({ ...prev, [incident.id]: '' }))
+  }
+
+  function beginEditIncidentNote(incidentId, note) {
+    setEditingNote({
+      incidentId,
+      incidentType: note.incidentType || '',
+      noteId: note.id,
+      text: String(note.text || ''),
+    })
+  }
+
+  async function saveEditedIncidentNote() {
+    if (!editingNote) return
+    if (editingNote.incidentType === 'Safeguarding' && !canViewSafeguarding) return
+
+    const text = String(editingNote.text || '').trim()
+    if (!text) return
+
+    const editedAt = new Date().toISOString()
+    const { incidentId, noteId } = editingNote
+
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incidentId) return inc
+
+      const updatedNotes = incidentNotesForIncident(inc).map(note => (
+        note.id === noteId && !note.deletedAt
+          ? {
+              ...note,
+              text,
+              updatedAt: editedAt,
+              updatedBy: actorInitials,
+            }
+          : note
+      ))
+
+      return {
+        ...inc,
+        incidentNotes: updatedNotes,
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+
+    setEditingNote(null)
+  }
+
+  async function uploadIncidentDocument(incident, file) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) {
+      alert('File must be under 8MB.')
+      return
+    }
+
+    setUploadingExtraIncidentId(incident.id)
+    try {
+      const url = await uploadDocumentFile(file)
+      const uploadedAt = new Date().toISOString()
+
+      await setIncidents(prev => prev.map(inc => (
+        inc.id === incident.id
+          ? {
+              ...inc,
+              incidentDocuments: [
+                ...incidentDocumentsForIncident(inc),
+                {
+                  id: crypto.randomUUID(),
+                  name: file.name,
+                  url,
+                  uploadedAt,
+                  uploadedBy: actorInitials,
+                },
+              ],
+              updatedByInitials: actorInitials,
+              updatedByUserId: actorUserId || inc.updatedByUserId || null,
+            }
+          : inc
+      )))
+    } catch (error) {
+      alert(error.message || 'Unable to upload document')
+    } finally {
+      setUploadingExtraIncidentId('')
+    }
+  }
+
+  async function deleteIncidentNote(incident, noteId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!window.confirm('Delete this note? You can recover it later.')) return
+
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentNotes: incidentNotesForIncident(inc).map(note => (
+          note.id === noteId
+            ? {
+                ...note,
+                deletedAt: new Date().toISOString(),
+                deletedBy: actorInitials,
+              }
+            : note
+        )),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+
+    if (editingNote?.incidentId === incident.id && editingNote?.noteId === noteId) {
+      setEditingNote(null)
+    }
+  }
+
+  async function deleteIncidentDocument(incident, docId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!window.confirm('Delete this document from the report updates list? You can recover it later.')) return
+
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentDocuments: incidentDocumentsForIncident(inc).map(doc => (
+          doc.id === docId
+            ? {
+                ...doc,
+                deletedAt: new Date().toISOString(),
+                deletedBy: actorInitials,
+              }
+            : doc
+        )),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+  }
+
+  async function recoverIncidentNote(incident, noteId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentNotes: incidentNotesForIncident(inc).map(note => (
+          note.id === noteId
+            ? { ...note, deletedAt: null, deletedBy: null }
+            : note
+        )),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+  }
+
+  async function recoverIncidentDocument(incident, docId) {
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentDocuments: incidentDocumentsForIncident(inc).map(doc => (
+          doc.id === docId
+            ? { ...doc, deletedAt: null, deletedBy: null }
+            : doc
+        )),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
   }
 
   const participantAttendance = attendance

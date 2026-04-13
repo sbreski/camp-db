@@ -349,7 +349,7 @@ function CreateAccountForm({ onSubmit, loading }) {
   )
 }
 
-export default function Staff({ staffList, setStaffList }) {
+export default function Staff({ staffList, setStaffList, campPeriod, setCampPeriod, canManageCampPeriod = false }) {
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -366,7 +366,18 @@ export default function Staff({ staffList, setStaffList }) {
   const [staffActionLoading, setStaffActionLoading] = useState(false)
   const [staffMessage, setStaffMessage] = useState('')
   const [staffError, setStaffError] = useState('')
+  const [campPeriodDraft, setCampPeriodDraft] = useState({ startDate: '', endDate: '' })
+  const [campPeriodSaving, setCampPeriodSaving] = useState(false)
+  const [campPeriodMessage, setCampPeriodMessage] = useState('')
+  const [campPeriodError, setCampPeriodError] = useState('')
   const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
+
+  useEffect(() => {
+    setCampPeriodDraft({
+      startDate: campPeriod?.startDate || campPeriod?.start_date || '',
+      endDate: campPeriod?.endDate || campPeriod?.end_date || '',
+    })
+  }, [campPeriod?.startDate, campPeriod?.start_date, campPeriod?.endDate, campPeriod?.end_date])
 
   async function addStaff(data) {
     setStaffActionLoading(true)
@@ -830,6 +841,21 @@ export default function Staff({ staffList, setStaffList }) {
     }
   }
 
+  async function saveCampPeriod() {
+    if (typeof setCampPeriod !== 'function') return
+    setCampPeriodSaving(true)
+    setCampPeriodError('')
+    setCampPeriodMessage('')
+    try {
+      await setCampPeriod(campPeriodDraft)
+      setCampPeriodMessage('Camp period updated for all range views.')
+    } catch (error) {
+      setCampPeriodError(error.message || 'Unable to save camp period')
+    } finally {
+      setCampPeriodSaving(false)
+    }
+  }
+
   const staffByEmail = useMemo(() => {
     const map = new Map()
     staffList.forEach(member => {
@@ -916,6 +942,47 @@ export default function Staff({ staffList, setStaffList }) {
       </div>
 
       <section className="card border-2 border-forest-200 space-y-4">
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
+          <div>
+            <h3 className="font-display font-bold text-forest-950 text-lg">Camp Period</h3>
+            <p className="text-sm text-stone-600">Used as the shared custom date range across tabs.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+            <div>
+              <label className="label">Start Date</label>
+              <input
+                type="date"
+                className="input"
+                value={campPeriodDraft.startDate}
+                onChange={e => setCampPeriodDraft(prev => ({ ...prev, startDate: e.target.value }))}
+                disabled={!canManageCampPeriod}
+              />
+            </div>
+            <div>
+              <label className="label">End Date</label>
+              <input
+                type="date"
+                className="input"
+                value={campPeriodDraft.endDate}
+                onChange={e => setCampPeriodDraft(prev => ({ ...prev, endDate: e.target.value }))}
+                disabled={!canManageCampPeriod}
+              />
+            </div>
+            {canManageCampPeriod && (
+              <button className="btn-primary text-sm" onClick={saveCampPeriod} disabled={campPeriodSaving}>
+                {campPeriodSaving ? 'Saving...' : 'Save Camp Period'}
+              </button>
+            )}
+          </div>
+
+          {!canManageCampPeriod && (
+            <p className="text-xs text-stone-500">Only owner/admin can change dates. Everyone can see and use this range.</p>
+          )}
+          {campPeriodError && <p className="text-xs text-red-700">{campPeriodError}</p>}
+          {campPeriodMessage && <p className="text-xs text-emerald-700">{campPeriodMessage}</p>}
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h3 className="font-display font-bold text-forest-950 text-lg flex items-center gap-2">

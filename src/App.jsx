@@ -202,6 +202,7 @@ function toSnake(obj) {
     firstAidExpiresOn: 'first_aid_expires_on', safeguardingExpiresOn: 'safeguarding_expires_on',
     isActiveThisSeason: 'is_active_this_season', isAssignedThisSeason: 'is_assigned_this_season',
     awardDate: 'award_date',
+    startDate: 'start_date', endDate: 'end_date',
     createdAt: 'created_at', updatedAt: 'updated_at',
     sortOrder: 'sort_order',
   }
@@ -284,6 +285,7 @@ function toCamel(obj) {
     first_aid_expires_on: 'firstAidExpiresOn', safeguarding_expires_on: 'safeguardingExpiresOn',
     is_active_this_season: 'isActiveThisSeason', is_assigned_this_season: 'isAssignedThisSeason',
     award_date: 'awardDate',
+    start_date: 'startDate', end_date: 'endDate',
     created_at: 'createdAt', updated_at: 'updatedAt',
     sort_order: 'sortOrder',
   }
@@ -349,6 +351,7 @@ export default function App() {
   const [rawTimetableEntries, , loadingT, reloadT] = useSupabaseTable('daily_timetable_entries', 'day_date', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
   const [rawTimetableSpaces, , loadingTS, reloadTS] = useSupabaseTable('timetable_spaces', 'name', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
   const [rawStarAwards, setRawStarAwardsState, loadingStar, reloadStar] = useSupabaseTable('star_of_day_awards', 'award_date', { enabled: tableQueriesEnabled && needsStarOfDay, cacheScope: tableCacheScope })
+  const [rawCampPeriodRows, setRawCampPeriodRowsState, loadingCampPeriod, reloadCampPeriod] = useSupabaseTable('camp_period_settings', 'updated_at', { enabled: tableQueriesEnabled, cacheScope: tableCacheScope })
   const [rawStaff, , loadingS, reloadS] = useSupabaseTable('staff', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsStaff, cacheScope: tableCacheScope })
 
   const participants = rawParticipants.map(toCamel)
@@ -358,9 +361,11 @@ export default function App() {
   const timetableEntries = rawTimetableEntries.map(toCamel)
   const timetableSpaces = rawTimetableSpaces.map(toCamel)
   const starAwards = rawStarAwards.map(toCamel)
+  const campPeriodRows = rawCampPeriodRows.map(toCamel)
+  const campPeriod = campPeriodRows[0] || { id: 'global', startDate: '', endDate: '' }
   const staffList = rawStaff.map(toCamel)
 
-  const loading = (needsParticipants && loadingP) || (needsAttendance && loadingA) || (needsIncidents && loadingI) || (needsBehaviourLogs && loadingBL) || (needsTimetable && (loadingT || loadingTS)) || (needsStarOfDay && loadingStar) || (needsStaff && loadingS)
+  const loading = (needsParticipants && loadingP) || (needsAttendance && loadingA) || (needsIncidents && loadingI) || (needsBehaviourLogs && loadingBL) || (needsTimetable && (loadingT || loadingTS)) || (needsStarOfDay && loadingStar) || loadingCampPeriod || (needsStaff && loadingS)
 
   function isMissingUpdatedAtColumnError(error) {
     const message = String(error?.message || '').toLowerCase()
@@ -762,6 +767,42 @@ export default function App() {
     } catch (error) {
       setRawStarAwardsState(previousRows)
       throw new Error(error.message || 'Unable to save Star of the Day changes')
+    }
+  }
+
+  async function setCampPeriod(updater) {
+    const current = {
+      id: campPeriod.id || 'global',
+      startDate: campPeriod.startDate || campPeriod.start_date || '',
+      endDate: campPeriod.endDate || campPeriod.end_date || '',
+    }
+    const next = typeof updater === 'function' ? updater(current) : updater
+    const startDateRaw = String(next?.startDate || '').trim()
+    const endDateRaw = String(next?.endDate || '').trim()
+
+    if (!startDateRaw || !endDateRaw) {
+      throw new Error('Choose both camp period start and end dates')
+    }
+
+    const startDate = startDateRaw <= endDateRaw ? startDateRaw : endDateRaw
+    const endDate = startDateRaw <= endDateRaw ? endDateRaw : startDateRaw
+    const row = {
+      id: current.id || 'global',
+      startDate,
+      endDate,
+      updatedAt: new Date().toISOString(),
+    }
+
+    const previousRows = rawCampPeriodRows
+    setRawCampPeriodRowsState([toSnake(row)])
+
+    try {
+      const { error } = await supabase.from('camp_period_settings').upsert(toSnake(row), { onConflict: 'id' })
+      if (error) throw error
+      reloadCampPeriod()
+    } catch (error) {
+      setRawCampPeriodRowsState(previousRows)
+      throw new Error(error.message || 'Unable to save camp period')
     }
   }
 
@@ -1221,6 +1262,12 @@ export default function App() {
           columns: 'id,participant_id,award_date',
           label: 'Star of the Day table is missing (star_of_day_awards). Run db/27_star_of_the_day.sql.',
         },
+        {
+          key: 'camp_period_settings_table',
+          table: 'camp_period_settings',
+          columns: 'id,start_date,end_date',
+          label: 'Camp period settings table is missing (camp_period_settings). Run db/28_camp_period_settings.sql.',
+        },
       ]
 
       for (const check of checks) {
@@ -1367,8 +1414,8 @@ export default function App() {
       )
       case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
-      case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} />
-      case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} />
+      case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} />
+      case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} />
       case 'participants': return <Participants participants={participants} setParticipants={setParticipants} onView={(id) => navigate('participant', id)} />
       case 'parents': return <Parents participants={participants} onUpdateParticipant={(id, approvedAdults) => {
         setParticipants(prev => prev.map(p => p.id === id ? { ...p, approvedAdults } : p))
@@ -1412,7 +1459,7 @@ export default function App() {
         />
       )
       case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} setParticipants={setParticipants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onView={(id) => navigate('participant', id)} />
-      case 'staff': return <Staff staffList={staffList} setStaffList={setStaffList} />
+      case 'staff': return <Staff staffList={staffList} setStaffList={setStaffList} campPeriod={campPeriod} setCampPeriod={setCampPeriod} canManageCampPeriod={isOwnerUser || isAdminUser} />
       default: return null
     }
   }
