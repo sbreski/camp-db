@@ -186,6 +186,7 @@ function toSnake(obj) {
     exceptionReason: 'exception_reason', exceptionNotes: 'exception_notes',
     collectedBy: 'collected_by', staffMember: 'staff_member', pdfName: 'pdf_name',
     pdfData: 'pdf_data', emergencyContact: 'emergency_contact', emergencyPhone: 'emergency_phone',
+    incidentNotes: 'incident_notes', incidentDocuments: 'incident_documents',
     followUpRequired: 'follow_up_required', followUpDueDate: 'follow_up_due_date',
     followUpCompletedAt: 'follow_up_completed_at', followUpCompletedBy: 'follow_up_completed_by',
     resolvedAt: 'resolved_at', resolvedBy: 'resolved_by',
@@ -265,6 +266,7 @@ function toCamel(obj) {
     exception_reason: 'exceptionReason', exception_notes: 'exceptionNotes',
     collected_by: 'collectedBy', staff_member: 'staffMember', pdf_name: 'pdfName',
     pdf_data: 'pdfData', emergency_contact: 'emergencyContact', emergency_phone: 'emergencyPhone',
+    incident_notes: 'incidentNotes', incident_documents: 'incidentDocuments',
     follow_up_required: 'followUpRequired', follow_up_due_date: 'followUpDueDate',
     follow_up_completed_at: 'followUpCompletedAt', follow_up_completed_by: 'followUpCompletedBy',
     resolved_at: 'resolvedAt', resolved_by: 'resolvedBy',
@@ -487,6 +489,8 @@ export default function App() {
         || isMissingColumnError(error, 'updated_by_user_id')
         || isMissingColumnError(error, 'resolved_at')
         || isMissingColumnError(error, 'resolved_by')
+        || isMissingColumnError(error, 'incident_notes')
+        || isMissingColumnError(error, 'incident_documents')
       )) {
         const {
           created_by_initials,
@@ -495,6 +499,8 @@ export default function App() {
           updated_by_user_id,
           resolved_at,
           resolved_by,
+          incident_notes,
+          incident_documents,
           ...fallbackRest
         } = rest
         const fallback = await supabase.from('incidents').insert({ id: inc.id, ...fallbackRest })
@@ -515,9 +521,19 @@ export default function App() {
         || isMissingColumnError(error, 'updated_by_user_id')
         || isMissingColumnError(error, 'resolved_at')
         || isMissingColumnError(error, 'resolved_by')
+        || isMissingColumnError(error, 'incident_notes')
+        || isMissingColumnError(error, 'incident_documents')
       )) {
         // Backward-compatible fallback before the updated_at migration is applied.
-        const { updated_by_initials, updated_by_user_id, resolved_at, resolved_by, ...fallbackRest } = rest
+        const {
+          updated_by_initials,
+          updated_by_user_id,
+          resolved_at,
+          resolved_by,
+          incident_notes,
+          incident_documents,
+          ...fallbackRest
+        } = rest
         const fallback = await supabase.from('incidents').update(fallbackRest).eq('id', inc.id)
         error = fallback.error
       }

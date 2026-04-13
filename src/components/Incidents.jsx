@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2, Mail, Edit2 } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2, Mail, Edit2, MessageSquare, Paperclip, Check, X } from 'lucide-react'
 import IncidentForm from './IncidentForm'
 import { supabase } from '../supabase'
 
@@ -27,6 +27,16 @@ function resolvedAtForIncident(incident) {
   return incident.resolvedAt || incident.resolved_at || null
 }
 
+function incidentNotesForIncident(incident) {
+  const notes = incident.incidentNotes || incident.incident_notes
+  return Array.isArray(notes) ? notes : []
+}
+
+function incidentDocumentsForIncident(incident) {
+  const docs = incident.incidentDocuments || incident.incident_documents
+  return Array.isArray(docs) ? docs : []
+}
+
 export default function Incidents({ incidents, setIncidents, participants, setParticipants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onView }) {
   const [showForm, setShowForm] = useState(false)
   const [selectedParticipant, setSelectedParticipant] = useState('')
@@ -35,6 +45,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   const [search, setSearch] = useState('')
   const [openingIncidentId, setOpeningIncidentId] = useState('')
   const [downloadingIncidentId, setDownloadingIncidentId] = useState('')
+  const [expandedIncidentId, setExpandedIncidentId] = useState('')
+  const [noteDraftByIncident, setNoteDraftByIncident] = useState({})
+  const [editingNote, setEditingNote] = useState(null)
+  const [uploadingExtraIncidentId, setUploadingExtraIncidentId] = useState('')
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const actorInitialsNormalized = normalizeInitials(actorInitials)
@@ -96,6 +110,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         followUpCompletedBy: null,
         resolvedAt: null,
         resolvedBy: null,
+        incidentNotes: [],
+        incidentDocuments: [],
       },
     ])
     setShowForm(false)
@@ -273,6 +289,140 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }
   }
 
+  async function uploadDocumentFile(file) {
+    const safeName = String(file?.name || 'attachment').replace(/\s+/g, '-')
+    const filePath = `${crypto.randomUUID()}-${safeName}`
+    const uploadTargets = [
+      { bucket: 'incidents', filePath },
+      { bucket: 'documents', filePath: `incidents/${filePath}` },
+    ]
+
+    let lastError = null
+
+    for (const target of uploadTargets) {
+      const { error } = await supabase.storage.from(target.bucket).upload(target.filePath, file)
+
+      if (error) {
+        lastError = error
+        if (/bucket not found/i.test(error.message || '')) continue
+        throw error
+      }
+
+      const { data } = supabase.storage.from(target.bucket).getPublicUrl(target.filePath)
+      return data?.publicUrl || ''
+    }
+
+    throw new Error(lastError?.message || 'No storage bucket available for incident uploads.')
+  }
+
+  async function addIncidentNote(incident) {
+    const noteText = String(noteDraftByIncident[incident.id] || '').trim()
+    if (!noteText) return
+
+    const createdAt = new Date().toISOString()
+    const nextNote = {
+      id: crypto.randomUUID(),
+      text: noteText,
+      createdAt,
+      createdBy: actorInitials,
+      updatedAt: null,
+      updatedBy: null,
+    }
+
+    await setIncidents(prev => prev.map(inc => (
+      inc.id === incident.id
+        ? {
+            ...inc,
+            incidentNotes: [...incidentNotesForIncident(inc), nextNote],
+            updatedByInitials: actorInitials,
+            updatedByUserId: actorUserId || inc.updatedByUserId || null,
+          }
+        : inc
+    )))
+
+    setNoteDraftByIncident(prev => ({ ...prev, [incident.id]: '' }))
+  }
+
+  function beginEditIncidentNote(incidentId, note) {
+    setEditingNote({
+      incidentId,
+      noteId: note.id,
+      text: String(note.text || ''),
+    })
+  }
+
+  async function saveEditedIncidentNote() {
+    if (!editingNote) return
+
+    const text = String(editingNote.text || '').trim()
+    if (!text) return
+
+    const editedAt = new Date().toISOString()
+    const { incidentId, noteId } = editingNote
+
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incidentId) return inc
+
+      const updatedNotes = incidentNotesForIncident(inc).map(note => (
+        note.id === noteId
+          ? {
+              ...note,
+              text,
+              updatedAt: editedAt,
+              updatedBy: actorInitials,
+            }
+          : note
+      ))
+
+      return {
+        ...inc,
+        incidentNotes: updatedNotes,
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+
+    setEditingNote(null)
+  }
+
+  async function uploadIncidentDocument(incident, file) {
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) {
+      alert('File must be under 8MB.')
+      return
+    }
+
+    setUploadingExtraIncidentId(incident.id)
+    try {
+      const url = await uploadDocumentFile(file)
+      const uploadedAt = new Date().toISOString()
+
+      await setIncidents(prev => prev.map(inc => (
+        inc.id === incident.id
+          ? {
+              ...inc,
+              incidentDocuments: [
+                ...incidentDocumentsForIncident(inc),
+                {
+                  id: crypto.randomUUID(),
+                  name: file.name,
+                  url,
+                  uploadedAt,
+                  uploadedBy: actorInitials,
+                },
+              ],
+              updatedByInitials: actorInitials,
+              updatedByUserId: actorUserId || inc.updatedByUserId || null,
+            }
+          : inc
+      )))
+    } catch (error) {
+      alert(error.message || 'Unable to upload document')
+    } finally {
+      setUploadingExtraIncidentId('')
+    }
+  }
+
   const filtered = incidents
     .filter(inc => {
       const p = participants.find(x => x.id === inc.participantId)
@@ -414,6 +564,11 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             const canEditSafeguarding = canEditSafeguardingIncident(inc)
             const isOpeningReport = openingIncidentId === inc.id
             const isDownloadingReport = downloadingIncidentId === inc.id
+            const incidentNotes = incidentNotesForIncident(inc)
+            const incidentDocuments = incidentDocumentsForIncident(inc)
+            const isUpdatesOpen = expandedIncidentId === inc.id
+            const noteDraft = noteDraftByIncident[inc.id] || ''
+            const isUploadingExtra = uploadingExtraIncidentId === inc.id
             return (
               <div key={inc.id} className="card hover:shadow-sm transition-shadow group cursor-pointer"
                 onClick={() => openIncidentReport(inc)}>
@@ -433,6 +588,12 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                       )}
                       {resolvedAtForIncident(inc) && (
                         <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Resolved</span>
+                      )}
+                      {incidentNotes.length > 0 && (
+                        <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{incidentNotes.length} notes</span>
+                      )}
+                      {incidentDocuments.length > 0 && (
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{incidentDocuments.length} docs</span>
                       )}
                       {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
                     </div>
@@ -508,6 +669,17 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                       </button>
                     )}
                     <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExpandedIncidentId(prev => (prev === inc.id ? '' : inc.id))
+                        setEditingNote(null)
+                      }}
+                      className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                    >
+                      Updates
+                    </button>
+                    <button
                       onClick={(e) => {
                         e.stopPropagation()
                         startEditIncident(inc)
@@ -562,6 +734,140 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                     <ChevronRight size={16} className="text-stone-300 group-hover:text-stone-500 mt-1" />
                   </div>
                 </div>
+
+                {isUpdatesOpen && (
+                  <div
+                    className="mt-4 pt-4 border-t border-stone-200 space-y-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-forest-900">
+                        <MessageSquare size={14} /> Notes & Updates
+                      </div>
+                      {incidentNotes.length === 0 ? (
+                        <p className="text-xs text-stone-500">No notes yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {incidentNotes.map(note => {
+                            const isEditingThisNote = editingNote?.incidentId === inc.id && editingNote?.noteId === note.id
+                            return (
+                              <div key={note.id} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                                {isEditingThisNote ? (
+                                  <div className="space-y-2">
+                                    <textarea
+                                      className="input min-h-[84px]"
+                                      value={editingNote?.text || ''}
+                                      onChange={(e) => setEditingNote(prev => prev ? { ...prev, text: e.target.value } : prev)}
+                                    />
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={saveEditedIncidentNote}
+                                        className="text-xs px-2 py-1 rounded-md border border-emerald-200 text-emerald-800 hover:text-emerald-900 hover:border-emerald-300 bg-white inline-flex items-center gap-1"
+                                      >
+                                        <Check size={13} /> Save Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingNote(null)}
+                                        className="text-xs px-2 py-1 rounded-md border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 bg-white inline-flex items-center gap-1"
+                                      >
+                                        <X size={13} /> Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="text-sm text-stone-800 whitespace-pre-wrap">{note.text}</p>
+                                    <div className="mt-1 flex items-center gap-3 text-[11px] text-stone-500 flex-wrap">
+                                      <span>
+                                        Added {new Date(note.createdAt).toLocaleDateString('en-GB', {
+                                          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        })}
+                                        {note.createdBy ? ` by ${note.createdBy}` : ''}
+                                      </span>
+                                      {note.updatedAt && (
+                                        <span>
+                                          Edited {new Date(note.updatedAt).toLocaleDateString('en-GB', {
+                                            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                          })}
+                                          {note.updatedBy ? ` by ${note.updatedBy}` : ''}
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => beginEditIncidentNote(inc.id, note)}
+                                        className="underline text-forest-700 hover:text-forest-900"
+                                      >
+                                        Edit note
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 space-y-2">
+                        <label className="text-xs font-semibold text-sky-900">Add note</label>
+                        <textarea
+                          className="input min-h-[84px]"
+                          placeholder="Add update details here..."
+                          value={noteDraft}
+                          onChange={(e) => setNoteDraftByIncident(prev => ({ ...prev, [inc.id]: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addIncidentNote(inc)}
+                          className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                        >
+                          Add Note
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-forest-900">
+                        <Paperclip size={14} /> Additional Documents
+                      </div>
+                      {incidentDocuments.length === 0 ? (
+                        <p className="text-xs text-stone-500">No additional documents yet.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {incidentDocuments.map(doc => (
+                            <div key={doc.id} className="text-xs text-stone-700 flex items-center gap-2 flex-wrap">
+                              <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                              <span className="text-stone-500">
+                                Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
+                                  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}
+                                {doc.uploadedBy ? ` by ${doc.uploadedBy}` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-3">
+                        <label className="text-xs font-semibold text-indigo-900 block mb-2">Upload another form/document</label>
+                        <input
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            uploadIncidentDocument(inc, file)
+                            e.target.value = ''
+                          }}
+                          className="block w-full text-xs text-stone-700"
+                        />
+                        {isUploadingExtra && (
+                          <p className="mt-2 text-xs text-indigo-800">Uploading document...</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )
                 })}
