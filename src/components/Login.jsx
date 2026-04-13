@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Lock, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { CAMP_NAME } from '../App'
 import { supabase } from '../supabase'
 
@@ -139,9 +139,11 @@ export default function Login() {
       <div className={`relative w-full max-w-sm fade-in ${shake ? 'animate-bounce' : ''}`}>
         <div className="bg-white rounded-3xl p-8 shadow-2xl">
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-forest-900 rounded-2xl flex items-center justify-center shadow-lg">
-              <Lock size={28} className="text-amber-400" strokeWidth={2} />
-            </div>
+            <img
+              src="/icon.svg"
+              alt="Impact Kidz"
+              className="w-20 h-20 rounded-2xl shadow-lg object-contain bg-forest-900 p-2"
+            />
           </div>
           <h1 className="text-2xl font-display font-bold text-center text-forest-950 mb-1">{CAMP_NAME}</h1>
           <p className="text-center text-stone-500 text-sm mb-8 font-body">Staff access only</p>
