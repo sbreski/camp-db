@@ -954,7 +954,8 @@ export default function Timetable({
   function printDaySchedule() {
     const isSpaceOverviewPrint = canSeeOverview && viewMode === 'space'
     const isStaffOverviewPrint = canSeeOverview && viewMode === 'staff' && staffFilter === 'all'
-    const isOverviewPrint = isSpaceOverviewPrint || isStaffOverviewPrint
+    const isWhereaboutsPrint = canSeeOverview && viewMode === 'whereabouts'
+    const isOverviewPrint = isSpaceOverviewPrint || isStaffOverviewPrint || isWhereaboutsPrint
     const printableWidthPx = isOverviewPrint ? 1500 : 760
     const estimatedTableWidth = 110 + (columns.length * 220)
     const scale = Math.min(1, printableWidthPx / Math.max(estimatedTableWidth, 1))
@@ -1387,17 +1388,23 @@ export default function Timetable({
                       const activeEntries = entriesForColumnAtSlot(column, row.startMinutes, row.endMinutes)
                       const spaces = [...new Set(activeEntries.map(entry => entrySpaceName(entry)).filter(Boolean))]
                       return (
-                        <td key={`${row.startLabel}-${key}`} className="border-b border-stone-200 px-2 py-1 align-top h-16">
+                        <td key={`${row.startLabel}-${key}`} className="border-b border-stone-200 px-2 py-1 h-16">
                           {spaces.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex h-full w-full items-center justify-center gap-1 flex-wrap">
                               {spaces.map(space => (
-                                <span key={space} className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900">
+                                <span
+                                  key={space}
+                                  className="inline-flex items-center rounded-md border px-2 py-1 text-xs text-forest-950"
+                                  style={{ backgroundColor: colorForSpace(space), borderColor: '#86efac' }}
+                                >
                                   {space}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-xs text-stone-400">-</span>
+                            <div className="flex h-full w-full items-center justify-center">
+                              <span className="text-xs text-stone-400">-</span>
+                            </div>
                           )}
                         </td>
                       )
