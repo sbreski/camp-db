@@ -176,7 +176,7 @@ export default function Login() {
                 value={identifier}
                 onChange={e => setIdentifier(e.target.value)}
                 className="input"
-                placeholder="sam.brenner, Sam Brenner, or name@camp.org"
+                placeholder="firstname.lastname or name@email.com"
                 autoFocus
                 required
               />
