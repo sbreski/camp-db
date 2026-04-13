@@ -485,19 +485,40 @@
         jpegQuality -= 0.08
         imgData = canvas.toDataURL('image/jpeg', jpegQuality)
       }
-      const imgHeight = (canvas.height * usableWidth) / canvas.width
+      const maxCanvasPixels = 7_000_000
+      let exportCanvas = canvas
+      const currentPixels = canvas.width * canvas.height
+      if (currentPixels > maxCanvasPixels) {
+        const ratio = Math.sqrt(maxCanvasPixels / currentPixels)
+        const resized = document.createElement('canvas')
+        resized.width = Math.max(1200, Math.floor(canvas.width * ratio))
+        resized.height = Math.max(1200, Math.floor(canvas.height * ratio))
+        const ctx = resized.getContext('2d')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, resized.width, resized.height)
+        ctx.drawImage(canvas, 0, 0, resized.width, resized.height)
+        exportCanvas = resized
+      }
 
-      let heightLeft = imgHeight
-      let y = margin
+      jpegQuality = 0.84
+      imgData = exportCanvas.toDataURL('image/jpeg', jpegQuality)
+      while (imgData.length > maxDataUrlLength && jpegQuality > 0.4) {
+        jpegQuality -= 0.08
+        imgData = exportCanvas.toDataURL('image/jpeg', jpegQuality)
+      }
 
-      pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
-      heightLeft -= usableHeight
+      const maxPdfHeight = usableHeight * 2
+      const baseImgHeight = (exportCanvas.height * usableWidth) / exportCanvas.width
+      const drawScale = baseImgHeight > maxPdfHeight ? (maxPdfHeight / baseImgHeight) : 1
+      const drawWidth = usableWidth * drawScale
+      const drawHeight = baseImgHeight * drawScale
+      const drawX = margin + ((usableWidth - drawWidth) / 2)
 
-      while (heightLeft > 0.1) {
-        y = margin - (imgHeight - heightLeft)
+      pdf.addImage(imgData, 'JPEG', drawX, margin, drawWidth, drawHeight)
+
+      if (drawHeight > usableHeight) {
         pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
-        heightLeft -= usableHeight
+        pdf.addImage(imgData, 'JPEG', drawX, margin - usableHeight, drawWidth, drawHeight)
       }
 
       const now = new Date().toISOString().slice(0, 10)
