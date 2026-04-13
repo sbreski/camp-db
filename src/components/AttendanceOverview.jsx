@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 
 function fmtTime(ts) {
@@ -475,64 +475,11 @@ function ParticipantOverview({ participants, attendance, startEditTime, openColl
 // ─── Main component ───────────────────────────────────────────────────────────
 const TABS = ['Daily', 'Weekly', 'Participant']
 
-export default function AttendanceOverview({ participants, attendance, setAttendance, setParticipants }) {
+export default function AttendanceOverview({ participants, attendance, setAttendance }) {
   const [tab, setTab] = useState('Daily')
   const [editingTime, setEditingTime] = useState(null) // { recordId, type: 'signIn' | 'signOut', currentTime, date }
   const [timeInput, setTimeInput] = useState('')
   const [collectionDetail, setCollectionDetail] = useState(null)
-  const [assignmentSearch, setAssignmentSearch] = useState('')
-  const [selectedParticipantIds, setSelectedParticipantIds] = useState([])
-
-  const assignmentRows = [...participants]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .filter(p => p.name.toLowerCase().includes(assignmentSearch.toLowerCase()))
-
-  const selectedSet = new Set(selectedParticipantIds)
-  const visibleIds = assignmentRows.map(p => p.id)
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedSet.has(id))
-  const anyVisibleSelected = visibleIds.some(id => selectedSet.has(id))
-  const includedThisSeasonCount = participants.filter(p => (p.isActiveThisSeason ?? p.is_active_this_season) !== false).length
-
-  function toggleParticipantSelection(participantId) {
-    setSelectedParticipantIds(prev => (
-      prev.includes(participantId)
-        ? prev.filter(id => id !== participantId)
-        : [...prev, participantId]
-    ))
-  }
-
-  function toggleSelectAllVisible() {
-    if (allVisibleSelected) {
-      setSelectedParticipantIds(prev => prev.filter(id => !visibleIds.includes(id)))
-      return
-    }
-    setSelectedParticipantIds(prev => [...new Set([...prev, ...visibleIds])])
-  }
-
-  function clearSelectedParticipants() {
-    setSelectedParticipantIds([])
-  }
-
-  function applySeasonAssignment(isIncluded) {
-    if (selectedParticipantIds.length === 0) {
-      alert('Select at least one participant first.')
-      return
-    }
-    if (typeof setParticipants !== 'function') {
-      alert('Participant updates are unavailable right now. Please reload and try again.')
-      return
-    }
-
-    setParticipants(prev => prev.map(p => (
-      selectedSet.has(p.id)
-        ? { ...p, isActiveThisSeason: isIncluded }
-        : p
-    )))
-
-    if (!isIncluded) {
-      setSelectedParticipantIds(prev => prev.filter(id => !selectedSet.has(id)))
-    }
-  }
 
   function startEditTime(recordId, type, currentTime, date) {
     const record = attendance.find(r => r.id === recordId)
@@ -676,75 +623,6 @@ export default function AttendanceOverview({ participants, attendance, setAttend
       <div>
         <h2 className="text-2xl font-display font-bold text-forest-950">Attendance Overview</h2>
         <p className="text-stone-500 text-sm">{attendance.length} records total</p>
-      </div>
-
-      <div className="card border-2 border-forest-200 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <h3 className="font-display font-bold text-forest-950">Season Sign-In Assignment</h3>
-            <p className="text-xs text-stone-500">{includedThisSeasonCount} of {participants.length} participants currently included this season.</p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-stone-600">
-            <span>{selectedParticipantIds.length} selected</span>
-            <button onClick={clearSelectedParticipants} className="btn-secondary text-xs py-1">Clear</button>
-          </div>
-        </div>
-
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-          <input
-            type="text"
-            className="input pl-8"
-            placeholder="Find participants for season assignment..."
-            value={assignmentSearch}
-            onChange={e => setAssignmentSearch(e.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button onClick={toggleSelectAllVisible} className="btn-secondary text-xs py-1">
-            {allVisibleSelected ? 'Unselect visible' : 'Select visible'}
-          </button>
-          <button
-            onClick={() => applySeasonAssignment(true)}
-            disabled={!anyVisibleSelected && selectedParticipantIds.length === 0}
-            className="btn-primary text-xs py-1 disabled:opacity-40"
-          >
-            Include selected this season
-          </button>
-          <button
-            onClick={() => applySeasonAssignment(false)}
-            disabled={!anyVisibleSelected && selectedParticipantIds.length === 0}
-            className="btn-secondary text-xs py-1 disabled:opacity-40"
-          >
-            Remove selected from this season
-          </button>
-        </div>
-
-        <div className="max-h-56 overflow-y-auto rounded-xl border border-stone-200 divide-y divide-stone-100">
-          {assignmentRows.length === 0 ? (
-            <p className="text-sm text-stone-500 p-3">No participants match your search.</p>
-          ) : assignmentRows.map(p => {
-            const isIncluded = (p.isActiveThisSeason ?? p.is_active_this_season) !== false
-            const isSelected = selectedSet.has(p.id)
-            return (
-              <label key={p.id} className="flex items-center justify-between gap-3 p-3 cursor-pointer hover:bg-stone-50">
-                <span className="inline-flex items-center gap-2 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleParticipantSelection(p.id)}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm text-forest-950 truncate">{participantDisplayName(p)}</span>
-                </span>
-                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${isIncluded ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-600'}`}>
-                  {isIncluded ? 'Included' : 'Excluded'}
-                </span>
-              </label>
-            )
-          })}
-        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">

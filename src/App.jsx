@@ -1367,7 +1367,7 @@ export default function App() {
       )
       case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
-      case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} setParticipants={setParticipants} />
+      case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} />
       case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} />
       case 'participants': return <Participants participants={participants} setParticipants={setParticipants} onView={(id) => navigate('participant', id)} />
       case 'parents': return <Parents participants={participants} onUpdateParticipant={(id, approvedAdults) => {
