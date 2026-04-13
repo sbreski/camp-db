@@ -146,6 +146,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
   async function markSafeguardingResolved(incident) {
     if (incident.type !== 'Safeguarding') return
+    if (!canViewSafeguarding) {
+      alert('Only authorised safeguarding users can resolve safeguarding incidents.')
+      return
+    }
     if (isSafeguardingResolved(incident)) return
 
     const resolvedAt = new Date().toISOString()
@@ -182,6 +186,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
   async function reopenSafeguardingIncident(incident) {
     if (incident.type !== 'Safeguarding') return
+    if (!canViewSafeguarding) {
+      alert('Only authorised safeguarding users can reopen safeguarding incidents.')
+      return
+    }
     if (!isSafeguardingResolved(incident)) return
 
     await setIncidents(prev => prev.map(inc => (
@@ -789,7 +797,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                     >
                       <Edit2 size={15} />
                     </button>
-                    {inc.type === 'Safeguarding' && !isSafeguardingResolved(inc) && (
+                    {inc.type === 'Safeguarding' && canViewSafeguarding && !isSafeguardingResolved(inc) && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -801,7 +809,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         Mark as Resolved
                       </button>
                     )}
-                    {inc.type === 'Safeguarding' && isSafeguardingResolved(inc) && (
+                    {inc.type === 'Safeguarding' && canViewSafeguarding && isSafeguardingResolved(inc) && (
                       <button
                         type="button"
                         onClick={(e) => {
