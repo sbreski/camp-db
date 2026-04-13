@@ -942,7 +942,9 @@ export default function Timetable({
   }
 
   function printDaySchedule() {
-    const isOverviewPrint = canSeeOverview
+    const isSpaceOverviewPrint = canSeeOverview && viewMode === 'space'
+    const isStaffOverviewPrint = canSeeOverview && viewMode === 'staff' && staffFilter === 'all'
+    const isOverviewPrint = isSpaceOverviewPrint || isStaffOverviewPrint
     const printableWidthPx = isOverviewPrint ? 1500 : 760
     const estimatedTableWidth = 110 + (columns.length * 220)
     const scale = Math.min(1, printableWidthPx / Math.max(estimatedTableWidth, 1))
