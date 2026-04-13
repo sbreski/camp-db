@@ -96,8 +96,8 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
           <p className="font-display font-semibold text-forest-950">{fmtDate(date)}</p>
           {date === todayKey() && <p className="text-xs text-amber-600 font-medium">Today</p>}
         </div>
-        <button onClick={() => setDate(addDays(date, 1))} disabled={date >= todayKey()}
-          className="btn-secondary px-2 py-2 disabled:opacity-30"><ChevronRight size={16} /></button>
+        <button onClick={() => setDate(addDays(date, 1))}
+          className="btn-secondary px-2 py-2"><ChevronRight size={16} /></button>
       </div>
 
       {/* Stats */}

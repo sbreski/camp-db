@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Plus, Search, ChevronRight, Trash2, User, Upload, CameraOff, Camera } from 'lucide-react'
 import ParticipantForm from './ParticipantForm'
 import ImportParticipants from './ImportParticipants'
-import ParticipantNameText from './ParticipantNameText'
+import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 
 function photoConsentMode(value) {

@@ -224,8 +224,8 @@ export default function SignInOut({ participants, attendance, setAttendance, act
 
   function signIn(participant) {
     const now = new Date()
-    // For past dates, use a reasonable sign-in time (9:00 AM)
-    const signInTime = selectedDate < today ? new Date(`${selectedDate}T10:00:00`) : now
+    // For non-today dates, use a predictable default sign-in time on that selected day.
+    const signInTime = selectedDate === today ? now : new Date(`${selectedDate}T10:00:00`)
     
     setAttendance(prev => [
       ...prev.filter(r => !(r.date === selectedDate && r.participantId === participant.id)),
@@ -262,8 +262,8 @@ export default function SignInOut({ participants, attendance, setAttendance, act
     if (!existing) return
     
     const now = new Date()
-    // For past dates, use a reasonable sign-out time (3:00 PM)
-    const signOutTime = selectedDate < today ? new Date(`${selectedDate}T16:00:00`) : now
+    // For non-today dates, use a predictable default sign-out time on that selected day.
+    const signOutTime = selectedDate === today ? now : new Date(`${selectedDate}T16:00:00`)
     
     setAttendance(prev => prev.map(r => r.id === existing.id ? { ...r, signOut: signOutTime.toISOString(), signOutBy: actorInitials, collectedBy } : r))
     setFlash({ id: participant.id, type: 'out' })
@@ -647,7 +647,6 @@ export default function SignInOut({ participants, attendance, setAttendance, act
           value={selectedDate}
           onChange={e => setSelectedDate(e.target.value)}
           className="input"
-          max={new Date().toISOString().slice(0, 10)}
         />
         <button
           onClick={() => setSelectedDate(today)}

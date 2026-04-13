@@ -131,7 +131,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
     setRangeKey('custom')
     setError('')
     setMessage('Visible period updated.')
-    const nextStart = addDays(endKey, 1) > today ? today : addDays(endKey, 1)
+    const nextStart = addDays(endKey, 1)
     setRangeStartInput(nextStart)
     setRangeEndInput(nextStart)
   }
@@ -283,7 +283,6 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
                   type="date"
                   className="input"
                   value={rangeStartInput}
-                  max={today}
                   onChange={event => setRangeStartInput(event.target.value)}
                 />
               </div>
@@ -293,7 +292,6 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
                   type="date"
                   className="input"
                   value={rangeEndInput}
-                  max={today}
                   onChange={event => setRangeEndInput(event.target.value)}
                 />
               </div>
