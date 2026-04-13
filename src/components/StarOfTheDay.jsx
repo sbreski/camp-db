@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Printer, Search, Star, Trophy } from 'lucide-react'
+import { Printer, Search, Star } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
-import { buildStarRangeDates, getStarTotalTone, isParticipantInSeason } from '../utils/starOfDay'
+import { addDays, buildDatesFromRanges, buildStarRangeDates, getStarTotalTone, isParticipantInSeason } from '../utils/starOfDay'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -22,6 +22,15 @@ function formatRangeLabel(dateKeys) {
   return `${first} - ${last}`
 }
 
+function formatShortDate(dateKey) {
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function defaultCustomRanges(today) {
+  const startKey = buildStarRangeDates('week', today)[0] || today
+  return [{ id: `${startKey}-${today}`, startKey, endKey: today }]
+}
+
 function totalBadgeClass(total) {
   const tone = getStarTotalTone(total)
   if (tone === 'high') return 'bg-red-100 text-red-700 border-red-200'
@@ -35,11 +44,15 @@ const RANGE_OPTIONS = [
   { id: '30d', label: '30 Days' },
   { id: 'month', label: 'This Month' },
   { id: 'all', label: 'All Time' },
+  { id: 'custom', label: 'Custom' },
 ]
 
 export default function StarOfTheDay({ participants, starAwards, setStarAwards }) {
   const [search, setSearch] = useState('')
   const [rangeKey, setRangeKey] = useState('week')
+  const [customRanges, setCustomRanges] = useState(() => defaultCustomRanges(todayKey()))
+  const [rangeStartInput, setRangeStartInput] = useState(() => defaultCustomRanges(todayKey())[0].startKey)
+  const [rangeEndInput, setRangeEndInput] = useState(() => defaultCustomRanges(todayKey())[0].endKey)
   const [savingKey, setSavingKey] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -57,7 +70,12 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
     )
   ), [inSeasonParticipants, search])
 
-  const dateKeys = useMemo(() => buildStarRangeDates(rangeKey, today, starAwards), [rangeKey, today, starAwards])
+  const dateKeys = useMemo(() => {
+    if (rangeKey === 'custom') {
+      return buildDatesFromRanges(customRanges)
+    }
+    return buildStarRangeDates(rangeKey, today, starAwards)
+  }, [rangeKey, today, starAwards, customRanges])
   const dateSet = useMemo(() => new Set(dateKeys), [dateKeys])
 
   const awardsInRange = useMemo(() => (
@@ -84,16 +102,51 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
     return totals
   }, [filteredParticipants, awardsInRange])
 
-  const leaderboard = useMemo(() => (
-    filteredParticipants
-      .map(participant => ({
-        participant,
-        total: totalsByParticipant.get(participant.id) || 0,
-      }))
-      .filter(row => row.total > 0)
-      .sort((a, b) => b.total - a.total || a.participant.name.localeCompare(b.participant.name))
-      .slice(0, 3)
-  ), [filteredParticipants, totalsByParticipant])
+  const visiblePeriodLabel = useMemo(() => {
+    if (rangeKey !== 'custom') return formatRangeLabel(dateKeys)
+    if (customRanges.length === 0) return 'No dates'
+    return customRanges
+      .map(range => range.startKey === range.endKey
+        ? formatShortDate(range.startKey)
+        : `${formatShortDate(range.startKey)} - ${formatShortDate(range.endKey)}`)
+      .join(', ')
+  }, [rangeKey, dateKeys, customRanges])
+
+  function selectRange(optionId) {
+    setRangeKey(optionId)
+    setMessage('')
+    setError('')
+  }
+
+  function addCustomRange() {
+    if (!rangeStartInput || !rangeEndInput) {
+      setError('Choose both a start and end date first.')
+      return
+    }
+
+    const startKey = rangeStartInput <= rangeEndInput ? rangeStartInput : rangeEndInput
+    const endKey = rangeStartInput <= rangeEndInput ? rangeEndInput : rangeStartInput
+    const nextRange = { id: `${startKey}-${endKey}-${crypto.randomUUID()}`, startKey, endKey }
+    setCustomRanges(prev => [...prev, nextRange])
+    setRangeKey('custom')
+    setError('')
+    setMessage('Visible period updated.')
+    const nextStart = addDays(endKey, 1) > today ? today : addDays(endKey, 1)
+    setRangeStartInput(nextStart)
+    setRangeEndInput(nextStart)
+  }
+
+  function removeCustomRange(rangeId) {
+    setCustomRanges(prev => prev.filter(range => range.id !== rangeId))
+  }
+
+  function resetCustomRanges() {
+    const initialRanges = defaultCustomRanges(today)
+    setCustomRanges(initialRanges)
+    setRangeStartInput(initialRanges[0].startKey)
+    setRangeEndInput(initialRanges[0].endKey)
+    setRangeKey('custom')
+  }
 
   async function toggleStar(participantId, awardDate) {
     const key = `${participantId}|${awardDate}`
@@ -160,7 +213,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
         </head>
         <body>
           <h1>Star of the Day</h1>
-          <p>${formatRangeLabel(dateKeys)} · In season only · Generated ${new Date().toLocaleString('en-GB')}</p>
+          <p>${visiblePeriodLabel} · In season only · Generated ${new Date().toLocaleString('en-GB')}</p>
           <table>
             <thead>
               <tr>
@@ -185,7 +238,6 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Star of the Day</h2>
-          <p className="text-stone-500 text-sm">Recognition matrix for children currently included this season.</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -196,29 +248,6 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
           </button>
         </div>
       </div>
-
-      {leaderboard.length > 0 && (
-        <div className="card">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
-              <Trophy size={16} />
-            </div>
-            <div>
-              <h3 className="font-display font-semibold text-forest-950">Weekly Leaderboard</h3>
-              <p className="text-xs text-stone-500">Top recognition totals for the current date range.</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {leaderboard.map((row, index) => (
-              <div key={row.participant.id} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">#{index + 1}</p>
-                <ParticipantNameText participant={row.participant} className="font-display font-semibold text-forest-950 mt-1" />
-                <p className="text-sm text-stone-500 mt-1">{row.total} star{row.total === 1 ? '' : 's'} this range</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="card space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
@@ -236,7 +265,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
             {RANGE_OPTIONS.map(option => (
               <button
                 key={option.id}
-                onClick={() => setRangeKey(option.id)}
+                onClick={() => selectRange(option.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-display font-medium border ${rangeKey === option.id ? 'bg-forest-900 text-white border-forest-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'}`}
               >
                 {option.label}
@@ -245,8 +274,61 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
           </div>
         </div>
 
+        {rangeKey === 'custom' && (
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-end">
+              <div>
+                <label className="label">Range Start</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={rangeStartInput}
+                  max={today}
+                  onChange={event => setRangeStartInput(event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Range End</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={rangeEndInput}
+                  max={today}
+                  onChange={event => setRangeEndInput(event.target.value)}
+                />
+              </div>
+              <button type="button" onClick={addCustomRange} className="btn-primary text-xs py-2.5">
+                Add Range
+              </button>
+              <button type="button" onClick={resetCustomRanges} className="btn-secondary text-xs py-2.5">
+                Reset
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {customRanges.length === 0 ? (
+                <p className="text-xs text-stone-500">No custom ranges selected yet.</p>
+              ) : customRanges.map(range => (
+                <span key={range.id} className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700">
+                  {range.startKey === range.endKey
+                    ? formatShortDate(range.startKey)
+                    : `${formatShortDate(range.startKey)} - ${formatShortDate(range.endKey)}`}
+                  <button
+                    type="button"
+                    onClick={() => removeCustomRange(range.id)}
+                    className="text-stone-400 hover:text-red-600"
+                    aria-label="Remove custom date range"
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-stone-500">Showing {filteredParticipants.length} child{filteredParticipants.length === 1 ? '' : 'ren'} · {formatRangeLabel(dateKeys)}</p>
+          <p className="text-xs text-stone-500">Showing {filteredParticipants.length} child{filteredParticipants.length === 1 ? '' : 'ren'} · {visiblePeriodLabel}</p>
           {(message || error) && (
             <p className={`text-xs font-medium ${error ? 'text-red-700' : 'text-emerald-700'}`}>
               {error || message}
@@ -254,7 +336,11 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards }
           )}
         </div>
 
-        {filteredParticipants.length === 0 ? (
+        {dateKeys.length === 0 ? (
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">
+            Add at least one visible date range to build the matrix.
+          </div>
+        ) : filteredParticipants.length === 0 ? (
           <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">
             No in-season children match the current search.
           </div>

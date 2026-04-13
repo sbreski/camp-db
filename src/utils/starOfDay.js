@@ -40,6 +40,25 @@ export function listDateKeys(startKey, endKey) {
   return keys
 }
 
+export function buildDatesFromRanges(ranges = []) {
+  const unique = new Set()
+
+  ranges.forEach((range) => {
+    const startKey = range?.startKey
+    const endKey = range?.endKey || startKey
+    if (!startKey || !endKey) return
+
+    const normalizedStart = startKey <= endKey ? startKey : endKey
+    const normalizedEnd = startKey <= endKey ? endKey : startKey
+
+    listDateKeys(normalizedStart, normalizedEnd).forEach((dateKey) => {
+      unique.add(dateKey)
+    })
+  })
+
+  return [...unique].sort()
+}
+
 export function buildStarRangeDates(rangeKey, todayKey, starAwards = []) {
   const safeToday = todayKey || new Date().toISOString().slice(0, 10)
   let startKey = safeToday

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildDatesFromRanges,
   buildStarRangeDates,
   getStarTotalTone,
   isParticipantInSeason,
@@ -43,6 +44,21 @@ describe('star of the day helpers', () => {
       '2026-04-14',
       '2026-04-15',
       '2026-04-16',
+    ])
+  })
+
+  it('builds non-contiguous date keys from multiple ranges', () => {
+    expect(buildDatesFromRanges([
+      { startKey: '2026-04-01', endKey: '2026-04-03' },
+      { startKey: '2026-04-05', endKey: '2026-04-08' },
+    ])).toEqual([
+      '2026-04-01',
+      '2026-04-02',
+      '2026-04-03',
+      '2026-04-05',
+      '2026-04-06',
+      '2026-04-07',
+      '2026-04-08',
     ])
   })
 })
