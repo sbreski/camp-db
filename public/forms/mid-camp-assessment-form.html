@@ -455,10 +455,19 @@
         return
       }
 
+      const captureScale = Math.max(2.5, window.devicePixelRatio || 2)
       const canvas = await window.html2canvas(formRoot, {
-        scale: 2,
+        scale: captureScale,
         useCORS: true,
         backgroundColor: '#ffffff',
+        scrollY: -window.scrollY,
+        onclone: (doc) => {
+          const cloneRoot = doc.querySelector('.form-body')
+          if (cloneRoot) {
+            cloneRoot.style.paddingBottom = '16px'
+            cloneRoot.style.boxSizing = 'border-box'
+          }
+        },
       })
 
       const { jsPDF } = window.jspdf
@@ -469,19 +478,19 @@
       const usableWidth = pageWidth - margin * 2
       const usableHeight = pageHeight - margin * 2
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      const imgData = canvas.toDataURL('image/png')
       const imgHeight = (canvas.height * usableWidth) / canvas.width
 
       let heightLeft = imgHeight
       let y = margin
 
-      pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
+      pdf.addImage(imgData, 'PNG', margin, y, usableWidth, imgHeight)
       heightLeft -= usableHeight
 
-      while (heightLeft > 0) {
+      while (heightLeft > 0.1) {
         y = margin - (imgHeight - heightLeft)
         pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', margin, y, usableWidth, imgHeight)
+        pdf.addImage(imgData, 'PNG', margin, y, usableWidth, imgHeight)
         heightLeft -= usableHeight
       }
 
