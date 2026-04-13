@@ -19,6 +19,7 @@ const TAB_OPTIONS = [
   { id: 'signin', label: 'Sign In / Out' },
   { id: 'shared-info', label: 'Shared Info' },
   { id: 'attendance', label: 'Attendance' },
+  { id: 'star-of-day', label: 'Star of the Day' },
   { id: 'participants', label: 'Participants' },
   { id: 'parents', label: 'Parents' },
   { id: 'dressing-rooms', label: 'Dressing Rooms' },

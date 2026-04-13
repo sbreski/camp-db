@@ -8,6 +8,7 @@ const loadSignInOut = () => import('./components/SignInOut')
 const loadSharedInfo = () => import('./components/SharedInfo')
 const loadParticipants = () => import('./components/Participants')
 const loadParticipantDetail = () => import('./components/ParticipantDetail')
+const loadStarOfTheDay = () => import('./components/StarOfTheDay')
 const loadParents = () => import('./components/Parents')
 const loadMedical = () => import('./components/Medical')
 const loadBehaviourLogs = () => import('./components/BehaviourLogs')
@@ -23,6 +24,7 @@ const SignInOut = lazy(loadSignInOut)
 const SharedInfo = lazy(loadSharedInfo)
 const Participants = lazy(loadParticipants)
 const ParticipantDetail = lazy(loadParticipantDetail)
+const StarOfTheDay = lazy(loadStarOfTheDay)
 const Parents = lazy(loadParents)
 const Medical = lazy(loadMedical)
 const BehaviourLogs = lazy(loadBehaviourLogs)
@@ -48,6 +50,7 @@ const ROUTE_PREFETCHERS = {
   signin: loadSignInOut,
   'shared-info': loadSharedInfo,
   attendance: loadAttendanceOverview,
+  'star-of-day': loadStarOfTheDay,
   participants: loadParticipants,
   participant: loadParticipantDetail,
   parents: loadParents,
@@ -64,6 +67,7 @@ const TAB_PATHS = {
   signin: '/signin',
   'shared-info': '/shared-info',
   attendance: '/attendance',
+  'star-of-day': '/star-of-day',
   participants: '/participants',
   parents: '/parents',
   'dressing-rooms': '/dressing-rooms',
@@ -197,6 +201,7 @@ function toSnake(obj) {
     firstAidTrained: 'first_aid_trained', safeguardingTrained: 'safeguarding_trained',
     firstAidExpiresOn: 'first_aid_expires_on', safeguardingExpiresOn: 'safeguarding_expires_on',
     isActiveThisSeason: 'is_active_this_season', isAssignedThisSeason: 'is_assigned_this_season',
+    awardDate: 'award_date',
     createdAt: 'created_at', updatedAt: 'updated_at',
     sortOrder: 'sort_order',
   }
@@ -278,6 +283,7 @@ function toCamel(obj) {
     first_aid_trained: 'firstAidTrained', safeguarding_trained: 'safeguardingTrained',
     first_aid_expires_on: 'firstAidExpiresOn', safeguarding_expires_on: 'safeguardingExpiresOn',
     is_active_this_season: 'isActiveThisSeason', is_assigned_this_season: 'isAssignedThisSeason',
+    award_date: 'awardDate',
     created_at: 'createdAt', updated_at: 'updatedAt',
     sort_order: 'sortOrder',
   }
@@ -328,11 +334,12 @@ export default function App() {
   const tableCacheScope = currentUser?.id || 'anon'
   const tableQueriesEnabled = authed && !authLoading
 
-  const needsParticipants = ['dashboard', 'signin', 'shared-info', 'attendance', 'participants', 'participant', 'parents', 'dressing-rooms', 'medical', 'incidents', 'behaviour'].includes(page)
+  const needsParticipants = ['dashboard', 'signin', 'shared-info', 'attendance', 'star-of-day', 'participants', 'participant', 'parents', 'dressing-rooms', 'medical', 'incidents', 'behaviour'].includes(page)
   const needsAttendance = ['dashboard', 'signin', 'attendance', 'participant'].includes(page)
   const needsIncidents = ['dashboard', 'signin', 'participant', 'incidents', 'behaviour'].includes(page)
   const needsBehaviourLogs = ['behaviour'].includes(page)
   const needsTimetable = ['timetable'].includes(page)
+  const needsStarOfDay = ['star-of-day'].includes(page)
   const needsStaff = ['participant', 'incidents', 'staff', 'documents', 'timetable'].includes(page) || permissionsLoading
 
   const [rawParticipants, , loadingP, reloadP] = useSupabaseTable('participants', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsParticipants, cacheScope: tableCacheScope })
@@ -341,6 +348,7 @@ export default function App() {
   const [rawBehaviourLogs, , loadingBL, reloadBL] = useSupabaseTable('behaviour_logs', 'logged_at', { enabled: tableQueriesEnabled && needsBehaviourLogs, cacheScope: tableCacheScope })
   const [rawTimetableEntries, , loadingT, reloadT] = useSupabaseTable('daily_timetable_entries', 'day_date', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
   const [rawTimetableSpaces, , loadingTS, reloadTS] = useSupabaseTable('timetable_spaces', 'name', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
+  const [rawStarAwards, setRawStarAwardsState, loadingStar, reloadStar] = useSupabaseTable('star_of_day_awards', 'award_date', { enabled: tableQueriesEnabled && needsStarOfDay, cacheScope: tableCacheScope })
   const [rawStaff, , loadingS, reloadS] = useSupabaseTable('staff', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsStaff, cacheScope: tableCacheScope })
 
   const participants = rawParticipants.map(toCamel)
@@ -349,9 +357,10 @@ export default function App() {
   const behaviourLogs = rawBehaviourLogs.map(toCamel)
   const timetableEntries = rawTimetableEntries.map(toCamel)
   const timetableSpaces = rawTimetableSpaces.map(toCamel)
+  const starAwards = rawStarAwards.map(toCamel)
   const staffList = rawStaff.map(toCamel)
 
-  const loading = (needsParticipants && loadingP) || (needsAttendance && loadingA) || (needsIncidents && loadingI) || (needsBehaviourLogs && loadingBL) || (needsTimetable && (loadingT || loadingTS)) || (needsStaff && loadingS)
+  const loading = (needsParticipants && loadingP) || (needsAttendance && loadingA) || (needsIncidents && loadingI) || (needsBehaviourLogs && loadingBL) || (needsTimetable && (loadingT || loadingTS)) || (needsStarOfDay && loadingStar) || (needsStaff && loadingS)
 
   function isMissingUpdatedAtColumnError(error) {
     const message = String(error?.message || '').toLowerCase()
@@ -717,6 +726,43 @@ export default function App() {
     }
 
     reloadTS()
+  }
+
+  async function setStarAwards(updater) {
+    const next = typeof updater === 'function' ? updater(starAwards) : updater
+    const previousRows = rawStarAwards
+    setRawStarAwardsState(next)
+
+    const added = next.filter(award => !starAwards.find(existing => existing.id === award.id))
+    const removed = starAwards.filter(award => !next.find(existing => existing.id === award.id))
+    const changed = next.filter(award => {
+      const old = starAwards.find(existing => existing.id === award.id)
+      return old && JSON.stringify(old) !== JSON.stringify(award)
+    })
+
+    try {
+      for (const award of added) {
+        const { id, ...rest } = toSnake(award)
+        const { error } = await supabase.from('star_of_day_awards').insert({ id: award.id, ...rest })
+        if (error) throw error
+      }
+
+      for (const award of changed) {
+        const { id, ...rest } = toSnake({ ...award, updatedAt: new Date().toISOString() })
+        const { error } = await supabase.from('star_of_day_awards').update(rest).eq('id', award.id)
+        if (error) throw error
+      }
+
+      for (const award of removed) {
+        const { error } = await supabase.from('star_of_day_awards').delete().eq('id', award.id)
+        if (error) throw error
+      }
+
+      reloadStar()
+    } catch (error) {
+      setRawStarAwardsState(previousRows)
+      throw new Error(error.message || 'Unable to save Star of the Day changes')
+    }
   }
 
   function clearSessionTimers() {
@@ -1108,7 +1154,7 @@ export default function App() {
   useEffect(() => {
     if (!authed || permissionsLoading) return
 
-    const likelyTabs = ['dashboard', 'signin', 'participants', 'incidents', 'attendance', 'medical', 'documents']
+    const likelyTabs = ['dashboard', 'signin', 'participants', 'incidents', 'attendance', 'star-of-day', 'medical', 'documents']
       .filter(tab => allowedTabIds.includes(tab) && tab !== page)
       .slice(0, 4)
 
@@ -1168,6 +1214,12 @@ export default function App() {
           table: 'staff',
           columns: 'id,is_assigned_this_season',
           label: 'Seasonal staff toggle column is missing (is_assigned_this_season). Run db/23_seasonal_signin_assignments.sql.',
+        },
+        {
+          key: 'star_of_day_table',
+          table: 'star_of_day_awards',
+          columns: 'id,participant_id,award_date',
+          label: 'Star of the Day table is missing (star_of_day_awards). Run db/27_star_of_the_day.sql.',
         },
       ]
 
@@ -1316,6 +1368,7 @@ export default function App() {
       case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} setParticipants={setParticipants} />
+      case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} />
       case 'participants': return <Participants participants={participants} setParticipants={setParticipants} onView={(id) => navigate('participant', id)} />
       case 'parents': return <Parents participants={participants} onUpdateParticipant={(id, approvedAdults) => {
         setParticipants(prev => prev.map(p => p.id === id ? { ...p, approvedAdults } : p))

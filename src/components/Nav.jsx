@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText, ClipboardList, Star } from 'lucide-react'
 import { CAMP_NAME } from '../App'
 
 export const NAV_ITEMS = [
@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { id: 'signin', label: 'Sign In / Out', icon: LogIn },
   { id: 'shared-info', label: 'Shared Info', icon: ClipboardList },
   { id: 'attendance', label: 'Attendance', icon: CalendarDays },
+  { id: 'star-of-day', label: 'Star of the Day', icon: Star },
   { id: 'participants', label: 'Participants', icon: Users },
   { id: 'parents', label: 'Parents', icon: UserCheck },
   { id: 'dressing-rooms', label: 'Dressing Rooms', icon: Shirt },
