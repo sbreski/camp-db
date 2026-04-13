@@ -1267,7 +1267,7 @@ export default function Timetable({
               {(() => {
                 const renderedEntries = new Set()
                 return timeRows.map((row, rowIdx) => (
-                  <tr key={row.startLabel}>
+                  <tr key={row.startLabel} className="h-16">
                     <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
                       {row.startLabel} - {row.endLabel}
                     </td>
@@ -1285,14 +1285,18 @@ export default function Timetable({
                         return entryStart >= row.startMinutes && entryStart < row.endMinutes
                       })
                       const entriesWithSpan = entriesToRender.map(entry => {
+                        const entryStart = timeToMinutes(entry.startTime || entry.start_time)
                         const entryEnd = timeToMinutes(entry.endTime || entry.end_time)
+                        const rowMinutes = Math.max(1, row.endMinutes - row.startMinutes)
+                        const startOffsetMinutes = Math.max(0, (entryStart ?? row.startMinutes) - row.startMinutes)
+                        const startOffsetPx = Math.round((startOffsetMinutes / rowMinutes) * 56)
                         let rowSpan = 1
                         for (let i = rowIdx + 1; i < timeRows.length; i++) {
                           if (entryEnd > timeRows[i].startMinutes) rowSpan++
                           else break
                         }
                         renderedEntries.add(entry.id)
-                        return { entry, rowSpan }
+                        return { entry, rowSpan, startOffsetPx }
                       })
 
                       if (entriesWithSpan.length === 0 && allEntriesInColumn.length === 0) {
@@ -1325,7 +1329,11 @@ export default function Timetable({
                             title={canEdit ? 'Double-click to add/edit' : ''}
                           >
                             <div className="grid gap-1" style={{ gridTemplateColumns: gridCols }}>
-                              {entriesWithSpan.map(({ entry }) => renderEntryCard(entry))}
+                              {entriesWithSpan.map(({ entry, startOffsetPx }) => (
+                                <div key={entry.id} style={{ marginTop: `${startOffsetPx}px` }}>
+                                  {renderEntryCard(entry)}
+                                </div>
+                              ))}
                             </div>
                           </td>
                         )
