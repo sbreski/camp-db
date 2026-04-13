@@ -1470,8 +1470,15 @@ export default function ParticipantDetail({
                   const createdByInitials = inc.createdByInitials || inc.created_by_initials || null
                   const updatedByInitials = inc.updatedByInitials || inc.updated_by_initials || null
                   const canEditSafeguarding = canEditSafeguardingIncident(inc)
-                  const isOpeningReport = openingIncidentId === inc.id
                   const isDownloadingReport = downloadingIncidentId === inc.id
+                  const incidentNotes = incidentNotesForIncident(inc)
+                  const incidentDocuments = incidentDocumentsForIncident(inc)
+                  const activeIncidentNotes = incidentNotes.filter(note => !note.deletedAt)
+                  const activeIncidentDocuments = incidentDocuments.filter(doc => !doc.deletedAt)
+                  const isUpdatesAllowed = canAccessIncidentUpdates(inc, canViewSafeguarding)
+                  const isUpdatesOpen = isUpdatesAllowed && expandedIncidentId === inc.id
+                  const noteDraft = noteDraftByIncident[inc.id] || ''
+                  const isUploadingExtra = uploadingExtraIncidentId === inc.id
                   return (
                   <div
                     key={inc.id}
@@ -1493,6 +1500,15 @@ export default function ParticipantDetail({
                         {inc.followUpCompletedAt && (
                           <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Followed up</span>
                         )}
+                        {resolvedAtForIncident(inc) && (
+                          <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Resolved</span>
+                        )}
+                        {isUpdatesAllowed && activeIncidentNotes.length > 0 && (
+                          <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{activeIncidentNotes.length} notes</span>
+                        )}
+                        {isUpdatesAllowed && activeIncidentDocuments.length > 0 && (
+                          <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{activeIncidentDocuments.length} docs</span>
+                        )}
                       </div>
                       <span className="text-xs text-stone-400">
                         {new Date(inc.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -1507,6 +1523,11 @@ export default function ParticipantDetail({
                     )}
                     {!isEdited && createdByInitials && (
                       <p className="text-xs text-stone-500 mb-2">Logged by {createdByInitials}</p>
+                    )}
+                    {resolvedAtForIncident(inc) && (
+                      <p className="text-xs text-emerald-700 mb-2">
+                        Resolved {new Date(resolvedAtForIncident(inc)).toLocaleDateString('en-GB')}{inc.resolvedBy ? ` by ${inc.resolvedBy}` : ''}
+                      </p>
                     )}
                     <p className="text-sm text-stone-700 leading-relaxed">{inc.description}</p>
                     {inc.followUpRequired && (
@@ -1542,7 +1563,20 @@ export default function ParticipantDetail({
                         )}
                       </div>
                     )}
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {isUpdatesAllowed && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setExpandedIncidentId(prev => (prev === inc.id ? '' : inc.id))
+                            setEditingNote(null)
+                          }}
+                          className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                        >
+                          Updates
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
@@ -1555,7 +1589,208 @@ export default function ParticipantDetail({
                           ? 'Safeguarding edit restricted'
                           : 'Edit submission'}
                       </button>
+                      {inc.type === 'Safeguarding' && canViewSafeguarding && !isSafeguardingResolved(inc) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            markSafeguardingResolved(inc)
+                          }}
+                          className="text-xs px-2 py-1 rounded-md border border-emerald-200 text-emerald-800 hover:text-emerald-900 hover:border-emerald-300 bg-white"
+                        >
+                          Mark as Resolved
+                        </button>
+                      )}
+                      {inc.type === 'Safeguarding' && canViewSafeguarding && isSafeguardingResolved(inc) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            reopenSafeguardingIncident(inc)
+                          }}
+                          className="text-xs px-2 py-1 rounded-md border border-amber-200 text-amber-800 hover:text-amber-900 hover:border-amber-300 bg-white"
+                        >
+                          Reopen
+                        </button>
+                      )}
                     </div>
+
+                    {isUpdatesOpen && (
+                      <div
+                        className="mt-4 pt-4 border-t border-stone-200 space-y-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-forest-900">
+                            <MessageSquare size={14} /> Notes & Updates
+                          </div>
+                          {incidentNotes.length === 0 ? (
+                            <p className="text-xs text-stone-500">No notes yet.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {incidentNotes.map(note => {
+                                const isEditingThisNote = editingNote?.incidentId === inc.id && editingNote?.noteId === note.id
+                                const isDeleted = Boolean(note.deletedAt)
+                                return (
+                                  <div key={note.id} className={`rounded-lg border px-3 py-2 ${isDeleted ? 'border-stone-200 bg-stone-100 opacity-75' : 'border-stone-200 bg-stone-50'}`}>
+                                    {isEditingThisNote && !isDeleted ? (
+                                      <div className="space-y-2">
+                                        <textarea
+                                          className="input min-h-[84px]"
+                                          value={editingNote?.text || ''}
+                                          onChange={(e) => setEditingNote(prev => prev ? { ...prev, text: e.target.value } : prev)}
+                                        />
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={saveEditedIncidentNote}
+                                            className="text-xs px-2 py-1 rounded-md border border-emerald-200 text-emerald-800 hover:text-emerald-900 hover:border-emerald-300 bg-white inline-flex items-center gap-1"
+                                          >
+                                            <Check size={13} /> Save Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingNote(null)}
+                                            className="text-xs px-2 py-1 rounded-md border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 bg-white inline-flex items-center gap-1"
+                                          >
+                                            <X size={13} /> Cancel
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <p className={`text-sm whitespace-pre-wrap ${isDeleted ? 'text-stone-500 line-through' : 'text-stone-800'}`}>{note.text}</p>
+                                        <div className="mt-1 flex items-center gap-3 text-[11px] text-stone-500 flex-wrap">
+                                          <span>
+                                            Added {new Date(note.createdAt).toLocaleDateString('en-GB', {
+                                              day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                            })}
+                                            {note.createdBy ? ` by ${note.createdBy}` : ''}
+                                          </span>
+                                          {note.updatedAt && (
+                                            <span>
+                                              Edited {new Date(note.updatedAt).toLocaleDateString('en-GB', {
+                                                day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                              })}
+                                              {note.updatedBy ? ` by ${note.updatedBy}` : ''}
+                                            </span>
+                                          )}
+                                          {!isDeleted && (
+                                            <button
+                                              type="button"
+                                              onClick={() => beginEditIncidentNote(inc.id, { ...note, incidentType: inc.type })}
+                                              className="underline text-forest-700 hover:text-forest-900"
+                                            >
+                                              Edit note
+                                            </button>
+                                          )}
+                                          {!isDeleted && (
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteIncidentNote(inc, note.id)}
+                                              className="underline text-red-700 hover:text-red-900"
+                                            >
+                                              Delete note
+                                            </button>
+                                          )}
+                                          {isDeleted && (
+                                            <button
+                                              type="button"
+                                              onClick={() => recoverIncidentNote(inc, note.id)}
+                                              className="underline text-emerald-700 hover:text-emerald-900"
+                                            >
+                                              Recover
+                                            </button>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 space-y-2">
+                            <label className="text-xs font-semibold text-sky-900">Add note</label>
+                            <textarea
+                              className="input min-h-[84px]"
+                              placeholder="Add update details here..."
+                              value={noteDraft}
+                              onChange={(e) => setNoteDraftByIncident(prev => ({ ...prev, [inc.id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addIncidentNote(inc)}
+                              className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                            >
+                              Add Note
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-forest-900">
+                            <Paperclip size={14} /> Additional Documents
+                          </div>
+                          {incidentDocuments.length === 0 ? (
+                            <p className="text-xs text-stone-500">No additional documents yet.</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {incidentDocuments.map(doc => (
+                                <div key={doc.id} className="text-xs text-stone-700 flex items-center gap-2 flex-wrap">
+                                  {doc.deletedAt ? (
+                                    <span className="text-stone-500 line-through">{doc.name}</span>
+                                  ) : (
+                                    <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                                  )}
+                                  <span className="text-stone-500">
+                                    Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
+                                      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                    })}
+                                    {doc.uploadedBy ? ` by ${doc.uploadedBy}` : ''}
+                                  </span>
+                                  {!doc.deletedAt && (
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteIncidentDocument(inc, doc.id)}
+                                      className="underline text-red-700 hover:text-red-900"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                  {doc.deletedAt && (
+                                    <button
+                                      type="button"
+                                      onClick={() => recoverIncidentDocument(inc, doc.id)}
+                                      className="underline text-emerald-700 hover:text-emerald-900"
+                                    >
+                                      Recover
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-3">
+                            <label className="text-xs font-semibold text-indigo-900 block mb-2">Upload additional document</label>
+                            <input
+                              type="file"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                uploadIncidentDocument(inc, file)
+                                e.target.value = ''
+                              }}
+                              className="block w-full text-xs text-stone-700"
+                            />
+                            {isUploadingExtra && (
+                              <p className="mt-2 text-xs text-indigo-800">Uploading document...</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )})}
               </div>
