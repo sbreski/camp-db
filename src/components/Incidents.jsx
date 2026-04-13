@@ -42,10 +42,13 @@ function incidentDocumentsForIncident(incident) {
   return Array.isArray(docs) ? docs : []
 }
 
-export default function Incidents({ incidents, setIncidents, participants, setParticipants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onView }) {
+export default function Incidents({ incidents, setIncidents, participants, setParticipants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onNavigate, onView }) {
   const [showForm, setShowForm] = useState(false)
+  const [showTypeLauncher, setShowTypeLauncher] = useState(false)
+  const [selectedReportType, setSelectedReportType] = useState('Incident/Accident')
   const [selectedParticipant, setSelectedParticipant] = useState('')
   const [editingIncidentId, setEditingIncidentId] = useState(null)
+  const [saveNotice, setSaveNotice] = useState('')
   const [reportSubTab, setReportSubTab] = useState('all')
   const [search, setSearch] = useState('')
   const [openingIncidentId, setOpeningIncidentId] = useState('')
@@ -119,8 +122,11 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         incidentDocuments: [],
       },
     ])
+    const participantName = participants.find(p => p.id === selectedParticipant)?.name || 'participant'
+    setSaveNotice(`Report saved for ${participantName}. Pickup handover note was added for today.`)
     setShowForm(false)
     setSelectedParticipant('')
+    setSelectedReportType('Incident/Accident')
   }
 
   function startEditIncident(inc) {
@@ -131,6 +137,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
     setSelectedParticipant(inc.participantId)
     setEditingIncidentId(inc.id)
+    setSelectedReportType(inc.type || 'Incident/Accident')
     setShowForm(true)
   }
 
@@ -575,6 +582,38 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
   return (
     <div className="fade-in space-y-5">
+      {showTypeLauncher && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-display font-semibold text-forest-950">Start New Report</h3>
+              <button type="button" onClick={() => setShowTypeLauncher(false)} className="text-stone-400 hover:text-stone-600">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-stone-600 mb-3">Choose the report type first, then select participant and complete the form.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {REPORT_TYPE_ORDER.map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => {
+                    setSelectedReportType(type)
+                    setShowTypeLauncher(false)
+                    setShowForm(true)
+                    setEditingIncidentId(null)
+                    setSelectedParticipant('')
+                  }}
+                  className="text-left rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 hover:border-forest-400"
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Reporting</h2>
@@ -586,18 +625,25 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
           )}
         </div>
         <button onClick={() => {
-          setShowForm(s => {
-            const next = !s
-            if (!next) {
-              setSelectedParticipant('')
-              setEditingIncidentId(null)
-            }
-            return next
-          })
+          setSaveNotice('')
+          setShowTypeLauncher(true)
         }} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
           <Plus size={15} strokeWidth={2.5} /> Log Incident
         </button>
       </div>
+
+      {saveNotice && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 flex flex-wrap items-center gap-2">
+          <span>{saveNotice}</span>
+          <button
+            type="button"
+            className="ml-auto text-xs font-semibold underline"
+            onClick={() => onNavigate?.('signin')}
+          >
+            Go to Sign In/Out
+          </button>
+        </div>
+      )}
 
       {/* New incident form */}
       {showForm && (
@@ -620,11 +666,18 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
               participantName={participants.find(p => p.id === selectedParticipant)?.name || ''}
               participantAge={participants.find(p => p.id === selectedParticipant)?.age || ''}
               defaultStaffMember={currentStaffName}
-              initial={editingIncident && editingIncident.participantId === selectedParticipant ? editingIncident : null}
+              initial={editingIncident && editingIncident.participantId === selectedParticipant
+                ? editingIncident
+                : { type: selectedReportType, staffMember: currentStaffName }}
               canEditSafeguarding={!editingIncident || canEditSafeguardingIncident(editingIncident)}
               staffList={staffList}
               onSave={saveIncident}
-              onCancel={() => { setShowForm(false); setSelectedParticipant(''); setEditingIncidentId(null) }}
+              onCancel={() => {
+                setShowForm(false)
+                setSelectedParticipant('')
+                setEditingIncidentId(null)
+                setSelectedReportType('Incident/Accident')
+              }}
             />
           )}
           {!selectedParticipant && (

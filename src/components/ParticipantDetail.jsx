@@ -59,14 +59,18 @@ function fmt(ts) {
 }
 
 const TABS = ['Overview', 'Medical', 'SEND / Support', 'Attendance', 'Incidents']
+const REPORT_TYPE_OPTIONS = ['Incident/Accident', 'Safeguarding', 'Mid-Camp Assessment', 'SEND Assessment']
 
 export default function ParticipantDetail({
   participant, participants, setParticipants,
-  attendance, setAttendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, onBack
+  attendance, setAttendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, onNavigate, onBack
 }) {
   const [editing, setEditing] = useState(false)
   const [showIncident, setShowIncident] = useState(false)
+  const [showIncidentLauncher, setShowIncidentLauncher] = useState(false)
+  const [pendingReportType, setPendingReportType] = useState('Incident/Accident')
   const [editingIncidentId, setEditingIncidentId] = useState(null)
+  const [saveNotice, setSaveNotice] = useState('')
   const [activeTab, setActiveTab] = useState('Overview')
   const [shareUsers, setShareUsers] = useState([])
   const [shareItems, setShareItems] = useState([])
@@ -168,8 +172,10 @@ export default function ParticipantDetail({
           followUpCompletedBy: followUpRequired ? inc.followUpCompletedBy : null,
         }
       }))
+      setSaveNotice('Report updated. Pickup handover note is available in Sign In/Out for today.')
       setShowIncident(false)
       setEditingIncidentId(null)
+      setPendingReportType('Incident/Accident')
       return
     }
 
@@ -196,7 +202,10 @@ export default function ParticipantDetail({
       )
     }
 
+    setSaveNotice('Report saved. Pickup handover note added in Sign In/Out for today.')
+
     setShowIncident(false)
+    setPendingReportType('Incident/Accident')
   }
 
   function startEditIncident(inc) {
@@ -205,6 +214,7 @@ export default function ParticipantDetail({
       return
     }
     setEditingIncidentId(inc.id)
+    setPendingReportType(inc.type || 'Incident/Accident')
     setShowIncident(true)
   }
 
@@ -1513,10 +1523,56 @@ export default function ParticipantDetail({
                   </p>
                 )}
               </div>
-              <button onClick={() => setShowIncident(s => !s)} className="btn-secondary text-xs flex items-center gap-1.5 py-1.5">
+              <button onClick={() => {
+                setSaveNotice('')
+                setEditingIncidentId(null)
+                setShowIncident(false)
+                setShowIncidentLauncher(true)
+              }} className="btn-secondary text-xs flex items-center gap-1.5 py-1.5">
                 {showIncident ? 'Close Form' : '+ Log Incident'}
               </button>
             </div>
+
+            {saveNotice && (
+              <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 flex flex-wrap items-center gap-2">
+                <span>{saveNotice}</span>
+                <button
+                  type="button"
+                  className="ml-auto text-xs font-semibold underline"
+                  onClick={() => onNavigate?.('signin')}
+                >
+                  Go to Sign In/Out
+                </button>
+              </div>
+            )}
+
+            {showIncidentLauncher && (
+              <div className="mb-3 rounded-xl border border-stone-200 bg-white p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-forest-900">Start New Report</p>
+                  <button type="button" className="text-stone-400 hover:text-stone-600" onClick={() => setShowIncidentLauncher(false)}>
+                    <X size={16} />
+                  </button>
+                </div>
+                <p className="text-xs text-stone-600">Choose report type, complete the form, then save.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {REPORT_TYPE_OPTIONS.map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setPendingReportType(type)
+                        setShowIncidentLauncher(false)
+                        setShowIncident(true)
+                      }}
+                      className="text-left rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 hover:border-forest-400"
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {showIncident && (
               <IncidentForm
@@ -1524,13 +1580,14 @@ export default function ParticipantDetail({
                 participantName={participant.name || ''}
                 participantAge={participant.age || ''}
                 defaultStaffMember={currentStaffName}
-                initial={editingIncident}
+                initial={editingIncident || { type: pendingReportType, staffMember: currentStaffName }}
                 canEditSafeguarding={!editingIncident || canEditSafeguardingIncident(editingIncident)}
                 staffList={staffList}
                 onSave={saveIncident}
                 onCancel={() => {
                   setShowIncident(false)
                   setEditingIncidentId(null)
+                  setPendingReportType('Incident/Accident')
                 }}
               />
             )}

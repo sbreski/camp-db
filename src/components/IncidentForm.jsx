@@ -17,6 +17,7 @@ export default function IncidentForm({
   onSave,
   onCancel,
 }) {
+  const WALKTHROUGH_KEY = 'campdb_reporting_walkthrough_seen_v1'
   const defaultStaff = String(defaultStaffMember || '').trim()
     || staffList.find(s => s.name === 'Sam Brenner')?.name
     || staffList[0]?.name
@@ -40,7 +41,18 @@ export default function IncidentForm({
   ]))
   const [isReceivingPdf, setIsReceivingPdf] = useState(false)
   const [uploadNotice, setUploadNotice] = useState('')
+  const [showWalkthrough, setShowWalkthrough] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.localStorage.getItem(WALKTHROUGH_KEY) !== '1'
+  })
   const formTypeRef = useRef(form.type)
+  function dismissWalkthrough() {
+    setShowWalkthrough(false)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(WALKTHROUGH_KEY, '1')
+    }
+  }
+
 
   const templates = useMemo(() => ([
     {
@@ -296,10 +308,19 @@ export default function IncidentForm({
         <h4 className="font-display font-semibold text-forest-950">{initial?.id ? 'Edit Submission' : 'Log Incident / Accident'}</h4>
         <button onClick={onCancel} className="text-stone-400 hover:text-stone-600"><X size={18} /></button>
       </div>
-      <div className="mb-3 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700">
-        <p className="font-semibold text-forest-900 mb-1">How this works</p>
-        <p>1) Complete a form, 2) confirm attachment, 3) save report. A pickup handover note is added automatically for today.</p>
-      </div>
+      {showWalkthrough && (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-semibold text-forest-900 mb-1">How this works</p>
+              <p>1) Complete a form, 2) confirm attachment, 3) save report. A pickup handover note is added automatically for today.</p>
+            </div>
+            <button type="button" onClick={dismissWalkthrough} className="text-stone-400 hover:text-stone-600" aria-label="Dismiss walkthrough">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
         <div className={`rounded-lg border px-2.5 py-2 text-xs ${selectedTemplate ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-white text-stone-600'}`}>
           <span className="font-semibold">Step 1:</span> Form selected
