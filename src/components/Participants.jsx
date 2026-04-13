@@ -3,6 +3,7 @@ import { Plus, Search, ChevronRight, Trash2, User, Upload, CameraOff, Camera } f
 import ParticipantForm from './ParticipantForm'
 import ImportParticipants from './ImportParticipants'
 import ParticipantNameText from './ParticipantNameText'
+import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 
 function photoConsentMode(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -105,7 +106,7 @@ export default function Participants({ participants, setParticipants, onView }) 
                 {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
                 {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                 {p.sendNeeds && <span className="badge-send">S</span>}
-                {p.safeguardingFlag && <span className="badge-safeguarding">SG</span>}
+                  {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
               </div>
               <button onClick={() => deleteParticipant(p.id)}
                 className="p-1.5 text-stone-400 hover:text-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">

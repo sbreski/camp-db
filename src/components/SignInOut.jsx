@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar, CameraOff, Camera, FileText } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
+import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { getPendingFollowUpsForParticipant } from '../utils/workflow'
 
 function todayKey() {
@@ -792,9 +793,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                       {hasSend && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span>
                       )}
-                      {hasSafeguarding && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">SG</span>
-                      )}
+                      {hasSafeguarding && <SafeguardingFlagIcon size={11} />}
                       {isIn && <CheckCircle size={13} className="text-amber-500" />}
                     </div>
                     <p className="text-xs text-stone-400 mt-0.5">
@@ -963,7 +962,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-orange-100 text-orange-800 border border-orange-200">D</span> Dietary</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-blue-100 text-blue-700 border border-blue-200">M</span> Medical</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span> SEND / Support</span>
-        <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-rose-100 text-rose-800 border border-rose-200">SG</span> Safeguarding flag</span>
+        <span className="flex items-center gap-1"><SafeguardingFlagIcon size={11} /> Safeguarding flag</span>
       </div>
     </div>
   )
