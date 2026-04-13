@@ -188,6 +188,7 @@ function toSnake(obj) {
     pdfData: 'pdf_data', emergencyContact: 'emergency_contact', emergencyPhone: 'emergency_phone',
     followUpRequired: 'follow_up_required', followUpDueDate: 'follow_up_due_date',
     followUpCompletedAt: 'follow_up_completed_at', followUpCompletedBy: 'follow_up_completed_by',
+    resolvedAt: 'resolved_at', resolvedBy: 'resolved_by',
     createdByInitials: 'created_by_initials', updatedByInitials: 'updated_by_initials',
     createdByUserId: 'created_by_user_id', updatedByUserId: 'updated_by_user_id',
     uploadedByInitials: 'uploaded_by_initials',
@@ -266,6 +267,7 @@ function toCamel(obj) {
     pdf_data: 'pdfData', emergency_contact: 'emergencyContact', emergency_phone: 'emergencyPhone',
     follow_up_required: 'followUpRequired', follow_up_due_date: 'followUpDueDate',
     follow_up_completed_at: 'followUpCompletedAt', follow_up_completed_by: 'followUpCompletedBy',
+    resolved_at: 'resolvedAt', resolved_by: 'resolvedBy',
     created_by_initials: 'createdByInitials', updated_by_initials: 'updatedByInitials',
     uploaded_by_initials: 'uploadedByInitials',
     first_aid_trained: 'firstAidTrained', safeguarding_trained: 'safeguardingTrained',
@@ -483,8 +485,18 @@ export default function App() {
         || isMissingColumnError(error, 'updated_by_initials')
         || isMissingColumnError(error, 'created_by_user_id')
         || isMissingColumnError(error, 'updated_by_user_id')
+        || isMissingColumnError(error, 'resolved_at')
+        || isMissingColumnError(error, 'resolved_by')
       )) {
-        const { created_by_initials, updated_by_initials, created_by_user_id, updated_by_user_id, ...fallbackRest } = rest
+        const {
+          created_by_initials,
+          updated_by_initials,
+          created_by_user_id,
+          updated_by_user_id,
+          resolved_at,
+          resolved_by,
+          ...fallbackRest
+        } = rest
         const fallback = await supabase.from('incidents').insert({ id: inc.id, ...fallbackRest })
         error = fallback.error
       }
@@ -501,9 +513,11 @@ export default function App() {
         isMissingUpdatedAtColumnError(error)
         || isMissingColumnError(error, 'updated_by_initials')
         || isMissingColumnError(error, 'updated_by_user_id')
+        || isMissingColumnError(error, 'resolved_at')
+        || isMissingColumnError(error, 'resolved_by')
       )) {
         // Backward-compatible fallback before the updated_at migration is applied.
-        const { updated_by_initials, updated_by_user_id, ...fallbackRest } = rest
+        const { updated_by_initials, updated_by_user_id, resolved_at, resolved_by, ...fallbackRest } = rest
         const fallback = await supabase.from('incidents').update(fallbackRest).eq('id', inc.id)
         error = fallback.error
       }

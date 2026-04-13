@@ -23,6 +23,10 @@ function createdUserIdForIncident(incident) {
   return String(incident.createdByUserId || incident.created_by_user_id || '').trim()
 }
 
+function resolvedAtForIncident(incident) {
+  return incident.resolvedAt || incident.resolved_at || null
+}
+
 export default function Incidents({ incidents, setIncidents, participants, setParticipants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onView }) {
   const [showForm, setShowForm] = useState(false)
   const [selectedParticipant, setSelectedParticipant] = useState('')
@@ -90,6 +94,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         followUpDueDate: data.followUpRequired ? getNextDateKey(createdAt) : null,
         followUpCompletedAt: null,
         followUpCompletedBy: null,
+        resolvedAt: null,
+        resolvedBy: null,
       },
     ])
     setShowForm(false)
@@ -114,7 +120,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   function isSafeguardingResolved(incident) {
-    return Boolean(incident.followUpCompletedAt || incident.follow_up_completed_at)
+    return Boolean(resolvedAtForIncident(incident))
   }
 
   async function markSafeguardingResolved(incident) {
@@ -127,9 +133,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       inc.id === incident.id
         ? {
             ...inc,
-            followUpRequired: false,
-            followUpCompletedAt: resolvedAt,
-            followUpCompletedBy: actorInitials,
+            resolvedAt,
+            resolvedBy: actorInitials,
             updatedByInitials: actorInitials,
             updatedByUserId: actorUserId || inc.updatedByUserId || null,
           }
@@ -399,7 +404,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Follow Up due</span>
                       )}
                       {inc.followUpCompletedAt && (
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Resolved</span>
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Followed up</span>
+                      )}
+                      {resolvedAtForIncident(inc) && (
+                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Resolved</span>
                       )}
                       {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
                     </div>
@@ -425,6 +433,11 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                           {inc.followUpCompletedAt
                             ? `Followed up ${new Date(inc.followUpCompletedAt).toLocaleDateString('en-GB')}`
                             : `Follow up due ${new Date((inc.followUpDueDate || inc.createdAt) + 'T12:00:00').toLocaleDateString('en-GB')}`}
+                        </span>
+                      )}
+                      {resolvedAtForIncident(inc) && (
+                        <span className="text-xs text-emerald-700">
+                          Resolved {new Date(resolvedAtForIncident(inc)).toLocaleDateString('en-GB')}{inc.resolvedBy ? ` by ${inc.resolvedBy}` : ''}
                         </span>
                       )}
                       {inc.pdfName && (
