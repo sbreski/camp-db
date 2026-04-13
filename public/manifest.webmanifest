@@ -1,6 +1,6 @@
 {
-  "name": "Camp Database",
-  "short_name": "Camp DB",
+  "name": "Camp Portal",
+  "short_name": "Camp Portal",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#052e16",
