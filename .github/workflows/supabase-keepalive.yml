@@ -20,13 +20,27 @@ jobs:
             exit 1
           fi
 
-          echo "Pinging keepalive endpoint..."
-          http_code=$(curl -sS -o response.json -w "%{http_code}" "$KEEPALIVE_URL")
+          max_attempts=4
+          attempt=1
 
-          echo "HTTP status: $http_code"
-          cat response.json
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "Pinging keepalive endpoint... attempt $attempt/$max_attempts"
+            http_code=$(curl -sS --max-time 20 -o response.json -w "%{http_code}" "$KEEPALIVE_URL")
 
-          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-            echo "Keepalive ping failed"
-            exit 1
-          fi
+            echo "HTTP status: $http_code"
+            cat response.json
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "Keepalive ping succeeded"
+              exit 0
+            fi
+
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Keepalive ping failed, retrying..."
+            fi
+
+            attempt=$((attempt + 1))
+          done
+
+          echo "Keepalive ping failed after $max_attempts attempts"
+          exit 1
