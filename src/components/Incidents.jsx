@@ -423,6 +423,38 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }
   }
 
+  async function deleteIncidentNote(incident, noteId) {
+    if (!window.confirm('Delete this note?')) return
+
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentNotes: incidentNotesForIncident(inc).filter(note => note.id !== noteId),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+
+    if (editingNote?.incidentId === incident.id && editingNote?.noteId === noteId) {
+      setEditingNote(null)
+    }
+  }
+
+  async function deleteIncidentDocument(incident, docId) {
+    if (!window.confirm('Delete this document from the report updates list?')) return
+
+    await setIncidents(prev => prev.map(inc => {
+      if (inc.id !== incident.id) return inc
+      return {
+        ...inc,
+        incidentDocuments: incidentDocumentsForIncident(inc).filter(doc => doc.id !== docId),
+        updatedByInitials: actorInitials,
+        updatedByUserId: actorUserId || inc.updatedByUserId || null,
+      }
+    }))
+  }
+
   const filtered = incidents
     .filter(inc => {
       const p = participants.find(x => x.id === inc.participantId)
@@ -801,6 +833,13 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                                       >
                                         Edit note
                                       </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteIncidentNote(inc, note.id)}
+                                        className="underline text-red-700 hover:text-red-900"
+                                      >
+                                        Delete note
+                                      </button>
                                     </div>
                                   </>
                                 )}
@@ -845,6 +884,13 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                                 })}
                                 {doc.uploadedBy ? ` by ${doc.uploadedBy}` : ''}
                               </span>
+                              <button
+                                type="button"
+                                onClick={() => deleteIncidentDocument(inc, doc.id)}
+                                className="underline text-red-700 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
                             </div>
                           ))}
                         </div>

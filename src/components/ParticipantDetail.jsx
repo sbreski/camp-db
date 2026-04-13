@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Edit2, Clock, AlertTriangle, Phone, Mail, User, FileText, Share2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Edit2, Clock, AlertTriangle, Phone, Mail, User, FileText, Share2, Trash2, MessageSquare, Paperclip, Check, X } from 'lucide-react'
 import ParticipantForm from './ParticipantForm'
 import IncidentForm from './IncidentForm'
 import ParticipantNameText from './ParticipantNameText'
@@ -21,6 +21,16 @@ function createdInitialsForIncident(incident) {
 
 function createdUserIdForIncident(incident) {
   return String(incident.createdByUserId || incident.created_by_user_id || '').trim()
+}
+
+function participantNotesForParticipant(value) {
+  const notes = value?.participantNotesHistory || value?.participant_notes_history
+  return Array.isArray(notes) ? notes : []
+}
+
+function participantDocumentsForParticipant(value) {
+  const docs = value?.participantDocuments || value?.participant_documents
+  return Array.isArray(docs) ? docs : []
 }
 
 function fmt(ts) {
@@ -48,6 +58,9 @@ export default function ParticipantDetail({
   const [shareError, setShareError] = useState('')
   const [openingIncidentId, setOpeningIncidentId] = useState('')
   const [downloadingIncidentId, setDownloadingIncidentId] = useState('')
+  const [participantNoteDraft, setParticipantNoteDraft] = useState('')
+  const [editingParticipantNote, setEditingParticipantNote] = useState(null)
+  const [uploadingParticipantDocument, setUploadingParticipantDocument] = useState(false)
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const participantId = participant?.id || null
@@ -215,6 +228,8 @@ export default function ParticipantDetail({
   const participantIncidents = incidents
     .filter(i => i.participantId === participantId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const participantNoteHistory = participantNotesForParticipant(participant)
+  const participantDocuments = participantDocumentsForParticipant(participant)
 
   const hasMedical = participant.medicalType?.length > 0 || participant.medicalDetails
   const hasConsents = Boolean(
@@ -240,6 +255,139 @@ export default function ParticipantDetail({
         .join(' - ')
     }
     return ''
+  }
+
+  async function uploadDocumentFile(file) {
+    const safeName = String(file?.name || 'attachment').replace(/\s+/g, '-')
+    const filePath = `${crypto.randomUUID()}-${safeName}`
+    const uploadTargets = [
+      { bucket: 'documents', filePath: `participants/${filePath}` },
+      { bucket: 'incidents', filePath },
+    ]
+
+    let lastError = null
+
+    for (const target of uploadTargets) {
+      const { error } = await supabase.storage.from(target.bucket).upload(target.filePath, file)
+      if (error) {
+        lastError = error
+        if (/bucket not found/i.test(error.message || '')) continue
+        throw error
+      }
+
+      const { data } = supabase.storage.from(target.bucket).getPublicUrl(target.filePath)
+      return data?.publicUrl || ''
+    }
+
+    throw new Error(lastError?.message || 'No storage bucket available for participant uploads.')
+  }
+
+  function updateParticipantRecord(updater) {
+    setParticipants(prev => prev.map(item => (
+      item.id === participant.id ? updater(item) : item
+    )))
+  }
+
+  function addParticipantNote() {
+    const text = String(participantNoteDraft || '').trim()
+    if (!text) return
+
+    const createdAt = new Date().toISOString()
+    const note = {
+      id: crypto.randomUUID(),
+      text,
+      createdAt,
+      createdBy: actorInitials,
+      updatedAt: null,
+      updatedBy: null,
+    }
+
+    updateParticipantRecord(current => ({
+      ...current,
+      participantNotesHistory: [...participantNotesForParticipant(current), note],
+    }))
+
+    setParticipantNoteDraft('')
+  }
+
+  function beginEditParticipantNote(note) {
+    setEditingParticipantNote({ noteId: note.id, text: String(note.text || '') })
+  }
+
+  function saveEditedParticipantNote() {
+    if (!editingParticipantNote) return
+    const text = String(editingParticipantNote.text || '').trim()
+    if (!text) return
+
+    const editedAt = new Date().toISOString()
+
+    updateParticipantRecord(current => ({
+      ...current,
+      participantNotesHistory: participantNotesForParticipant(current).map(note => (
+        note.id === editingParticipantNote.noteId
+          ? {
+              ...note,
+              text,
+              updatedAt: editedAt,
+              updatedBy: actorInitials,
+            }
+          : note
+      )),
+    }))
+
+    setEditingParticipantNote(null)
+  }
+
+  function deleteParticipantNote(noteId) {
+    if (!window.confirm('Delete this participant note?')) return
+
+    updateParticipantRecord(current => ({
+      ...current,
+      participantNotesHistory: participantNotesForParticipant(current).filter(note => note.id !== noteId),
+    }))
+
+    if (editingParticipantNote?.noteId === noteId) {
+      setEditingParticipantNote(null)
+    }
+  }
+
+  async function uploadParticipantDocument(file) {
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) {
+      alert('File must be under 8MB.')
+      return
+    }
+
+    setUploadingParticipantDocument(true)
+    try {
+      const url = await uploadDocumentFile(file)
+      const uploadedAt = new Date().toISOString()
+      const doc = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        url,
+        uploadedAt,
+        uploadedBy: actorInitials,
+      }
+
+      updateParticipantRecord(current => ({
+        ...current,
+        participantDocuments: [...participantDocumentsForParticipant(current), doc],
+      }))
+    } catch (error) {
+      alert(error.message || 'Unable to upload participant document')
+    } finally {
+      setUploadingParticipantDocument(false)
+    }
+  }
+
+  function deleteParticipantDocument(docId) {
+    if (!window.confirm('Delete this participant document?')) return
+
+    updateParticipantRecord(current => ({
+      ...current,
+      participantDocuments: participantDocumentsForParticipant(current).filter(doc => doc.id !== docId),
+    }))
   }
 
   async function withAccessToken() {
@@ -543,6 +691,149 @@ export default function ParticipantDetail({
                 </div>
               </div>
             )}
+
+            <div className="pt-3 border-t border-stone-100 space-y-4">
+              <div className="space-y-2">
+                <h4 className="font-display font-semibold text-forest-900 flex items-center gap-2">
+                  <MessageSquare size={14} className="text-forest-600" /> Participant Notes
+                </h4>
+                {participantNoteHistory.length === 0 ? (
+                  <p className="text-xs text-stone-500">No participant notes yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {participantNoteHistory.map(note => {
+                      const isEditing = editingParticipantNote?.noteId === note.id
+                      return (
+                        <div key={note.id} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <textarea
+                                className="input min-h-[84px]"
+                                value={editingParticipantNote?.text || ''}
+                                onChange={e => setEditingParticipantNote(prev => prev ? { ...prev, text: e.target.value } : prev)}
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={saveEditedParticipantNote}
+                                  className="text-xs px-2 py-1 rounded-md border border-emerald-200 text-emerald-800 hover:text-emerald-900 hover:border-emerald-300 bg-white inline-flex items-center gap-1"
+                                >
+                                  <Check size={13} /> Save Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingParticipantNote(null)}
+                                  className="text-xs px-2 py-1 rounded-md border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 bg-white inline-flex items-center gap-1"
+                                >
+                                  <X size={13} /> Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm text-stone-800 whitespace-pre-wrap">{note.text}</p>
+                              <div className="mt-1 flex items-center gap-3 text-[11px] text-stone-500 flex-wrap">
+                                <span>
+                                  Added {new Date(note.createdAt).toLocaleDateString('en-GB', {
+                                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  })}
+                                  {note.createdBy ? ` by ${note.createdBy}` : ''}
+                                </span>
+                                {note.updatedAt && (
+                                  <span>
+                                    Edited {new Date(note.updatedAt).toLocaleDateString('en-GB', {
+                                      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                    })}
+                                    {note.updatedBy ? ` by ${note.updatedBy}` : ''}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => beginEditParticipantNote(note)}
+                                  className="underline text-forest-700 hover:text-forest-900"
+                                >
+                                  Edit note
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteParticipantNote(note.id)}
+                                  className="underline text-red-700 hover:text-red-900"
+                                >
+                                  Delete note
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 space-y-2">
+                  <label className="text-xs font-semibold text-sky-900">Add participant note</label>
+                  <textarea
+                    className="input min-h-[84px]"
+                    placeholder="Add participant update notes here..."
+                    value={participantNoteDraft}
+                    onChange={(e) => setParticipantNoteDraft(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={addParticipantNote}
+                    className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                  >
+                    Add Note
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-display font-semibold text-forest-900 flex items-center gap-2">
+                  <Paperclip size={14} className="text-forest-600" /> Participant Documents
+                </h4>
+                {participantDocuments.length === 0 ? (
+                  <p className="text-xs text-stone-500">No participant documents uploaded.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {participantDocuments.map(doc => (
+                      <div key={doc.id} className="text-xs text-stone-700 flex items-center gap-2 flex-wrap">
+                        <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                        <span className="text-stone-500">
+                          Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
+                            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}
+                          {doc.uploadedBy ? ` by ${doc.uploadedBy}` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => deleteParticipantDocument(doc.id)}
+                          className="underline text-red-700 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-3">
+                  <label className="text-xs font-semibold text-indigo-900 block mb-2">Upload participant document</label>
+                  <input
+                    type="file"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      uploadParticipantDocument(file)
+                      e.target.value = ''
+                    }}
+                    className="block w-full text-xs text-stone-700"
+                  />
+                  {uploadingParticipantDocument && (
+                    <p className="mt-2 text-xs text-indigo-800">Uploading document...</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
