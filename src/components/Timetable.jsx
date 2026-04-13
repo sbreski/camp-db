@@ -5,6 +5,8 @@ const DEFAULT_SPACE_OPTIONS = ['Drama Space', 'Art Space', 'bardepot', 'Studio T
 const DAY_START_MINUTES = 9 * 60 + 45
 const DAY_END_MINUTES = 16 * 60 + 30
 const GRID_STEP_MINUTES = 15
+const DRAG_PIXELS_PER_5_MINUTES = 12
+const DRAG_PIXELS_PER_SPACE = 180
 const USUAL_BLOCKS = [
   ['09:45', '10:00'],
   ['10:00', '10:30'],
@@ -232,6 +234,7 @@ export default function Timetable({
   const [saving, setSaving] = useState(false)
   const [newSpaceName, setNewSpaceName] = useState('')
   const [duplicateTargetDate, setDuplicateTargetDate] = useState(addDays(todayKey(), 1))
+  const [dragState, setDragState] = useState(null)
   const [spaceColors, setSpaceColors] = useState(() => {
     const fromStorage = colorMapFromStorage()
     return { ...DEFAULT_SPACE_COLORS, ...fromStorage }
@@ -394,6 +397,133 @@ export default function Timetable({
     }
     return allStaffOptions
   }, [viewMode, canSeeOverview, spaceFilter, spaceOptions, myStaffOption, allStaffOptions, staffFilter])
+
+  function clampEntryStart(startMinutes, durationMinutes) {
+    const latest = DAY_END_MINUTES - durationMinutes
+    return Math.max(DAY_START_MINUTES, Math.min(startMinutes, latest))
+  }
+
+  function beginEntryDrag(event, entry) {
+    if (!canEdit) return
+    if (event.button !== 0) return
+    if (event.target.closest('button')) return
+
+    const start = timeToMinutes(entry.startTime || entry.start_time)
+    const end = timeToMinutes(entry.endTime || entry.end_time)
+    if (start === null || end === null || end <= start) return
+
+    setDragState({
+      mode: 'move',
+      entryId: entry.id,
+      pointerStartX: event.clientX,
+      pointerStartY: event.clientY,
+      originalStart: start,
+      originalEnd: end,
+      previewStart: start,
+      previewEnd: end,
+      originalSpace: entrySpaceName(entry),
+      previewSpace: entrySpaceName(entry),
+      moved: false,
+    })
+  }
+
+  function beginEntryResize(event, entry, edge) {
+    if (!canEdit) return
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const start = timeToMinutes(entry.startTime || entry.start_time)
+    const end = timeToMinutes(entry.endTime || entry.end_time)
+    if (start === null || end === null || end <= start) return
+
+    setDragState({
+      mode: edge === 'start' ? 'resize-start' : 'resize-end',
+      entryId: entry.id,
+      pointerStartX: event.clientX,
+      pointerStartY: event.clientY,
+      originalStart: start,
+      originalEnd: end,
+      previewStart: start,
+      previewEnd: end,
+      originalSpace: entrySpaceName(entry),
+      previewSpace: entrySpaceName(entry),
+      moved: false,
+    })
+  }
+
+  useEffect(() => {
+    if (!dragState) return
+
+    function onMove(event) {
+      const dy = event.clientY - dragState.pointerStartY
+      const dx = event.clientX - dragState.pointerStartX
+      const minuteShift = Math.round(dy / DRAG_PIXELS_PER_5_MINUTES) * 5
+      let nextStart = dragState.originalStart
+      let nextEnd = dragState.originalEnd
+
+      if (dragState.mode === 'resize-start') {
+        nextStart = Math.max(DAY_START_MINUTES, Math.min(dragState.originalStart + minuteShift, dragState.originalEnd - 5))
+      } else if (dragState.mode === 'resize-end') {
+        nextEnd = Math.min(DAY_END_MINUTES, Math.max(dragState.originalEnd + minuteShift, dragState.originalStart + 5))
+      } else {
+        const duration = dragState.originalEnd - dragState.originalStart
+        nextStart = clampEntryStart(dragState.originalStart + minuteShift, duration)
+        nextEnd = nextStart + duration
+      }
+
+      let nextSpace = dragState.originalSpace
+      if (viewMode === 'space' && columns.length > 0) {
+        const spaceColumns = columns.filter(col => typeof col === 'string')
+        const fromIndex = Math.max(0, spaceColumns.findIndex(col => normalizeText(col) === normalizeText(dragState.originalSpace)))
+        const colShift = Math.round(dx / DRAG_PIXELS_PER_SPACE)
+        const nextIndex = Math.max(0, Math.min(fromIndex + colShift, spaceColumns.length - 1))
+        nextSpace = spaceColumns[nextIndex] || nextSpace
+      }
+
+      setDragState(prev => {
+        if (!prev) return prev
+        const moved = prev.moved || Math.abs(dx) > 4 || Math.abs(dy) > 4
+        if (
+          prev.previewStart === nextStart
+          && prev.previewEnd === nextEnd
+          && normalizeText(prev.previewSpace) === normalizeText(nextSpace)
+          && prev.moved === moved
+        ) return prev
+        return {
+          ...prev,
+          previewStart: nextStart,
+          previewEnd: nextEnd,
+          previewSpace: nextSpace,
+          moved,
+        }
+      })
+    }
+
+    function onUp() {
+      const finalState = dragState
+      setDragState(null)
+      if (!finalState?.moved) return
+
+      void setTimetableEntries(prev => prev.map(item => {
+        if (item.id !== finalState.entryId) return item
+        return {
+          ...item,
+          startTime: minutesToTimeLabel(finalState.previewStart),
+          endTime: minutesToTimeLabel(finalState.previewEnd),
+          spaceName: viewMode === 'space' ? finalState.previewSpace : (item.spaceName || item.space_name || ''),
+          location: viewMode === 'space' ? finalState.previewSpace : (item.location || item.spaceName || item.space_name || ''),
+        }
+      }))
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [dragState, columns, viewMode, setTimetableEntries])
 
   const conflictSummary = useMemo(() => {
     if (!canSeeOverview) return { slotAlerts: [], entryConflictIds: new Set() }
@@ -825,7 +955,7 @@ export default function Timetable({
           <td>${escapeHtml(entry.groupName || entry.group_name || '')}</td>
           <td>${escapeHtml(entrySpaceName(entry))}</td>
           <td>${escapeHtml(assigned)}</td>
-          <td>${escapeHtml(entry.notes || '')}</td>
+          <td>${escapeHtml(entry.notes || '').replaceAll('\n', '<br />')}</td>
         </tr>
       `
     }).join('')
@@ -906,6 +1036,10 @@ export default function Timetable({
       .map(email => allStaffOptions.find(option => option.email === email)?.label || email)
       .join(', ')
     const noteText = String(entry.notes || '').trim()
+    const isDragging = dragState?.entryId === entry.id
+    const displayStart = isDragging ? minutesToTimeLabel(dragState.previewStart) : (entry.startTime || entry.start_time)
+    const displayEnd = isDragging ? minutesToTimeLabel(dragState.previewEnd) : (entry.endTime || entry.end_time)
+    const displaySpace = isDragging && viewMode === 'space' ? dragState.previewSpace : entrySpaceName(entry)
 
     const isConflicting = conflictSummary.entryConflictIds.has(entry.id)
     const spaceColor = colorForSpace(entrySpaceName(entry))
@@ -914,21 +1048,29 @@ export default function Timetable({
       <div
         key={entry.id}
         onDoubleClick={() => openEdit(entry)}
+        onMouseDown={(event) => beginEntryDrag(event, entry)}
         style={{ backgroundColor: isConflicting ? '#ffe4e6' : spaceColor }}
-        className={`rounded-lg border px-2 py-1.5 text-xs ${isConflicting ? 'border-rose-300 text-rose-900' : 'border-emerald-200 text-emerald-900'}`}
+        className={`rounded-lg border px-2 py-1.5 text-xs select-none ${isDragging ? 'opacity-85 cursor-grabbing shadow-md' : 'cursor-grab'} ${isConflicting ? 'border-rose-300 text-rose-900' : 'border-emerald-200 text-emerald-900'}`}
       >
+        {canEdit && (
+          <div
+            className="-mt-1 mb-1 h-1.5 rounded bg-stone-300/80 hover:bg-stone-400 cursor-ns-resize"
+            title="Drag to change start time (5-minute steps)"
+            onMouseDown={(event) => beginEntryResize(event, entry, 'start')}
+          />
+        )}
         <p className="font-semibold leading-tight">{entry.activityName || entry.activity_name}</p>
         <p className="mt-0.5 text-[11px]">
-          {entry.startTime || entry.start_time}
-          {(entry.endTime || entry.end_time) ? `-${entry.endTime || entry.end_time}` : ''}
+          {displayStart}
+          {displayEnd ? `-${displayEnd}` : ''}
           {(entry.groupName || entry.group_name) ? ` · ${entry.groupName || entry.group_name}` : ''}
         </p>
-        <p className="text-[11px]">{entrySpaceName(entry)}</p>
+        <p className="text-[11px]">{displaySpace}</p>
         {viewMode === 'space' && assignedNames && (
           <p className="text-[11px]">{assignedNames}</p>
         )}
         {noteText && (
-          <p className="mt-1 text-[11px] italic text-stone-700">Note: {noteText}</p>
+          <p className="mt-1 text-[11px] italic text-stone-700 whitespace-pre-line">Note: {noteText}</p>
         )}
         {isConflicting && (
           <p className="mt-1 text-[11px] font-semibold">Double-booked staff overlap</p>
@@ -942,6 +1084,13 @@ export default function Timetable({
               <Trash2 size={12} />
             </button>
           </div>
+        )}
+        {canEdit && (
+          <div
+            className="mt-1 h-1.5 rounded bg-stone-300/80 hover:bg-stone-400 cursor-ns-resize"
+            title="Drag to change end time (5-minute steps)"
+            onMouseDown={(event) => beginEntryResize(event, entry, 'end')}
+          />
         )}
       </div>
     )
