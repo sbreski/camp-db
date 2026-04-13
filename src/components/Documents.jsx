@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { Upload, FileText, Download, Trash2, Lock, ShieldAlert } from 'lucide-react'
 import { toCsv } from '../utils/workflow'
+import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 
 export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST' }) {
   const [section, setSection] = useState('policies') // 'policies' or 'other'
@@ -19,6 +20,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   const [safeguardingReports, setSafeguardingReports] = useState([])
   const [loadingSafeguarding, setLoadingSafeguarding] = useState(false)
   const [safeguardingActionId, setSafeguardingActionId] = useState('')
+  const [safeguardingFilter, setSafeguardingFilter] = useState('open')
 
   useEffect(() => {
     loadDocuments()
@@ -140,14 +142,28 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function closeSafeguardingReport(report) {
-    if (!window.confirm(`Mark safeguarding report for ${report.participantName} as closed?`)) return
+    if (!window.confirm(`Mark safeguarding report for ${report.participantName} as resolved/closed?`)) return
 
     setSafeguardingActionId(report.id)
     try {
-      await fetchSafeguarding('close_report', { reportId: report.id })
+      await fetchSafeguarding('close_report', { reportId: report.id, actorInitials })
       await loadSafeguardingReports()
     } catch (error) {
       alert('Error closing safeguarding report: ' + error.message)
+    } finally {
+      setSafeguardingActionId('')
+    }
+  }
+
+  async function reopenSafeguardingReport(report) {
+    if (!window.confirm(`Reopen safeguarding report for ${report.participantName}?`)) return
+
+    setSafeguardingActionId(report.id)
+    try {
+      await fetchSafeguarding('reopen_report', { reportId: report.id })
+      await loadSafeguardingReports()
+    } catch (error) {
+      alert('Error reopening safeguarding report: ' + error.message)
     } finally {
       setSafeguardingActionId('')
     }
@@ -468,6 +484,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     return acc
   }, {})
 
+  const filteredSafeguardingReports = safeguardingReports.filter(report => (
+    safeguardingFilter === 'all' ? true : report.status === safeguardingFilter
+  ))
+
   return (
     <div className="fade-in space-y-4">
       {/* Header */}
@@ -545,6 +565,22 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
               <p className="text-xs text-stone-500 mt-1">
                 Restricted to Camp Coordinator, Admins, Director, and the owner account.
               </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {[
+                  { id: 'open', label: 'Active / Open' },
+                  { id: 'closed', label: 'Resolved / Closed' },
+                  { id: 'all', label: 'All' },
+                ].map(option => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSafeguardingFilter(option.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-display font-medium border ${safeguardingFilter === option.id ? 'bg-forest-900 text-white border-forest-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
             {isOwnerUser ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -570,18 +606,19 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
 
           {loadingSafeguarding ? (
             <p className="text-sm text-stone-500">Loading safeguarding reports...</p>
-          ) : safeguardingReports.length === 0 ? (
+          ) : filteredSafeguardingReports.length === 0 ? (
             <p className="text-sm text-stone-500">No safeguarding reports logged.</p>
           ) : (
             <div className="space-y-2">
-              {safeguardingReports.map(report => (
+              {filteredSafeguardingReports.map(report => (
                 <div key={report.id} className="rounded-xl border border-stone-200 px-4 py-3 bg-white">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-sm text-forest-950">{report.participantName}</p>
-                        <span className={report.status === 'open' ? 'badge-safeguarding' : 'badge-medical'}>
-                          {report.status === 'open' ? 'Open' : 'Closed'}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${report.status === 'open' ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
+                          <SafeguardingFlagIcon className="px-0 py-0 border-0 bg-transparent" size={11} />
+                          {report.status === 'open' ? 'Open' : 'Resolved'}
                         </span>
                       </div>
                       <p className="text-xs text-stone-500 mt-1">{report.reportName}</p>
@@ -615,7 +652,16 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                           disabled={safeguardingActionId === report.id}
                           className={`btn-primary text-xs ${safeguardingActionId === report.id ? 'opacity-60 cursor-not-allowed' : ''}`}
                         >
-                          Close
+                          Resolve / Close
+                        </button>
+                      )}
+                      {report.status === 'closed' && (
+                        <button
+                          onClick={() => reopenSafeguardingReport(report)}
+                          disabled={safeguardingActionId === report.id}
+                          className={`btn-secondary text-xs ${safeguardingActionId === report.id ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                          Reopen
                         </button>
                       )}
                     </div>

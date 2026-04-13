@@ -3,6 +3,7 @@ import { ArrowLeft, Edit2, Clock, AlertTriangle, Phone, Mail, User, FileText, Sh
 import ParticipantForm from './ParticipantForm'
 import IncidentForm from './IncidentForm'
 import ParticipantNameText from './ParticipantNameText'
+import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 
 function getNextDateKey(isoString) {
@@ -182,6 +183,8 @@ export default function ParticipantDetail({
         : inc
     )))
 
+    await syncSafeguardingReportStatus(incident.id, 'close_report')
+
     await setParticipants(prev => prev.map(p => (
       p.id === incident.participantId
         ? { ...p, safeguardingFlag: false }
@@ -208,6 +211,8 @@ export default function ParticipantDetail({
           }
         : inc
     )))
+
+    await syncSafeguardingReportStatus(incident.id, 'reopen_report')
 
     await setParticipants(prev => prev.map(p => (
       p.id === incident.participantId
@@ -239,6 +244,27 @@ export default function ParticipantDetail({
     }
 
     return result.url
+  }
+
+  async function syncSafeguardingReportStatus(incidentId, action) {
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data.session?.access_token
+
+    if (!accessToken || !incidentId) return
+
+    const response = await fetch('/.netlify/functions/safeguarding-reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ action, incidentId, actorInitials }),
+    })
+
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}))
+      console.error(result.error || 'Unable to sync safeguarding report state')
+    }
   }
 
   async function openIncidentReport(inc) {
@@ -918,7 +944,7 @@ export default function ParticipantDetail({
           {participant.medicalType?.includes('Dietary') && <span className="badge-dietary">🍽 Dietary</span>}
           {participant.medicalType?.includes('Medical') && <span className="badge-medical">+ Medical</span>}
           {participant.sendNeeds && <span className="badge-send">★ SEND / Support</span>}
-          {participant.safeguardingFlag && <span className="badge-safeguarding">Safeguarding Flag</span>}
+          {participant.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={12} />}
         </div>
       </div>
 

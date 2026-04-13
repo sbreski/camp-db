@@ -115,6 +115,48 @@ async function syncParticipantFlags(admin, participantIds) {
   await Promise.all(uniqueIds.map(id => syncParticipantFlag(admin, id)))
 }
 
+async function resolveReportByIdOrIncidentId(admin, reportId, incidentId) {
+  let query = admin
+    .from('safeguarding_reports')
+    .select('id, participant_id, incident_id, status, storage_path')
+
+  if (reportId) {
+    query = query.eq('id', reportId)
+  } else if (incidentId) {
+    query = query.eq('incident_id', incidentId).order('created_at', { ascending: false }).limit(1)
+  } else {
+    throw new Error('reportId or incidentId is required')
+  }
+
+  const { data, error } = await query.maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('Safeguarding report not found')
+  return data
+}
+
+async function setIncidentResolvedState(admin, incidentId, isResolved, actorInitials = '') {
+  if (!incidentId) return
+
+  const payload = isResolved
+    ? {
+        resolved_at: new Date().toISOString(),
+        resolved_by: actorInitials || null,
+      }
+    : {
+        resolved_at: null,
+        resolved_by: null,
+      }
+
+  const { error } = await admin
+    .from('incidents')
+    .update(payload)
+    .eq('id', incidentId)
+
+  if (error) {
+    console.error('SAFEGUARDING INCIDENT SYNC ERROR:', error.message)
+  }
+}
+
 export async function handler(event) {
   try {
     if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') {
@@ -142,6 +184,13 @@ export async function handler(event) {
 
       if (error) return json(500, { error: error.message })
 
+      const incidentIds = [...new Set((data || []).map(row => row.incident_id).filter(Boolean))]
+      const { data: incidents, error: incidentsError } = incidentIds.length === 0
+        ? { data: [], error: null }
+        : await admin.from('incidents').select('id, resolved_at, resolved_by').in('id', incidentIds)
+
+      if (incidentsError) return json(500, { error: incidentsError.message })
+
       const participantIds = [...new Set((data || []).map(row => row.participant_id).filter(Boolean))]
       const { data: participants, error: participantsError } = participantIds.length === 0
         ? { data: [], error: null }
@@ -150,19 +199,25 @@ export async function handler(event) {
       if (participantsError) return json(500, { error: participantsError.message })
 
       const participantMap = new Map((participants || []).map(row => [row.id, row.name]))
+      const incidentMap = new Map((incidents || []).map(row => [row.id, row]))
 
       return json(200, {
         reports: (data || []).map(row => ({
+          const incident = incidentMap.get(row.incident_id)
+          const isResolved = row.status === 'closed' || Boolean(incident?.resolved_at)
+          return {
           id: row.id,
           participantId: row.participant_id,
           participantName: participantMap.get(row.participant_id) || 'Unknown participant',
           incidentId: row.incident_id,
-          status: row.status,
+          status: isResolved ? 'closed' : 'open',
           reportName: row.report_name,
           raisedByEmail: row.raised_by_email,
           createdAt: row.created_at,
-          closedAt: row.closed_at,
-        })),
+          closedAt: row.closed_at || incident?.resolved_at || null,
+          resolvedBy: incident?.resolved_by || null,
+        }
+        }),
       })
     }
 
@@ -299,7 +354,14 @@ export async function handler(event) {
 
     if (action === 'close_report') {
       const reportId = String(body.reportId || '')
-      if (!reportId) return json(400, { error: 'reportId is required' })
+      const incidentId = String(body.incidentId || '')
+      const actorInitials = String(body.actorInitials || '').trim().toUpperCase()
+      let report
+      try {
+        report = await resolveReportByIdOrIncidentId(admin, reportId, incidentId)
+      } catch (error) {
+        return json(400, { error: error.message })
+      }
 
       const { data, error } = await admin
         .from('safeguarding_reports')
@@ -308,12 +370,41 @@ export async function handler(event) {
           closed_at: new Date().toISOString(),
           closed_by_user_id: currentUser.id,
         })
-        .eq('id', reportId)
+        .eq('id', report.id)
         .select('participant_id')
         .single()
 
       if (error) return json(500, { error: error.message })
 
+      await setIncidentResolvedState(admin, report.incident_id, true, actorInitials)
+      await syncParticipantFlag(admin, data.participant_id)
+      return json(200, { ok: true })
+    }
+
+    if (action === 'reopen_report') {
+      const reportId = String(body.reportId || '')
+      const incidentId = String(body.incidentId || '')
+      let report
+      try {
+        report = await resolveReportByIdOrIncidentId(admin, reportId, incidentId)
+      } catch (error) {
+        return json(400, { error: error.message })
+      }
+
+      const { data, error } = await admin
+        .from('safeguarding_reports')
+        .update({
+          status: 'open',
+          closed_at: null,
+          closed_by_user_id: null,
+        })
+        .eq('id', report.id)
+        .select('participant_id')
+        .single()
+
+      if (error) return json(500, { error: error.message })
+
+      await setIncidentResolvedState(admin, report.incident_id, false)
       await syncParticipantFlag(admin, data.participant_id)
       return json(200, { ok: true })
     }

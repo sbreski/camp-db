@@ -166,6 +166,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         : inc
     )))
 
+      await syncSafeguardingReportStatus(incident.id, 'close_report')
+
     if (typeof setParticipants !== 'function') return
 
     const hasOtherOpenSafeguarding = incidents.some(inc => (
@@ -204,6 +206,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         : inc
     )))
 
+      await syncSafeguardingReportStatus(incident.id, 'reopen_report')
+
     if (typeof setParticipants !== 'function') return
 
     await setParticipants(prev => prev.map(p => (
@@ -236,6 +240,27 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }
 
     return result.url
+  }
+
+  async function syncSafeguardingReportStatus(incidentId, action) {
+    const { data } = await supabase.auth.getSession()
+    const accessToken = data.session?.access_token
+
+    if (!accessToken || !incidentId) return
+
+    const response = await fetch('/.netlify/functions/safeguarding-reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ action, incidentId, actorInitials }),
+    })
+
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}))
+      console.error(result.error || 'Unable to sync safeguarding report state')
+    }
   }
 
   async function openIncidentReport(inc) {
