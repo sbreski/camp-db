@@ -5,7 +5,6 @@ const DEFAULT_SPACE_OPTIONS = ['Drama Space', 'Art Space', 'bardepot', 'Studio T
 const DAY_START_MINUTES = 9 * 60 + 45
 const DAY_END_MINUTES = 16 * 60 + 30
 const GRID_STEP_MINUTES = 15
-const PIXELS_PER_MINUTE = 2
 const USUAL_BLOCKS = [
   ['09:45', '10:00'],
   ['10:00', '10:30'],
@@ -1261,91 +1260,55 @@ export default function Timetable({
               </tr>
             </thead>
             <tbody>
-              {timeRows.map(row => {
-                const rowDuration = row.endMinutes - row.startMinutes
-                const rowHeight = Math.max(48, rowDuration * PIXELS_PER_MINUTE)
+              {timeRows.map(row => (
+                <tr key={row.startLabel}>
+                  <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
+                    {row.startLabel} - {row.endLabel}
+                  </td>
+                  {columns.map(column => {
+                    const key = viewMode === 'space' ? column : column.email
+                    const activeEntries = dayEntries.filter(entry =>
+                      (viewMode === 'space'
+                        ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
+                        : normalizeAssignedEmails(entry).includes(column.email)
+                      ) && isActiveInRange(entry, row.startMinutes, row.endMinutes)
+                    )
 
-                return (
-                  <tr key={row.startLabel} style={{ height: `${rowHeight}px` }}>
-                    <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
-                      {row.startLabel} - {row.endLabel}
-                    </td>
-                    {columns.map(column => {
-                      const key = viewMode === 'space' ? column : column.email
-                      const allEntriesInColumn = dayEntries.filter(entry =>
-                        (viewMode === 'space' 
-                          ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
-                          : normalizeAssignedEmails(entry).includes(column.email)
-                        ) && isActiveInRange(entry, row.startMinutes, row.endMinutes)
+                    if (activeEntries.length === 0) {
+                      return (
+                        <td
+                          key={`${row.startLabel}-${key}`}
+                          onDoubleClick={() => {
+                            if (!canEdit) return
+                            openCreateAtSlot(column, row.startLabel, row.endLabel)
+                          }}
+                          className="border-b border-stone-200 px-2 py-1 align-top h-16 cursor-pointer"
+                          title={canEdit ? 'Double-click to add/edit this slot' : ''}
+                        >
+                          <div className="h-full min-h-10 rounded border border-dashed border-stone-200 hover:border-forest-300" />
+                        </td>
                       )
-                      const entriesStartingInRow = dayEntries.filter(entry => {
-                        const sameColumn = viewMode === 'space'
-                          ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
-                          : normalizeAssignedEmails(entry).includes(column.email)
-                        if (!sameColumn) return false
-                        const entryStart = timeToMinutes(entry.startTime || entry.start_time)
-                        if (entryStart === null) return false
-                        return entryStart >= row.startMinutes && entryStart < row.endMinutes
-                      })
-                      const entriesWithPosition = entriesStartingInRow.map(entry => {
-                        const entryStart = timeToMinutes(entry.startTime || entry.start_time)
-                        const entryEnd = timeToMinutes(entry.endTime || entry.end_time)
-                        const safeStart = entryStart === null ? row.startMinutes : entryStart
-                        const safeEnd = entryEnd === null ? row.endMinutes : entryEnd
-                        const top = Math.max(0, safeStart - row.startMinutes) * PIXELS_PER_MINUTE + 2
-                        const height = Math.max(24, (safeEnd - safeStart) * PIXELS_PER_MINUTE - 4)
-                        return { entry, top, height }
-                      })
+                    }
 
-                      if (entriesWithPosition.length === 0 && allEntriesInColumn.length === 0) {
-                        return (
-                          <td
-                            key={`${row.startLabel}-${key}`}
-                            onDoubleClick={() => { if (!canEdit) return; openCreateAtSlot(column, row.startLabel, row.endLabel) }}
-                            className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer"
-                            style={{ height: `${rowHeight}px`, position: 'relative' }}
-                            title={canEdit ? 'Double-click to add/edit this slot' : ''}
-                          >
-                            <div className="h-full min-h-8 rounded border border-dashed border-stone-200 hover:border-forest-300" />
-                          </td>
-                        )
-                      }
-
-                      if (entriesWithPosition.length > 0) {
-                        return (
-                          <td
-                            key={`${row.startLabel}-${key}`}
-                            onDoubleClick={() => { if (!canEdit) return; openEdit(entriesWithPosition[0].entry) }}
-                            className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer hover:bg-stone-50 transition-colors"
-                            style={{ height: `${rowHeight}px`, position: 'relative', overflow: 'visible' }}
-                            title={canEdit ? 'Double-click to add/edit' : ''}
-                          >
-                            <div className="relative h-full">
-                              {entriesWithPosition.map(({ entry, top, height }) => (
-                                <div key={entry.id} style={{ position: 'absolute', top: `${top}px`, left: 0, right: 0, minHeight: `${height}px`, zIndex: 10 }}>
-                                  {renderEntryCard(entry)}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        )
-                      }
-
-                      if (allEntriesInColumn.length > 0) {
-                        return (
-                          <td
-                            key={`${row.startLabel}-${key}`}
-                            className="border-b border-stone-200 px-2 py-1 align-top"
-                            style={{ height: `${rowHeight}px` }}
-                          />
-                        )
-                      }
-
-                      return null
-                    }).filter(Boolean)}
-                  </tr>
-                )
-              })}
+                    const gridCols = `repeat(${activeEntries.length}, minmax(0, 1fr))`
+                    return (
+                      <td
+                        key={`${row.startLabel}-${key}`}
+                        onDoubleClick={() => {
+                          if (!canEdit) return
+                          openEdit(activeEntries[0])
+                        }}
+                        className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer hover:bg-stone-50 transition-colors"
+                        title={canEdit ? 'Double-click to add/edit' : ''}
+                      >
+                        <div className="grid gap-1" style={{ gridTemplateColumns: gridCols }}>
+                          {activeEntries.map(entry => renderEntryCard(entry))}
+                        </div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
