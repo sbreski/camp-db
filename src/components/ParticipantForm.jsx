@@ -10,6 +10,7 @@ const EMPTY = {
   dietaryType: '', allergyDetails: '', mealAdjustments: '',
   medicalType: [], medicalDetails: '',
   sendNeeds: '', sendDiagnosed: false, sendDiagnosis: '',
+  isActiveThisSeason: true,
   notes: '',
 }
 
@@ -19,6 +20,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     ...initial,
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
+    isActiveThisSeason: initial.isActiveThisSeason !== false,
   })
   const [otcAllowedItemsInput, setOtcAllowedItemsInput] = useState(() => {
     if (Array.isArray(initial.otcAllowedItems)) return initial.otcAllowedItems.join(', ')
@@ -117,6 +119,17 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
             <div>
               <label className="label">Age</label>
               <input className="input" type="number" min="1" max="25" value={form.age} onChange={e => set('age', e.target.value)} placeholder="10" />
+            </div>
+            <div className="col-span-2">
+              <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-1">
+                <input
+                  type="checkbox"
+                  checked={form.isActiveThisSeason !== false}
+                  onChange={e => set('isActiveThisSeason', e.target.checked)}
+                  className="rounded"
+                />
+                Include on Sign In / Out this season
+              </label>
             </div>
           </div>
         </section>

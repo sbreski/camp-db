@@ -196,6 +196,7 @@ function toSnake(obj) {
     uploadedByInitials: 'uploaded_by_initials',
     firstAidTrained: 'first_aid_trained', safeguardingTrained: 'safeguarding_trained',
     firstAidExpiresOn: 'first_aid_expires_on', safeguardingExpiresOn: 'safeguarding_expires_on',
+    isActiveThisSeason: 'is_active_this_season', isAssignedThisSeason: 'is_assigned_this_season',
     createdAt: 'created_at', updatedAt: 'updated_at',
     sortOrder: 'sort_order',
   }
@@ -276,6 +277,7 @@ function toCamel(obj) {
     uploaded_by_initials: 'uploadedByInitials',
     first_aid_trained: 'firstAidTrained', safeguarding_trained: 'safeguardingTrained',
     first_aid_expires_on: 'firstAidExpiresOn', safeguarding_expires_on: 'safeguardingExpiresOn',
+    is_active_this_season: 'isActiveThisSeason', is_assigned_this_season: 'isAssignedThisSeason',
     created_at: 'createdAt', updated_at: 'updatedAt',
     sort_order: 'sortOrder',
   }

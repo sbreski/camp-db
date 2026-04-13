@@ -61,6 +61,7 @@ function StaffForm({ initial, onSave, onCancel }) {
     safeguardingTrained: false,
     firstAidExpiresOn: '',
     safeguardingExpiresOn: '',
+    isAssignedThisSeason: true,
   }
   const [form, setForm] = useState({
     ...empty,
@@ -69,6 +70,7 @@ function StaffForm({ initial, onSave, onCancel }) {
     safeguardingTrained: Boolean(initial?.safeguardingTrained),
     firstAidExpiresOn: initial?.firstAidExpiresOn || '',
     safeguardingExpiresOn: initial?.safeguardingExpiresOn || '',
+    isAssignedThisSeason: initial?.isAssignedThisSeason !== false,
   })
   function set(k, v) { setForm(p => ({ ...p, [k]: v })) }
   async function submit(e) {
@@ -112,6 +114,17 @@ function StaffForm({ initial, onSave, onCancel }) {
           <div className="col-span-2">
             <label className="label">Notes</label>
             <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
+          </div>
+          <div className="col-span-2">
+            <label className="inline-flex items-center gap-2 text-sm text-stone-700">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={form.isAssignedThisSeason !== false}
+                onChange={e => set('isAssignedThisSeason', e.target.checked)}
+              />
+              Assigned to current season (can sign in)
+            </label>
           </div>
           <div className="col-span-2">
             <p className="label mb-2">Training & Expiry</p>
@@ -199,6 +212,10 @@ function StaffDetail({ member, onEdit, onClose }) {
             <p className="text-stone-700 leading-relaxed">{member.notes}</p>
           </div>
         )}
+        <p className="flex items-center gap-2 text-stone-700">
+          <span className="text-stone-500 w-28 flex-shrink-0">Season</span>
+          <span>{member.isAssignedThisSeason === false ? 'Not assigned' : 'Assigned'}</span>
+        </p>
         <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
           <p className="label">Training & Expiry</p>
           <p className="flex items-center gap-2 text-stone-700">
@@ -780,7 +797,7 @@ export default function Staff({ staffList, setStaffList }) {
         const existing = prev.find(member => (member.email || '').toLowerCase() === ownerEmail)
         if (existing) {
           return prev.map(member => member.id === existing.id
-            ? { ...member, name: 'Sam Brenner', role: 'Camp Coordinator', email: ownerEmail }
+            ? { ...member, name: 'Sam Brenner', role: 'Camp Coordinator', email: ownerEmail, isAssignedThisSeason: true }
             : member
           )
         }
@@ -800,6 +817,7 @@ export default function Staff({ staffList, setStaffList }) {
             safeguardingTrained: false,
             firstAidExpiresOn: '',
             safeguardingExpiresOn: '',
+            isAssignedThisSeason: true,
           },
         ]
       })
@@ -883,6 +901,7 @@ export default function Staff({ staffList, setStaffList }) {
                 <div className="flex items-center gap-1 mt-1">
                   {s.firstAidTrained && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">FA</span>}
                   {s.safeguardingTrained && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">SG</span>}
+                  {s.isAssignedThisSeason === false && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">No camp assigned</span>}
                 </div>
               </div>
               <button onClick={e => { e.stopPropagation(); deleteStaff(s.id) }}

@@ -72,6 +72,27 @@ export default function Login() {
         setLoading(false)
         return
       }
+
+      const { data: staffRows, error: staffError } = await supabase
+        .from('staff')
+        .select('is_assigned_this_season')
+        .eq('email', email)
+        .is('deleted_at', null)
+        .limit(1)
+
+      if (staffError) {
+        const missingColumn = String(staffError.message || '').toLowerCase().includes('is_assigned_this_season')
+          && String(staffError.message || '').toLowerCase().includes('does not exist')
+        if (!missingColumn) {
+          throw new Error('Unable to verify camp assignment. Please try again.')
+        }
+      } else if (Array.isArray(staffRows) && staffRows[0]?.is_assigned_this_season === false) {
+        setError('No camp assigned. Please contact admin.')
+        setLoading(false)
+        setShake(true)
+        setTimeout(() => setShake(false), 500)
+        return
+      }
     } catch (lookupError) {
       setLoading(false)
       setError(lookupError.message || 'Unable to resolve username')

@@ -195,6 +195,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
   const [reasonInput, setReasonInput] = useState('')
   const [reasonNotesInput, setReasonNotesInput] = useState('')
   const today = todayKey()
+  const seasonParticipants = participants.filter(p => p.isActiveThisSeason !== false)
   const selectedRecords = attendance.filter(a => a.date === selectedDate)
 
   function getPendingFollowUps(participantId) {
@@ -431,22 +432,22 @@ export default function SignInOut({ participants, attendance, setAttendance, act
   }
 
   // Alphabetical by first name
-  const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name))
+  const sorted = [...seasonParticipants].sort((a, b) => a.name.localeCompare(b.name))
   const filtered = sorted.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
 
-  const onSite = participants.filter(p => { const r = getRecord(p.id); return r?.signIn && !r?.signOut })
-  const notIn = participants.filter(p => {
+  const onSite = seasonParticipants.filter(p => { const r = getRecord(p.id); return r?.signIn && !r?.signOut })
+  const notIn = seasonParticipants.filter(p => {
     const r = getRecord(p.id)
     return !(r?.signIn && !r?.signOut)
   })
-  const participantsWithFollowUps = participants.filter(p => {
+  const participantsWithFollowUps = seasonParticipants.filter(p => {
     const hasIncidentFollowUp = getPendingFollowUps(p.id).length > 0
     const hasNoteFollowUp = canViewAdminFollowUps && hasParticipantNoteFollowUp(p.id)
     return hasIncidentFollowUp || hasNoteFollowUp
   }).length
 
   function printFireRecord() {
-    const onSiteList = [...participants]
+    const onSiteList = [...seasonParticipants]
       .filter(p => {
         const r = getRecord(p.id)
         return r?.signIn && !r?.signOut
@@ -688,9 +689,9 @@ export default function SignInOut({ participants, attendance, setAttendance, act
         </button>
       </div>
 
-      {participants.length === 0 ? (
+      {seasonParticipants.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-stone-400 text-sm">No participants registered yet.</p>
+          <p className="text-stone-400 text-sm">No participants are assigned to Sign In / Out this season.</p>
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
