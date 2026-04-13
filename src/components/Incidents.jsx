@@ -23,10 +23,11 @@ function createdUserIdForIncident(incident) {
   return String(incident.createdByUserId || incident.created_by_user_id || '').trim()
 }
 
-export default function Incidents({ incidents, setIncidents, participants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onView }) {
+export default function Incidents({ incidents, setIncidents, participants, setParticipants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onView }) {
   const [showForm, setShowForm] = useState(false)
   const [selectedParticipant, setSelectedParticipant] = useState('')
   const [editingIncidentId, setEditingIncidentId] = useState(null)
+  const [reportSubTab, setReportSubTab] = useState('all')
   const [search, setSearch] = useState('')
   const [openingIncidentId, setOpeningIncidentId] = useState('')
   const [downloadingIncidentId, setDownloadingIncidentId] = useState('')
@@ -109,6 +110,47 @@ export default function Incidents({ incidents, setIncidents, participants, staff
   function deleteIncident(id) {
     if (window.confirm('Delete this incident? This cannot be undone.')) {
       setIncidents(prev => prev.filter(inc => inc.id !== id))
+    }
+  }
+
+  function isSafeguardingResolved(incident) {
+    return Boolean(incident.followUpCompletedAt || incident.follow_up_completed_at)
+  }
+
+  async function markSafeguardingResolved(incident) {
+    if (incident.type !== 'Safeguarding') return
+    if (isSafeguardingResolved(incident)) return
+
+    const resolvedAt = new Date().toISOString()
+
+    await setIncidents(prev => prev.map(inc => (
+      inc.id === incident.id
+        ? {
+            ...inc,
+            followUpRequired: false,
+            followUpCompletedAt: resolvedAt,
+            followUpCompletedBy: actorInitials,
+            updatedByInitials: actorInitials,
+            updatedByUserId: actorUserId || inc.updatedByUserId || null,
+          }
+        : inc
+    )))
+
+    if (typeof setParticipants !== 'function') return
+
+    const hasOtherOpenSafeguarding = incidents.some(inc => (
+      inc.id !== incident.id
+      && inc.participantId === incident.participantId
+      && inc.type === 'Safeguarding'
+      && !isSafeguardingResolved(inc)
+    ))
+
+    if (!hasOtherOpenSafeguarding) {
+      await setParticipants(prev => prev.map(p => (
+        p.id === incident.participantId
+          ? { ...p, safeguardingFlag: false }
+          : p
+      )))
     }
   }
 
@@ -206,6 +248,7 @@ export default function Incidents({ incidents, setIncidents, participants, staff
       const p = participants.find(x => x.id === inc.participantId)
       return !search || p?.name.toLowerCase().includes(search.toLowerCase())
     })
+    .filter(inc => reportSubTab === 'all' || inc.type === reportSubTab)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
   const groupedIncidents = filtered.reduce((groups, incident) => {
@@ -291,6 +334,26 @@ export default function Incidents({ incidents, setIncidents, participants, staff
           onChange={e => setSearch(e.target.value)} className="input pl-9" />
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setReportSubTab('all')}
+          className={`btn-secondary text-sm ${reportSubTab === 'all' ? 'bg-forest-900 text-white border-forest-900' : ''}`}
+        >
+          All Reports
+        </button>
+        {REPORT_TYPE_ORDER.map(type => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => setReportSubTab(type)}
+            className={`btn-secondary text-sm ${reportSubTab === type ? 'bg-forest-900 text-white border-forest-900' : ''}`}
+          >
+            {type}
+          </button>
+        ))}
+      </div>
+
       {/* List */}
       {incidents.length === 0 ? (
         <div className="card text-center py-12">
@@ -336,7 +399,7 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                         <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Follow Up due</span>
                       )}
                       {inc.followUpCompletedAt && (
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Followed up</span>
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Resolved</span>
                       )}
                       {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
                     </div>
@@ -418,6 +481,18 @@ export default function Incidents({ incidents, setIncidents, participants, staff
                     >
                       <Edit2 size={15} />
                     </button>
+                    {inc.type === 'Safeguarding' && !isSafeguardingResolved(inc) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          markSafeguardingResolved(inc)
+                        }}
+                        className="text-xs px-2 py-1 rounded-md border border-emerald-200 text-emerald-800 hover:text-emerald-900 hover:border-emerald-300 bg-white"
+                      >
+                        Mark as Resolved
+                      </button>
+                    )}
                     <button onClick={(e) => { e.stopPropagation(); deleteIncident(inc.id) }}
                       className="p-1.5 text-stone-400 hover:text-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                       <Trash2 size={15} />

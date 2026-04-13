@@ -1312,7 +1312,7 @@ export default function App() {
           canEditTimetable={canEditTimetable}
         />
       )
-      case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onView={(id) => navigate('participant', id)} />
+      case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} setParticipants={setParticipants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onView={(id) => navigate('participant', id)} />
       case 'staff': return <Staff staffList={staffList} setStaffList={setStaffList} />
       default: return null
     }
