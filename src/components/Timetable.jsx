@@ -905,6 +905,7 @@ export default function Timetable({
     const assignedNames = normalizeAssignedEmails(entry)
       .map(email => allStaffOptions.find(option => option.email === email)?.label || email)
       .join(', ')
+    const noteText = String(entry.notes || '').trim()
 
     const isConflicting = conflictSummary.entryConflictIds.has(entry.id)
     const spaceColor = colorForSpace(entrySpaceName(entry))
@@ -925,6 +926,9 @@ export default function Timetable({
         <p className="text-[11px]">{entrySpaceName(entry)}</p>
         {viewMode === 'space' && assignedNames && (
           <p className="text-[11px]">{assignedNames}</p>
+        )}
+        {noteText && (
+          <p className="mt-1 text-[11px] italic text-stone-700">Note: {noteText}</p>
         )}
         {isConflicting && (
           <p className="mt-1 text-[11px] font-semibold">Double-booked staff overlap</p>
