@@ -5,6 +5,7 @@ const DEFAULT_SPACE_OPTIONS = ['Drama Space', 'Art Space', 'bardepot', 'Studio T
 const DAY_START_MINUTES = 9 * 60 + 45
 const DAY_END_MINUTES = 16 * 60 + 30
 const GRID_STEP_MINUTES = 15
+const PIXELS_PER_MINUTE = 2
 const USUAL_BLOCKS = [
   ['09:45', '10:00'],
   ['10:00', '10:30'],
@@ -812,12 +813,6 @@ export default function Timetable({
   }
 
   function printDaySchedule() {
-    const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760')
-    if (!popup) {
-      alert('Unable to open print window. Please allow pop-ups for this site.')
-      return
-    }
-
     const sorted = [...dayEntries].sort((a, b) => String(a.startTime || a.start_time || '').localeCompare(String(b.startTime || b.start_time || '')))
     const rows = sorted.map(entry => {
       const assigned = normalizeAssignedEmails(entry)
@@ -836,7 +831,7 @@ export default function Timetable({
       `
     }).join('')
 
-    popup.document.write(`<!doctype html>
+    const html = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -869,10 +864,42 @@ export default function Timetable({
     </tbody>
   </table>
 </body>
-</html>`)
-    popup.document.close()
-    popup.focus()
-    popup.print()
+</html>`
+
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760')
+    if (popup) {
+      popup.document.write(html)
+      popup.document.close()
+      popup.focus()
+      popup.print()
+      return
+    }
+
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentWindow?.document
+    if (!iframeDoc || !iframe.contentWindow) {
+      iframe.remove()
+      alert('Unable to print schedule right now. Please try again.')
+      return
+    }
+
+    iframeDoc.open()
+    iframeDoc.write(html)
+    iframeDoc.close()
+
+    iframe.onload = () => {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+      window.setTimeout(() => iframe.remove(), 1000)
+    }
   }
 
   function renderEntryCard(entry) {
@@ -1234,58 +1261,91 @@ export default function Timetable({
               </tr>
             </thead>
             <tbody>
-              {(() => {
-                const renderedEntries = new Set()
-                return timeRows.map((row, rowIdx) => (
-                  <tr key={row.startLabel}>
+              {timeRows.map(row => {
+                const rowDuration = row.endMinutes - row.startMinutes
+                const rowHeight = Math.max(48, rowDuration * PIXELS_PER_MINUTE)
+
+                return (
+                  <tr key={row.startLabel} style={{ height: `${rowHeight}px` }}>
                     <td className="sticky left-0 z-10 bg-white border-r border-b border-stone-200 px-3 py-2 align-top text-xs font-medium text-stone-500">
                       {row.startLabel} - {row.endLabel}
                     </td>
                     {columns.map(column => {
                       const key = viewMode === 'space' ? column : column.email
-                      const allEntriesInColumn = dayEntries.filter(entry => 
+                      const allEntriesInColumn = dayEntries.filter(entry =>
                         (viewMode === 'space' 
                           ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
                           : normalizeAssignedEmails(entry).includes(column.email)
                         ) && isActiveInRange(entry, row.startMinutes, row.endMinutes)
                       )
-                      const entriesToRender = allEntriesInColumn.filter(entry => {
-                        if (renderedEntries.has(entry.id)) return false
+                      const entriesStartingInRow = dayEntries.filter(entry => {
+                        const sameColumn = viewMode === 'space'
+                          ? normalizeText(entrySpaceName(entry)) === normalizeText(column)
+                          : normalizeAssignedEmails(entry).includes(column.email)
+                        if (!sameColumn) return false
                         const entryStart = timeToMinutes(entry.startTime || entry.start_time)
+                        if (entryStart === null) return false
                         return entryStart >= row.startMinutes && entryStart < row.endMinutes
                       })
-                      const entriesWithSpan = entriesToRender.map(entry => {
+                      const entriesWithPosition = entriesStartingInRow.map(entry => {
                         const entryStart = timeToMinutes(entry.startTime || entry.start_time)
                         const entryEnd = timeToMinutes(entry.endTime || entry.end_time)
-                        let rowSpan = 1
-                        for (let i = rowIdx + 1; i < timeRows.length; i++) {
-                          if (entryEnd > timeRows[i].startMinutes) rowSpan++
-                          else break
-                        }
-                        renderedEntries.add(entry.id)
-                        return { entry, rowSpan }
+                        const safeStart = entryStart === null ? row.startMinutes : entryStart
+                        const safeEnd = entryEnd === null ? row.endMinutes : entryEnd
+                        const top = Math.max(0, safeStart - row.startMinutes) * PIXELS_PER_MINUTE + 2
+                        const height = Math.max(24, (safeEnd - safeStart) * PIXELS_PER_MINUTE - 4)
+                        return { entry, top, height }
                       })
-                      if (entriesWithSpan.length === 0 && allEntriesInColumn.length === 0) {
+
+                      if (entriesWithPosition.length === 0 && allEntriesInColumn.length === 0) {
                         return (
-                          <td key={`${row.startLabel}-${key}`} onDoubleClick={() => { if (!canEdit) return; openCreateAtSlot(column, row.startLabel, row.endLabel) }} className="border-b border-stone-200 px-2 py-1 align-top h-14 cursor-pointer" title={canEdit ? 'Double-click to add/edit this slot' : ''}>
+                          <td
+                            key={`${row.startLabel}-${key}`}
+                            onDoubleClick={() => { if (!canEdit) return; openCreateAtSlot(column, row.startLabel, row.endLabel) }}
+                            className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer"
+                            style={{ height: `${rowHeight}px`, position: 'relative' }}
+                            title={canEdit ? 'Double-click to add/edit this slot' : ''}
+                          >
                             <div className="h-full min-h-8 rounded border border-dashed border-stone-200 hover:border-forest-300" />
                           </td>
                         )
                       }
-                      if (entriesWithSpan.length > 0) {
+
+                      if (entriesWithPosition.length > 0) {
                         return (
-                          <td key={`${row.startLabel}-${key}`} rowSpan={Math.max(...entriesWithSpan.map(e => e.rowSpan))} onDoubleClick={() => { if (!canEdit) return; entriesWithSpan.length > 0 ? openEdit(entriesWithSpan[0].entry) : openCreateAtSlot(column, row.startLabel, row.endLabel) }} className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer hover:bg-stone-50 transition-colors" title={canEdit ? 'Double-click to add/edit' : ''}>
-                            <div className="space-y-1">
-                              {entriesWithSpan.map(({ entry }) => renderEntryCard(entry))}
+                          <td
+                            key={`${row.startLabel}-${key}`}
+                            onDoubleClick={() => { if (!canEdit) return; openEdit(entriesWithPosition[0].entry) }}
+                            className="border-b border-stone-200 px-2 py-1 align-top cursor-pointer hover:bg-stone-50 transition-colors"
+                            style={{ height: `${rowHeight}px`, position: 'relative', overflow: 'visible' }}
+                            title={canEdit ? 'Double-click to add/edit' : ''}
+                          >
+                            <div className="relative h-full">
+                              {entriesWithPosition.map(({ entry, top, height }) => (
+                                <div key={entry.id} style={{ position: 'absolute', top: `${top}px`, left: 0, right: 0, minHeight: `${height}px`, zIndex: 10 }}>
+                                  {renderEntryCard(entry)}
+                                </div>
+                              ))}
                             </div>
                           </td>
                         )
                       }
+
+                      if (allEntriesInColumn.length > 0) {
+                        return (
+                          <td
+                            key={`${row.startLabel}-${key}`}
+                            className="border-b border-stone-200 px-2 py-1 align-top"
+                            style={{ height: `${rowHeight}px` }}
+                          />
+                        )
+                      }
+
                       return null
                     }).filter(Boolean)}
                   </tr>
-                ))
-              })()}
+                )
+              })}
             </tbody>
           </table>
         </div>
