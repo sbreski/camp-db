@@ -30,10 +30,13 @@ export default function Nav({ page, onNavigate, onLogout, visibleTabIds = [] }) 
       {/* Desktop sidebar */}
       <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-56 bg-forest-950 z-30">
         <div className="p-5 border-b border-forest-800">
-          <h1 className="font-display font-bold text-white text-base leading-tight">
-            {line1}<br />
-            <span className="text-amber-400">{line2}</span>
-          </h1>
+          <div className="flex items-center gap-3">
+            <img src="/ik-logo.png" alt="Impact Kidz" className="h-10 w-10 rounded-lg object-contain bg-forest-900 p-1" />
+            <h1 className="font-display font-bold text-white text-base leading-tight">
+              {line1}<br />
+              <span className="text-amber-400">{line2}</span>
+            </h1>
+          </div>
           <p className="text-forest-400 text-xs mt-1 font-body">Staff Portal</p>
         </div>
         <div className="flex-1 p-3 space-y-1 overflow-y-auto">

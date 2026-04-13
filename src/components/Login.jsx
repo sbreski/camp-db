@@ -140,7 +140,7 @@ export default function Login() {
         <div className="bg-white rounded-3xl p-8 shadow-2xl">
           <div className="flex justify-center mb-6">
             <img
-              src="/icon.svg"
+              src="/ik-logo.png"
               alt="Impact Kidz"
               className="w-20 h-20 rounded-2xl shadow-lg object-contain bg-forest-900 p-2"
             />
