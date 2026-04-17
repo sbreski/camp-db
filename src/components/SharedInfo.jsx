@@ -22,6 +22,17 @@ export default function SharedInfo({ currentUser, participants }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeCategory, setActiveCategory] = useState('all')
+
+  // Group items by participant
+  const grouped = useMemo(() => {
+    const map = new Map()
+    for (const item of items) {
+      if (!map.has(item.participant_id)) map.set(item.participant_id, [])
+      map.get(item.participant_id).push(item)
+    }
+    return map
+  }, [items])
 
   const participantMap = useMemo(() => {
     const map = new Map()
@@ -66,16 +77,31 @@ export default function SharedInfo({ currentUser, participants }) {
 
   return (
     <div className="fade-in space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950 flex items-center gap-2">
             <ClipboardList size={22} /> Shared Info
           </h2>
-          <p className="text-sm text-stone-500">Only admin-shared support and safety information for your role.</p>
+          <p className="text-sm text-stone-500">All admin-shared support and safety information for your role, grouped by participant.</p>
         </div>
         <button className="btn-secondary text-sm flex items-center gap-2" onClick={loadSharedItems} disabled={loading}>
           <RefreshCw size={14} /> Refresh
         </button>
+      </div>
+
+      {/* Filter buttons */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        <button
+          className={`btn-secondary text-xs px-3 py-1 rounded-full ${activeCategory === 'all' ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : ''}`}
+          onClick={() => setActiveCategory('all')}
+        >All</button>
+        {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+          <button
+            key={key}
+            className={`btn-secondary text-xs px-3 py-1 rounded-full ${activeCategory === key ? 'bg-emerald-100 border-emerald-300 text-emerald-900' : ''}`}
+            onClick={() => setActiveCategory(key)}
+          >{label}</button>
+        ))}
       </div>
 
       {error && (
@@ -89,31 +115,41 @@ export default function SharedInfo({ currentUser, participants }) {
         <div className="card text-center py-10">
           <p className="text-stone-500">Loading shared info...</p>
         </div>
-      ) : items.length === 0 ? (
+      ) : grouped.size === 0 ? (
         <div className="card text-center py-10">
           <p className="text-stone-500">No shared items yet.</p>
           <p className="text-xs text-stone-400 mt-1">Admins can share SEND, allergy, medical, and dietary notes from participant profiles.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {items.map(item => {
-            const participant = participantMap.get(item.participant_id)
-            const categoryKey = String(item.category || '').toLowerCase()
-            const categoryLabel = CATEGORY_LABELS[categoryKey] || 'Shared'
-            const badgeClass = CATEGORY_STYLES[categoryKey] || 'bg-stone-100 text-stone-700 border-stone-200'
-
+        <div className="space-y-4">
+          {[...grouped.entries()].map(([participantId, items]) => {
+            const participant = participantMap.get(participantId)
+            // Filter items by category if not 'all'
+            const filteredItems = activeCategory === 'all'
+              ? items
+              : items.filter(item => String(item.category || '').toLowerCase() === activeCategory)
+            if (filteredItems.length === 0) return null
             return (
-              <div key={item.id} className="card">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="font-display font-semibold text-forest-950">{participant?.name || 'Participant not found'}</p>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${badgeClass}`}>
-                    {categoryLabel}
-                  </span>
+              <div key={participantId} className="card">
+                <div className="font-display font-semibold text-forest-950 mb-2">
+                  {participant?.name || 'Participant not found'}
                 </div>
-                <p className="text-sm text-stone-700 whitespace-pre-wrap">{item.summary}</p>
-                <p className="text-[11px] text-stone-400 mt-2">
-                  Updated {new Date(item.updated_at || item.created_at).toLocaleString('en-GB')}
-                </p>
+                <div className="space-y-2">
+                  {filteredItems.map(item => {
+                    const categoryKey = String(item.category || '').toLowerCase()
+                    const categoryLabel = CATEGORY_LABELS[categoryKey] || 'Shared'
+                    const badgeClass = CATEGORY_STYLES[categoryKey] || 'bg-stone-100 text-stone-700 border-stone-200'
+                    return (
+                      <div key={item.id} className="">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${badgeClass}`}>{categoryLabel}</span>
+                          <span className="text-[11px] text-stone-400">Updated {new Date(item.updated_at || item.created_at).toLocaleString('en-GB')}</span>
+                        </div>
+                        <p className="text-sm text-stone-700 whitespace-pre-wrap">{item.summary}</p>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )
           })}
