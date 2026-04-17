@@ -1277,29 +1277,30 @@ export default function ParticipantDetail({
           <div className="card">
             <h3 className="font-display font-semibold text-forest-950 mb-4">Medical, Allergy & Dietary</h3>
             {hasMedical ? (
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  {participant.medicalType?.map(t => (
-                    <span key={t} className={
-                      t === 'Allergy' || t === 'Dietary' ? 'badge-allergy text-sm px-3 py-1' :
-                      t === 'Medical' ? 'badge-medical text-sm px-3 py-1' :
-                      'badge-dietary text-sm px-3 py-1'
-                    }>{t}</span>
-                  ))}
-                </div>
-                {participant.medicalDetails && (
-                  <div className="bg-stone-50 rounded-xl p-4 text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
-                    {participant.medicalDetails}
-                  </div>
-                )}
-                {hasDietaryAllergy && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {participant.dietaryType && (
-                      <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
-                        <p className="label mb-1">Dietary Type</p>
-                        <p>{participant.dietaryType}</p>
-                      </div>
-                    )}
+  <div className="space-y-4">
+    <div className="flex flex-wrap gap-2">
+      {participant.medicalType?.map(t => (
+        <span key={t} className={
+          t === 'Allergy' ? 'badge-allergy text-sm px-3 py-1' :
+          t === 'Dietary' ? 'badge-dietary text-sm px-3 py-1' :
+          t === 'Medical' ? 'badge-medical text-sm px-3 py-1' :
+          'text-sm px-3 py-1'
+        }>{t}</span>
+      ))}
+    </div>
+    {participant.medicalDetails && (
+      <div className="bg-stone-50 rounded-xl p-4 text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
+        {participant.medicalDetails}
+      </div>
+    )}
+    {hasDietaryAllergy && (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {participant.dietaryType && (
+          <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
+            <p className="label mb-1">Dietary Type</p>
+            <p>{participant.dietaryType}</p>
+          </div>
+        )}
                     {participant.mealAdjustments && (
                       <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
                         <p className="label mb-1">Dietary Details</p>

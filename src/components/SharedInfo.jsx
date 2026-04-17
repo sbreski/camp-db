@@ -6,7 +6,7 @@ const CATEGORY_STYLES = {
   send: 'bg-purple-100 text-purple-800 border-purple-200',
   allergy: 'bg-red-100 text-red-700 border-red-200',
   medical: 'bg-blue-100 text-blue-700 border-blue-200',
-  dietary: 'bg-orange-100 text-orange-800 border-orange-200',
+  dietary: 'bg-green-100 text-green-800 border-green-200',
   notes: 'bg-stone-100 text-stone-700 border-stone-200',
 }
 
