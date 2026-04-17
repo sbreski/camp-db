@@ -5,6 +5,7 @@ const EMPTY = {
   name: '', pronouns: '', age: '',
   parentName: '', parentEmail: '', parentPhone: '',
   approvedAdults: '',
+  canLeaveAlone: false,
   photoConsent: 'yes', otcConsent: false,
   otcAllowedItems: [], otcNotes: '',
   dietaryType: '', allergyDetails: '', mealAdjustments: '',
@@ -21,6 +22,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
     isActiveThisSeason: (initial.isActiveThisSeason ?? initial.is_active_this_season) !== false,
+    canLeaveAlone: Boolean(initial.canLeaveAlone),
   })
   const [otcAllowedItemsInput, setOtcAllowedItemsInput] = useState(() => {
     if (Array.isArray(initial.otcAllowedItems)) return initial.otcAllowedItems.join(', ')
@@ -131,6 +133,18 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
                 Include on Sign In / Out this season
               </label>
             </div>
+          </div>
+
+          <div className="col-span-2">
+            <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-1">
+              <input
+                type="checkbox"
+                checked={form.canLeaveAlone || false}
+                onChange={e => set('canLeaveAlone', e.target.checked)}
+                className="rounded"
+              />
+              Can leave by themselves if aged 11 or over
+            </label>
           </div>
         </section>
 

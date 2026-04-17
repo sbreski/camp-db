@@ -66,7 +66,13 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
   const [otherReason, setOtherReason] = useState('')
   const [validationError, setValidationError] = useState('')
 
+  const canLeaveAlone = participant.canLeaveAlone && Number(participant.age) >= 11
+
   function handleConfirm() {
+    if (canLeaveAlone && selected === 'LeaveAlone') {
+      onConfirm('Left by themselves')
+      return
+    }
     if (selected !== 'Other / not on approved list') {
       onConfirm(selected || 'Not recorded')
       return
@@ -103,6 +109,19 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
           <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
         </div>
         <div className="p-5 space-y-3">
+          {canLeaveAlone && (
+            <button
+              onClick={() => selectCollector('LeaveAlone')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                selected === 'LeaveAlone' ? 'border-emerald-600 bg-emerald-50' : 'border-stone-200 hover:border-stone-300'
+              }`}
+            >
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-display flex-shrink-0 ${
+                selected === 'LeaveAlone' ? 'bg-emerald-900 text-white' : 'bg-stone-100 text-stone-600'
+              }`}>✓</div>
+              <span className="text-sm font-medium text-emerald-800">Allowed to leave by themselves</span>
+            </button>
+          )}
           {adults.length > 0 ? (
             <>
               <p className="text-sm font-medium text-stone-700">Who is collecting?</p>
@@ -170,8 +189,8 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
         </div>
         <div className="p-5 pt-0 flex gap-2">
           <button onClick={handleConfirm}
-            disabled={adults.length > 0 && !selected}
-            className={`flex-1 btn-primary py-3 ${adults.length > 0 && !selected ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            disabled={adults.length > 0 && !selected && !(canLeaveAlone && selected === 'LeaveAlone')}
+            className={`flex-1 btn-primary py-3 ${adults.length > 0 && !selected && !(canLeaveAlone && selected === 'LeaveAlone') ? 'opacity-40 cursor-not-allowed' : ''}`}>
             Confirm Sign Out
           </button>
           <button onClick={onCancel} className="btn-secondary px-4">Cancel</button>
