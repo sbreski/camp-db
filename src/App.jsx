@@ -1159,7 +1159,7 @@ export default function App() {
       window.removeEventListener('scroll', handleActivity)
       window.removeEventListener('touchstart', handleActivity)
     }
-  }, [authed, showSessionWarning])
+  }, [authed, showSessionWarning, isAdminUser])
 
   useEffect(() => {
     if (!authed || !showSessionWarning) {
