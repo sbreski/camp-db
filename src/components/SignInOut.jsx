@@ -815,10 +815,20 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                         </span>
                       )}
                       {hasMedical && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">M</span>
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 cursor-help"
+                          title={String(p.medicalType || '').trim() || 'No medical details recorded'}
+                        >
+                          M
+                        </span>
                       )}
                       {hasSend && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span>
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200 cursor-help"
+                          title={String(p.sendNeeds || '').trim() || 'No SEND/support details recorded'}
+                        >
+                          S
+                        </span>
                       )}
                       {hasSafeguarding && <SafeguardingFlagIcon size={11} />}
                       {isIn && <CheckCircle size={13} className="text-amber-500" />}
