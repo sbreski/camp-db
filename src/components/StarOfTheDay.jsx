@@ -78,6 +78,13 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
   }, [campPeriod, campPeriods])
   const hasCampPeriod = campPeriodRanges.length > 0
 
+  // Define campStart and campEnd for use in JSX
+  let campStart = null, campEnd = null;
+  if (hasCampPeriod) {
+    campStart = campPeriodRanges.reduce((min, r) => !min || r.startKey < min ? r.startKey : min, null)
+    campEnd = campPeriodRanges.reduce((max, r) => !max || r.endKey > max ? r.endKey : max, null)
+  }
+
   const inSeasonParticipants = useMemo(() => (
     [...participants]
       .filter(isParticipantInSeason)
