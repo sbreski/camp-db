@@ -349,7 +349,7 @@ function CreateAccountForm({ onSubmit, loading }) {
   )
 }
 
-export default function Staff({ staffList, setStaffList, campPeriod, setCampPeriod, canManageCampPeriod = false }) {
+export default function Staff({ staffList, setStaffList, campPeriods, setCampPeriods, canManageCampPeriod = false }) {
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -366,18 +366,21 @@ export default function Staff({ staffList, setStaffList, campPeriod, setCampPeri
   const [staffActionLoading, setStaffActionLoading] = useState(false)
   const [staffMessage, setStaffMessage] = useState('')
   const [staffError, setStaffError] = useState('')
-  const [campPeriodDraft, setCampPeriodDraft] = useState({ startDate: '', endDate: '' })
+  const [campPeriodDrafts, setCampPeriodDrafts] = useState([])
+const [newPeriodDraft, setNewPeriodDraft] = useState({ label: '', startDate: '', endDate: '' })
   const [campPeriodSaving, setCampPeriodSaving] = useState(false)
   const [campPeriodMessage, setCampPeriodMessage] = useState('')
   const [campPeriodError, setCampPeriodError] = useState('')
   const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 
   useEffect(() => {
-    setCampPeriodDraft({
-      startDate: campPeriod?.startDate || campPeriod?.start_date || '',
-      endDate: campPeriod?.endDate || campPeriod?.end_date || '',
-    })
-  }, [campPeriod?.startDate, campPeriod?.start_date, campPeriod?.endDate, campPeriod?.end_date])
+  setCampPeriodDrafts(campPeriods?.map(p => ({
+    id: p.id,
+    label: p.label || '',
+    startDate: p.start_date || '',
+    endDate: p.end_date || '',
+  })) || [])
+}, [campPeriods])
 
   async function addStaff(data) {
     setStaffActionLoading(true)
@@ -841,20 +844,38 @@ export default function Staff({ staffList, setStaffList, campPeriod, setCampPeri
     }
   }
 
-  async function saveCampPeriod() {
-    if (typeof setCampPeriod !== 'function') return
-    setCampPeriodSaving(true)
-    setCampPeriodError('')
-    setCampPeriodMessage('')
-    try {
-      await setCampPeriod(campPeriodDraft)
-      setCampPeriodMessage('Camp period updated for all range views.')
-    } catch (error) {
-      setCampPeriodError(error.message || 'Unable to save camp period')
-    } finally {
-      setCampPeriodSaving(false)
-    }
+async function saveCampPeriod(id) {
+  const draft = campPeriodDrafts.find(d => d.id === id)
+  if (!draft) return
+  setCampPeriodSaving(true)
+  try {
+    await setCampPeriods(prev => prev.map(p => p.id === id ? { ...p, ...draft } : p))
+    setCampPeriodMessage('Period updated.')
+  } catch (error) {
+    setCampPeriodError(error.message)
+  } finally {
+    setCampPeriodSaving(false)
   }
+}
+
+async function addCampPeriod() {
+  if (!newPeriodDraft.label || !newPeriodDraft.startDate || !newPeriodDraft.endDate) return
+  setCampPeriodSaving(true)
+  try {
+    await setCampPeriods(prev => [...prev, { ...newPeriodDraft, id: crypto.randomUUID() }])
+    setNewPeriodDraft({ label: '', startDate: '', endDate: '' })
+    setCampPeriodMessage('Period added.')
+  } catch (error) {
+    setCampPeriodError(error.message)
+  } finally {
+    setCampPeriodSaving(false)
+  }
+}
+
+async function deleteCampPeriod(id) {
+  if (!window.confirm('Remove this period?')) return
+  await setCampPeriods(prev => prev.filter(p => p.id !== id))
+}
 
   const staffByEmail = useMemo(() => {
     const map = new Map()
