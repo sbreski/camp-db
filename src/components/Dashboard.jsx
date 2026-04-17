@@ -230,6 +230,52 @@ export default function Dashboard({
         ))}
       </div>
 
+
+      {canAccess('signin') && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <div>
+              <h3 className="font-display font-semibold text-forest-950">Follow Ups Due</h3>
+              <p className="text-xs text-stone-500">Items needing follow up today.</p>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary text-xs flex items-center gap-1.5"
+              onClick={() => onNavigate('signin')}
+            >
+              Open register →
+            </button>
+          </div>
+
+          {followUpsDue.length === 0 ? (
+            <p className="text-sm text-stone-500">No open follow ups due today.</p>
+          ) : (
+            <div className="space-y-2">
+              {followUpsDue.slice(0, 6).map(inc => (
+                <div key={inc.id} className="rounded-xl border border-stone-200 px-3 py-2">
+                  <p className="text-sm font-medium text-forest-900">{inc.participant ? inc.participant.name : 'Unknown participant'}</p>
+                  <p className="text-xs text-stone-500">{inc.type}</p>
+                  <p className={`text-xs mt-1 font-semibold ${inc.status === 'overdue' ? 'text-red-700' : 'text-amber-700'}`}>
+                    {inc.status === 'overdue' ? 'Overdue' : 'Due today'} · {new Date((inc.dueDate || today) + 'T12:00:00').toLocaleDateString('en-GB')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {canManageUserResets && noteFollowUps.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
+              <p className="text-xs font-semibold text-stone-600 uppercase tracking-wide">Sign In/Out Notes</p>
+              {noteFollowUps.slice(0, 6).map(item => (
+                <div key={item.id} className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2">
+                  <p className="text-sm font-medium text-indigo-900">{item.participant ? item.participant.name : 'Unknown participant'}</p>
+                  <p className="text-xs text-indigo-800 mt-0.5 whitespace-pre-wrap">{item.note}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="card">
         <div className="flex items-center justify-between mb-3 gap-2">
           <div>
@@ -281,52 +327,6 @@ export default function Dashboard({
           </div>
         )}
       </div>
-
-      {canAccess('signin') && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-3 gap-2">
-            <div>
-              <h3 className="font-display font-semibold text-forest-950">Follow Ups Due</h3>
-              <p className="text-xs text-stone-500">Items needing follow up today.</p>
-            </div>
-            <button
-              type="button"
-              className="btn-secondary text-xs flex items-center gap-1.5"
-              onClick={() => onNavigate('signin')}
-            >
-              Open register →
-            </button>
-          </div>
-
-          {followUpsDue.length === 0 ? (
-            <p className="text-sm text-stone-500">No open follow ups due today.</p>
-          ) : (
-            <div className="space-y-2">
-              {followUpsDue.slice(0, 6).map(inc => (
-                <div key={inc.id} className="rounded-xl border border-stone-200 px-3 py-2">
-                  <p className="text-sm font-medium text-forest-900">{inc.participant ? inc.participant.name : 'Unknown participant'}</p>
-                  <p className="text-xs text-stone-500">{inc.type}</p>
-                  <p className={`text-xs mt-1 font-semibold ${inc.status === 'overdue' ? 'text-red-700' : 'text-amber-700'}`}>
-                    {inc.status === 'overdue' ? 'Overdue' : 'Due today'} · {new Date((inc.dueDate || today) + 'T12:00:00').toLocaleDateString('en-GB')}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {canManageUserResets && noteFollowUps.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
-              <p className="text-xs font-semibold text-stone-600 uppercase tracking-wide">Sign In/Out Notes</p>
-              {noteFollowUps.slice(0, 6).map(item => (
-                <div key={item.id} className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2">
-                  <p className="text-sm font-medium text-indigo-900">{item.participant ? item.participant.name : 'Unknown participant'}</p>
-                  <p className="text-xs text-indigo-800 mt-0.5 whitespace-pre-wrap">{item.note}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Today's attendance */}
       {(canAccess('signin') || canAccess('incidents')) && (
