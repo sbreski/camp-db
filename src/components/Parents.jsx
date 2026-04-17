@@ -233,7 +233,38 @@ export default function Parents({ participants, onUpdateParticipant }) {
                     {editingId === p.id && (
                       <tr className="bg-stone-50">
                         <td colSpan="7" className="px-4 py-3">
-                          <div className="rounded-2xl border border-stone-200 bg-white p-4">
+                          <div className="rounded-2xl border border-stone-200 bg-white p-4 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                              <div>
+                                <label className="label">Parent/Guardian Name</label>
+                                <input
+                                  className="input"
+                                  value={p.parentName || ''}
+                                  onChange={e => onUpdateParticipant(p.id, { parentName: e.target.value })}
+                                  placeholder="Parent name"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Parent/Guardian Email</label>
+                                <input
+                                  className="input"
+                                  type="email"
+                                  value={p.parentEmail || ''}
+                                  onChange={e => onUpdateParticipant(p.id, { parentEmail: e.target.value })}
+                                  placeholder="parent@email.com"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Parent/Guardian Phone</label>
+                                <input
+                                  className="input"
+                                  type="tel"
+                                  value={p.parentPhone || ''}
+                                  onChange={e => onUpdateParticipant(p.id, { parentPhone: e.target.value })}
+                                  placeholder="+44 7700 000000"
+                                />
+                              </div>
+                            </div>
                             <div className="flex gap-2 flex-col sm:flex-row items-stretch">
                               <input
                                 className="input flex-1"
