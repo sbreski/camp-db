@@ -242,14 +242,15 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
                     key={type}
                     type="button"
                     onClick={() => toggleMedType(type)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                      form.medicalType.includes(type)
-                        ? type === 'Allergy' ? 'bg-red-600 text-white border-red-600'
-                          : type === 'Medical' ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
-                    }`}
-                  >
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+  form.medicalType.includes(type)
+    ? type === 'Allergy' ? 'bg-red-600 text-white border-red-600'
+      : type === 'Medical' ? 'bg-blue-600 text-white border-blue-600'
+      : type === 'Dietary' ? 'bg-emerald-600 text-white border-emerald-600'
+      : 'bg-white text-stone-600 border-stone-200'
+    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+}`}
+>
                     {type}
                   </button>
                 ))}

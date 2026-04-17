@@ -6,14 +6,12 @@ const FIELD_MAP = {
   name: ['name', 'full name', 'fullname', 'participant', 'participant name', 'child name', 'child'],
   pronouns: ['pronouns', 'pronoun'],
   age: ['age'],
-  role: ['role', 'part', 'character', 'cast'],
   parentName: ['parent', 'guardian', 'parent name', 'guardian name', 'parent/guardian'],
   parentEmail: ['email', 'parent email', 'guardian email', 'e-mail'],
   parentPhone: ['phone', 'mobile', 'telephone', 'contact number', 'parent phone', 'phone number'],
   approvedAdults: ['approved adults', 'approved', 'authorised adults', 'authorized adults', 'collection'],
   medicalDetails: ['medical', 'medical details', 'medical info', 'health', 'allergies', 'dietary'],
   sendNeeds: ['send', 'send needs', 'support', 'support needs', 'additional needs', 'sen'],
-  dressingRoom: ['dressing room', 'room', 'dressing'],
   notes: ['notes', 'additional notes', 'other'],
 }
 
@@ -62,10 +60,10 @@ export default function ImportParticipants({ onImport, onClose }) {
 
   const OUR_FIELDS = Object.keys(FIELD_MAP)
   const FIELD_LABELS = {
-    name: 'Full Name *', pronouns: 'Pronouns', age: 'Age', role: 'Role / Part',
+    name: 'Full Name *', pronouns: 'Pronouns', age: 'Age',
     parentName: 'Parent Name', parentEmail: 'Parent Email', parentPhone: 'Parent Phone',
     approvedAdults: 'Approved Adults', medicalDetails: 'Medical Details',
-    sendNeeds: 'SEND / Support Needs', dressingRoom: 'Dressing Room', notes: 'Notes',
+    sendNeeds: 'SEND / Support Needs', notes: 'Notes',
   }
 
   function handleFile(e) {
@@ -121,7 +119,7 @@ export default function ImportParticipants({ onImport, onClose }) {
   }
 
   function downloadTemplate() {
-    const headers = 'Name,Pronouns,Age,Role,Parent Name,Parent Email,Parent Phone,Approved Adults,Medical Details,SEND Needs,Dressing Room,Notes'
+    const headers = 'Name,Pronouns,Age,Parent Name,Parent Email,Parent Phone,Approved Adults,Medical Details,SEND Needs,Notes'
     const example = 'Jane Smith,she/her,10,Dorothy,Sarah Smith,sarah@email.com,07700000000,"Grandma Smith (Grandmother)",Allergy to nuts - carries EpiPen,,Room 1,'
     const blob = new Blob([headers + '\n' + example], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -213,7 +211,7 @@ export default function ImportParticipants({ onImport, onClose }) {
                 <table className="w-full text-xs">
                   <thead className="bg-stone-50 sticky top-0">
                     <tr>
-                      {['Name', 'Age', 'Role', 'Parent', 'Medical'].map(h => (
+                      {['Name', 'Age', 'Parent', 'Medical'].map(h => (
                         <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
@@ -223,7 +221,6 @@ export default function ImportParticipants({ onImport, onClose }) {
                       <tr key={i} className="hover:bg-stone-50">
                         <td className="px-3 py-2 font-medium text-forest-950">{p.name}</td>
                         <td className="px-3 py-2 text-stone-600">{p.age || '—'}</td>
-                        <td className="px-3 py-2 text-stone-600">{p.role || '—'}</td>
                         <td className="px-3 py-2 text-stone-600">{p.parentName || '—'}</td>
                         <td className="px-3 py-2">
                           {p.medicalType?.length > 0
