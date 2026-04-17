@@ -361,8 +361,8 @@ export default function App() {
   const timetableEntries = rawTimetableEntries.map(toCamel)
   const timetableSpaces = rawTimetableSpaces.map(toCamel)
   const starAwards = rawStarAwards.map(toCamel)
-  const campPeriodRows = rawCampPeriodRows.map(toCamel)
-  const campPeriod = campPeriodRows[0] || { id: 'global', startDate: '', endDate: '' }
+  const campPeriods = rawCampPeriodRows.map(toCamel)
+  const campPeriod = campPeriods[0] || { id: 'global', startDate: '', endDate: '' }
   const staffList = rawStaff.map(toCamel)
 
   const loading = (needsParticipants && loadingP) || (needsAttendance && loadingA) || (needsIncidents && loadingI) || (needsBehaviourLogs && loadingBL) || (needsTimetable && (loadingT || loadingTS)) || (needsStarOfDay && loadingStar) || loadingCampPeriod || (needsStaff && loadingS)
@@ -770,39 +770,45 @@ export default function App() {
     }
   }
 
-  async function setCampPeriod(updater) {
-    const current = {
-      id: campPeriod.id || 'global',
-      startDate: campPeriod.startDate || campPeriod.start_date || '',
-      endDate: campPeriod.endDate || campPeriod.end_date || '',
-    }
+  async function setCampPeriods(updater) {
+    const current = campPeriods
     const next = typeof updater === 'function' ? updater(current) : updater
-    const startDateRaw = String(next?.startDate || '').trim()
-    const endDateRaw = String(next?.endDate || '').trim()
+    const rows = Array.isArray(next) ? next : []
+    const normalized = rows.map((row) => ({
+      id: row.id || crypto.randomUUID(),
+      label: String(row.label || '').trim(),
+      startDate: String(row.startDate || row.start_date || '').trim(),
+      endDate: String(row.endDate || row.end_date || '').trim(),
+      updatedAt: new Date().toISOString(),
+    }))
 
-    if (!startDateRaw || !endDateRaw) {
-      throw new Error('Choose both camp period start and end dates')
+    if (normalized.length === 0) {
+      throw new Error('Choose at least one camp period with start and end dates')
     }
 
-    const startDate = startDateRaw <= endDateRaw ? startDateRaw : endDateRaw
-    const endDate = startDateRaw <= endDateRaw ? endDateRaw : startDateRaw
-    const row = {
-      id: current.id || 'global',
-      startDate,
-      endDate,
-      updatedAt: new Date().toISOString(),
+    const invalid = normalized.find(row => !row.startDate || !row.endDate)
+    if (invalid) {
+      throw new Error('Each camp period must include both start and end dates')
     }
 
     const previousRows = rawCampPeriodRows
-    setRawCampPeriodRowsState([toSnake(row)])
-
+    setRawCampPeriodRowsState(normalized.map(toSnake))
     try {
-      const { error } = await supabase.from('camp_period_settings').upsert(toSnake(row), { onConflict: 'id' })
+      const { error } = await supabase.from('camp_period_settings').upsert(normalized.map(toSnake), { onConflict: 'id' })
       if (error) throw error
+
+      const previousIds = current.map(r => r.id).filter(Boolean)
+      const nextIds = normalized.map(r => r.id).filter(Boolean)
+      const removedIds = previousIds.filter(id => !nextIds.includes(id))
+      if (removedIds.length > 0) {
+        const { error: deleteError } = await supabase.from('camp_period_settings').delete().in('id', removedIds)
+        if (deleteError) throw deleteError
+      }
+
       reloadCampPeriod()
     } catch (error) {
       setRawCampPeriodRowsState(previousRows)
-      throw new Error(error.message || 'Unable to save camp period')
+      throw new Error(error.message || 'Unable to save camp periods')
     }
   }
 
@@ -1420,8 +1426,8 @@ export default function App() {
       )
       case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
-      case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} />
-      case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} />
+      case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} campPeriods={campPeriods} />
+      case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'participants': return <Participants participants={participants} setParticipants={setParticipants} onView={(id) => navigate('participant', id)} />
       case 'parents': return <Parents participants={participants} onUpdateParticipant={(id, approvedAdults) => {
         setParticipants(prev => prev.map(p => p.id === id ? { ...p, approvedAdults } : p))
@@ -1467,7 +1473,7 @@ export default function App() {
         />
       )
       case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} setParticipants={setParticipants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onNavigate={navigate} onView={(id) => navigate('participant', id)} />
-      case 'staff': return <Staff staffList={staffList} setStaffList={setStaffList} campPeriod={campPeriod} setCampPeriod={setCampPeriod} canManageCampPeriod={isOwnerUser || isAdminUser} />
+      case 'staff': return <Staff staffList={staffList} setStaffList={setStaffList} campPeriods={campPeriods} setCampPeriods={setCampPeriods} canManageCampPeriod={isOwnerUser || isAdminUser} />
       default: return null
     }
   }

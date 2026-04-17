@@ -212,13 +212,30 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
 }
 
 // ─── Weekly Overview ──────────────────────────────────────────────────────────
-function WeeklyOverview({ participants, attendance, startEditTime, markPresent, markAbsent, campPeriod }) {
+function WeeklyOverview({ participants, attendance, startEditTime, markPresent, markAbsent, campPeriod, campPeriods }) {
   const [weekOf, setWeekOf] = useState(weekStart(todayKey()))
   const [rangeKey, setRangeKey] = useState('week')
 
-  const campStart = String(campPeriod?.startDate || campPeriod?.start_date || '').trim()
-  const campEnd = String(campPeriod?.endDate || campPeriod?.end_date || '').trim()
-  const hasCampPeriod = Boolean(campStart && campEnd)
+  const campPeriodRanges = useMemo(() => {
+    const rows = Array.isArray(campPeriods) ? campPeriods : []
+    const mapped = rows.map((row) => ({
+      id: row.id,
+      label: String(row.label || '').trim(),
+      startKey: String(row.startDate || row.start_date || '').trim(),
+      endKey: String(row.endDate || row.end_date || '').trim(),
+    })).filter(r => r.startKey && r.endKey)
+    if (mapped.length > 0) return mapped
+    if (campPeriod?.startDate || campPeriod?.start_date || campPeriod?.endDate || campPeriod?.end_date) {
+      return [{
+        id: campPeriod.id,
+        label: '',
+        startKey: String(campPeriod?.startDate || campPeriod?.start_date || '').trim(),
+        endKey: String(campPeriod?.endDate || campPeriod?.end_date || '').trim(),
+      }]
+    }
+    return []
+  }, [campPeriod, campPeriods])
+  const hasCampPeriod = campPeriodRanges.length > 0
   const today = todayKey()
 
   const days = (() => {
@@ -242,9 +259,7 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
       return listDateKeys(earliest || weekStart(today), today)
     }
     if (rangeKey === 'custom' && hasCampPeriod) {
-      const start = campStart <= campEnd ? campStart : campEnd
-      const end = campStart <= campEnd ? campEnd : campStart
-      return listDateKeys(start, end)
+      return buildDatesFromRanges(campPeriodRanges)
     }
     return []
   })()
@@ -256,7 +271,7 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
 
   const visibleLabel = (() => {
     if (!days.length) return 'No dates'
-    if (rangeKey === 'custom' && hasCampPeriod) return 'Camp Period'
+    if (rangeKey === 'custom' && hasCampPeriod) return `Camp Period: ${campPeriodRanges.map(range => range.label || `${fmtDate(range.startKey)} - ${fmtDate(range.endKey)}`).join(', ')}`
     if (rangeKey === 'week') return `Week of ${fmtDate(weekOf)}`
     return `${fmtDate(days[0])} - ${fmtDate(days[days.length - 1])}`
   })()
@@ -591,7 +606,7 @@ function ParticipantOverview({ participants, attendance, startEditTime, openColl
 // ─── Main component ───────────────────────────────────────────────────────────
 const TABS = ['Daily', 'Weekly', 'Participant']
 
-export default function AttendanceOverview({ participants, attendance, setAttendance, campPeriod }) {
+export default function AttendanceOverview({ participants, attendance, setAttendance, campPeriod, campPeriods }) {
   const [tab, setTab] = useState('Daily')
   const [editingTime, setEditingTime] = useState(null) // { recordId, type: 'signIn' | 'signOut', currentTime, date }
   const [timeInput, setTimeInput] = useState('')
@@ -776,7 +791,7 @@ export default function AttendanceOverview({ participants, attendance, setAttend
         ) : (
           <>
             {tab === 'Daily' && <DailyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
-            {tab === 'Weekly' && <WeeklyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} campPeriod={campPeriod} />}
+            {tab === 'Weekly' && <WeeklyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} campPeriod={campPeriod} campPeriods={campPeriods} />}
             {tab === 'Participant' && <ParticipantOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
           </>
         )}

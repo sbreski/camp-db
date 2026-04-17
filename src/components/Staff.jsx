@@ -374,12 +374,12 @@ const [newPeriodDraft, setNewPeriodDraft] = useState({ label: '', startDate: '',
   const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 
   useEffect(() => {
-  setCampPeriodDrafts(campPeriods?.map(p => ({
-    id: p.id,
-    label: p.label || '',
-    startDate: p.start_date || '',
-    endDate: p.end_date || '',
-  })) || [])
+    setCampPeriodDrafts(campPeriods?.map(p => ({
+      id: p.id,
+      label: p.label || '',
+      startDate: p.startDate || p.start_date || '',
+      endDate: p.endDate || p.end_date || '',
+    })) || [])
 }, [campPeriods])
 
   async function addStaff(data) {
@@ -966,39 +966,115 @@ async function deleteCampPeriod(id) {
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
           <div>
             <h3 className="font-display font-bold text-forest-950 text-lg">Camp Period</h3>
-            <p className="text-sm text-stone-600">Used as the shared custom date range across tabs.</p>
+            <p className="text-sm text-stone-600">Used as the shared custom date ranges across tabs.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-            <div>
-              <label className="label">Start Date</label>
-              <input
-                type="date"
-                className="input"
-                value={campPeriodDraft.startDate}
-                onChange={e => setCampPeriodDraft(prev => ({ ...prev, startDate: e.target.value }))}
-                disabled={!canManageCampPeriod}
-              />
+          {campPeriodDrafts.length === 0 ? (
+            <p className="text-sm text-stone-500">No camp period ranges defined yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {campPeriodDrafts.map((draft, index) => (
+                <div key={draft.id} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                  <div>
+                    <label className="label">Label</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={draft.label || ''}
+                      onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, label: e.target.value } : item))}
+                      placeholder={`Range ${index + 1}`}
+                      disabled={!canManageCampPeriod}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Start Date</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={draft.startDate}
+                      onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, startDate: e.target.value } : item))}
+                      disabled={!canManageCampPeriod}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">End Date</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={draft.endDate}
+                      onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, endDate: e.target.value } : item))}
+                      disabled={!canManageCampPeriod}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn-secondary text-sm"
+                      onClick={() => saveCampPeriod(draft.id)}
+                      disabled={!canManageCampPeriod || campPeriodSaving}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary text-sm text-rose-700 border-rose-200 hover:bg-rose-50"
+                      onClick={() => deleteCampPeriod(draft.id)}
+                      disabled={!canManageCampPeriod || campPeriodSaving}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              <label className="label">End Date</label>
-              <input
-                type="date"
-                className="input"
-                value={campPeriodDraft.endDate}
-                onChange={e => setCampPeriodDraft(prev => ({ ...prev, endDate: e.target.value }))}
-                disabled={!canManageCampPeriod}
-              />
+          )}
+
+          {canManageCampPeriod && (
+            <div className="rounded-xl border border-stone-200 bg-white p-4">
+              <p className="text-sm font-semibold mb-3">Add a new camp period</p>
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                <div>
+                  <label className="label">Label</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={newPeriodDraft.label}
+                    onChange={e => setNewPeriodDraft(prev => ({ ...prev, label: e.target.value }))}
+                    placeholder="e.g. Week 1"
+                  />
+                </div>
+                <div>
+                  <label className="label">Start Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={newPeriodDraft.startDate}
+                    onChange={e => setNewPeriodDraft(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">End Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={newPeriodDraft.endDate}
+                    onChange={e => setNewPeriodDraft(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary text-sm"
+                  onClick={addCampPeriod}
+                  disabled={campPeriodSaving || !newPeriodDraft.startDate || !newPeriodDraft.endDate}
+                >
+                  {campPeriodSaving ? 'Saving...' : 'Add Range'}
+                </button>
+              </div>
             </div>
-            {canManageCampPeriod && (
-              <button className="btn-primary text-sm" onClick={saveCampPeriod} disabled={campPeriodSaving}>
-                {campPeriodSaving ? 'Saving...' : 'Save Camp Period'}
-              </button>
-            )}
-          </div>
+          )}
 
           {!canManageCampPeriod && (
-            <p className="text-xs text-stone-500">Only owner/admin can change dates. Everyone can see and use this range.</p>
+            <p className="text-xs text-stone-500">Only owner/admin can change dates. Everyone can see and use the selected ranges.</p>
           )}
           {campPeriodError && <p className="text-xs text-red-700">{campPeriodError}</p>}
           {campPeriodMessage && <p className="text-xs text-emerald-700">{campPeriodMessage}</p>}

@@ -47,7 +47,7 @@ const RANGE_OPTIONS = [
   { id: 'custom', label: 'Camp Period' },
 ]
 
-export default function StarOfTheDay({ participants, starAwards, setStarAwards, campPeriod }) {
+export default function StarOfTheDay({ participants, starAwards, setStarAwards, campPeriod, campPeriods }) {
   const [search, setSearch] = useState('')
   const [rangeKey, setRangeKey] = useState('week')
   const [customRanges, setCustomRanges] = useState(() => defaultCustomRanges(todayKey()))
@@ -57,9 +57,26 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const today = todayKey()
-  const campStart = String(campPeriod?.startDate || campPeriod?.start_date || '').trim()
-  const campEnd = String(campPeriod?.endDate || campPeriod?.end_date || '').trim()
-  const hasCampPeriod = Boolean(campStart && campEnd)
+  const campPeriodRanges = useMemo(() => {
+    const rows = Array.isArray(campPeriods) ? campPeriods : []
+    const mapped = rows.map((row) => ({
+      id: row.id,
+      label: String(row.label || '').trim(),
+      startKey: String(row.startDate || row.start_date || '').trim(),
+      endKey: String(row.endDate || row.end_date || '').trim(),
+    })).filter(r => r.startKey && r.endKey)
+    if (mapped.length > 0) return mapped
+    if (campPeriod?.startDate || campPeriod?.start_date || campPeriod?.endDate || campPeriod?.end_date) {
+      return [{
+        id: campPeriod.id,
+        label: '',
+        startKey: String(campPeriod?.startDate || campPeriod?.start_date || '').trim(),
+        endKey: String(campPeriod?.endDate || campPeriod?.end_date || '').trim(),
+      }]
+    }
+    return []
+  }, [campPeriod, campPeriods])
+  const hasCampPeriod = campPeriodRanges.length > 0
 
   const inSeasonParticipants = useMemo(() => (
     [...participants]
@@ -76,12 +93,12 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
   const dateKeys = useMemo(() => {
     if (rangeKey === 'custom') {
       if (hasCampPeriod) {
-        return buildDatesFromRanges([{ id: 'camp-period', startKey: campStart, endKey: campEnd }])
+        return buildDatesFromRanges(campPeriodRanges)
       }
       return buildDatesFromRanges(customRanges)
     }
     return buildStarRangeDates(rangeKey, today, starAwards)
-  }, [rangeKey, today, starAwards, customRanges, hasCampPeriod, campStart, campEnd])
+  }, [rangeKey, today, starAwards, customRanges, hasCampPeriod, campPeriodRanges])
   const dateSet = useMemo(() => new Set(dateKeys), [dateKeys])
 
   const awardsInRange = useMemo(() => (
@@ -111,7 +128,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
   const visiblePeriodLabel = useMemo(() => {
     if (rangeKey !== 'custom') return formatRangeLabel(dateKeys)
     if (hasCampPeriod) {
-      return `Camp Period: ${formatRangeLabel(buildDatesFromRanges([{ id: 'camp-period', startKey: campStart, endKey: campEnd }]))}`
+      return `Camp Period: ${campPeriodRanges.map(range => range.label || `${formatShortDate(range.startKey)} - ${formatShortDate(range.endKey)}`).join(', ')}`
     }
     if (customRanges.length === 0) return 'No dates'
     return customRanges
@@ -119,7 +136,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
         ? formatShortDate(range.startKey)
         : `${formatShortDate(range.startKey)} - ${formatShortDate(range.endKey)}`)
       .join(', ')
-  }, [rangeKey, dateKeys, customRanges, hasCampPeriod, campStart, campEnd])
+  }, [rangeKey, dateKeys, customRanges, hasCampPeriod, campPeriodRanges])
 
   function selectRange(optionId) {
     setRangeKey(optionId)
