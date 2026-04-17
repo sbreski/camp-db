@@ -66,10 +66,10 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
   const [otherReason, setOtherReason] = useState('')
   const [validationError, setValidationError] = useState('')
 
-  const canLeaveAlone = participant.canLeaveAlone && Number(participant.age) >= 11
+  const can_leave_alone = (participant.canLeaveAlone ?? participant.can_leave_alone) && Number(participant.age) >= 11
 
   function handleConfirm() {
-    if (canLeaveAlone && selected === 'LeaveAlone') {
+    if (can_leave_alone && selected === 'LeaveAlone') {
       onConfirm('Left by themselves')
       return
     }
@@ -109,7 +109,7 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
           <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
         </div>
         <div className="p-5 space-y-3">
-          {canLeaveAlone && (
+          {can_leave_alone && (
             <button
               onClick={() => selectCollector('LeaveAlone')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
@@ -193,8 +193,8 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
         </div>
         <div className="p-5 pt-0 flex gap-2">
           <button onClick={handleConfirm}
-            disabled={adults.length > 0 && !selected && !(canLeaveAlone && selected === 'LeaveAlone')}
-            className={`flex-1 btn-primary py-3 ${adults.length > 0 && !selected && !(canLeaveAlone && selected === 'LeaveAlone') ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            disabled={adults.length > 0 && !selected && !(can_leave_alone && selected === 'LeaveAlone')}
+            className={`flex-1 btn-primary py-3 ${adults.length > 0 && !selected && !(can_leave_alone && selected === 'LeaveAlone') ? 'opacity-40 cursor-not-allowed' : ''}`}>
             Confirm Sign Out
           </button>
           <button onClick={onCancel} className="btn-secondary px-4">Cancel</button>
