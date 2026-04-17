@@ -963,7 +963,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
       {/* Key */}
       <div className="flex gap-3 flex-wrap text-xs text-stone-500">
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-red-100 text-red-700 border border-red-200">A</span> Allergy</span>
-        <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-orange-100 text-orange-800 border border-orange-200">D</span> Dietary</span>
+        <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-orange-100 text-orange-800 border border-green-200">D</span> Dietary</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-blue-100 text-blue-700 border border-blue-200">M</span> Medical</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span> SEND / Support</span>
         <span className="flex items-center gap-1"><SafeguardingFlagIcon size={11} /> Safeguarding flag</span>
