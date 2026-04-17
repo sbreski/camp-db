@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X, Printer } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 
