@@ -465,6 +465,10 @@ export default function Dashboard({
               <Stethoscope size={15} /> Medical View
             </button>
           )}
+          {/* Timetable is always visible */}
+          <button onClick={() => onNavigate('timetable')} className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto">
+            <Clock size={15} /> Timetable
+          </button>
         </div>
       </div>
 
