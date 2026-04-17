@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X, Printer } from 'lucide-react'
+import { buildDatesFromRanges } from '../utils/starOfDay'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 
 function isIncludedThisSeason(participant) {
