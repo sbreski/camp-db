@@ -22,7 +22,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
     isActiveThisSeason: (initial.isActiveThisSeason ?? initial.is_active_this_season) !== false,
-    canLeaveAlone: Boolean(initial.can_leave_alone),
+    can_leave_alone: Boolean(initial.can_leave_alone),
   })
   const [otcAllowedItemsInput, setOtcAllowedItemsInput] = useState(() => {
     if (Array.isArray(initial.otcAllowedItems)) return initial.otcAllowedItems.join(', ')
@@ -143,7 +143,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
                 onChange={e => set('can_leave_alone', e.target.checked)}
                 className="rounded"
               />
-              Can leave by themselves if aged 11 or over (parental permission obtained)
+              Can leave by themselves if aged 11 or over
             </label>
           </div>
         </section>
