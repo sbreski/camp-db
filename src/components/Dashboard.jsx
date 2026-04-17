@@ -387,8 +387,11 @@ export default function Dashboard({
                     }`} />
                     <div>
                       {p ? <ParticipantNameText participant={p} className="text-sm font-medium text-forest-950" /> : <p className="text-sm font-medium text-forest-950">Unknown</p>}
-                      <p className="text-xs text-stone-500 line-clamp-1">{inc.description}</p>
-                      <p className="text-xs text-stone-400 mt-0.5">{new Date(inc.createdAt).toLocaleDateString('en-GB')}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">{inc.type || 'Other'}</span>
+                        <span className="text-xs text-stone-400">{new Date(inc.createdAt).toLocaleDateString('en-GB')}</span>
+                      </div>
+                      <p className="text-xs text-stone-500 line-clamp-1 mt-0.5">{inc.description}</p>
                     </div>
                   </div>
                 )
