@@ -824,7 +824,7 @@ export default function App() {
   }
 
   function startInactivityTimer() {
-    if (!authed) return
+    if (!authed || !isAdminUser) return
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current)
     inactivityTimeoutRef.current = setTimeout(() => {
       setWarningCountdown(SESSION_WARNING_SECONDS)
