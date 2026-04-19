@@ -1,8 +1,39 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { X, Plus } from 'lucide-react'
 import ParticipantNameText from './ParticipantNameText'
+import { isIncludedThisSeason } from './AttendanceOverview'
 
 export default function DressingRooms({ participants }) {
+    // Memoized list of included participants
+    const includedParticipants = useMemo(() => participants.filter(isIncludedThisSeason), [participants])
+
+    // Helper: get participant's age (if available)
+    function getAge(p) {
+      return p.age || (p.dob ? Math.floor((Date.now() - new Date(p.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null)
+    }
+
+    // Helper: find which room a participant is in
+    function getParticipantRoomId(participantId) {
+      const room = rooms.find(r => r.participants.some(p => p.id === participantId))
+      return room ? room.id : ''
+    }
+
+    // Assign participant to a room (from list)
+    function assignParticipantToRoom(participant, roomId) {
+      // Remove from all rooms first
+      setRooms(prev => prev.map(r => ({
+        ...r,
+        participants: r.participants.filter(p => p.id !== participant.id)
+      })))
+      // Then add to selected room
+      if (roomId) {
+        setRooms(prev => prev.map(r =>
+          r.id === roomId
+            ? { ...r, participants: [...r.participants, participant] }
+            : r
+        ))
+      }
+    }
   const [rooms, setRooms] = useState(() => {
     const initialRooms = []
     for (let i = 1; i <= 5; i++) {
@@ -14,14 +45,16 @@ export default function DressingRooms({ participants }) {
   const [searchParticipant, setSearchParticipant] = useState('')
 
   function addParticipantToRoom(roomId, participant) {
-    setRooms(prev => prev.map(r => {
-      if (r.id === roomId) {
-        if (!r.participants.find(p => p.id === participant.id)) {
-          return { ...r, participants: [...r.participants, participant] }
-        }
-      }
-      return r
-    }))
+    // Remove from all rooms first, then add to selected room
+    setRooms(prev => prev.map(r => ({
+      ...r,
+      participants: r.participants.filter(p => p.id !== participant.id)
+    })))
+    setRooms(prev => prev.map(r =>
+      r.id === roomId
+        ? { ...r, participants: [...r.participants, participant] }
+        : r
+    ))
     setSearchParticipant('')
   }
 
@@ -75,6 +108,42 @@ export default function DressingRooms({ participants }) {
             </div>
           </button>
         ))}
+      </div>
+
+      {/* Included Participants List with Room Selector */}
+      <div className="mt-8">
+        <h3 className="font-display font-semibold text-forest-950 text-lg mb-2">Assign Participants to Rooms</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border border-stone-200 rounded-lg">
+            <thead>
+              <tr className="bg-stone-50">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Name</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Age</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Room</th>
+              </tr>
+            </thead>
+            <tbody>
+              {includedParticipants.map(p => (
+                <tr key={p.id} className="border-t border-stone-100">
+                  <td className="px-3 py-2"><ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-medium text-sm text-stone-900" /></td>
+                  <td className="px-3 py-2">{getAge(p) !== null ? getAge(p) : <span className="text-stone-400">—</span>}</td>
+                  <td className="px-3 py-2">
+                    <select
+                      className="input"
+                      value={getParticipantRoomId(p.id)}
+                      onChange={e => assignParticipantToRoom(p, e.target.value)}
+                    >
+                      <option value="">No room</option>
+                      {rooms.map(room => (
+                        <option key={room.id} value={room.id}>{room.name}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {currentRoom && (
