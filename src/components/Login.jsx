@@ -28,10 +28,13 @@ export default function Login() {
   async function resolveLoginEmail(rawIdentifier) {
     const value = String(rawIdentifier || '').trim()
     if (!value) return ''
+
+    // Real email — use directly
     if (value.includes('@')) return value.toLowerCase()
 
     const lowered = value.toLowerCase()
     const targetUsername = normalizeUsername(value)
+
     const { data, error: lookupError } = await supabase
       .from('staff')
       .select('email,name')
@@ -42,19 +45,25 @@ export default function Login() {
     }
 
     const rows = Array.isArray(data) ? data : []
+
+    // Try exact full name match
     const exact = rows.find(row => String(row?.name || '').trim().toLowerCase() === lowered)
     if (exact?.email) return String(exact.email).trim().toLowerCase()
 
+    // Try normalised username match against staff with an email
     const usernameMatches = rows.filter(row => normalizeUsername(row?.name) === targetUsername && row?.email)
-    if (usernameMatches.length === 1) {
-      return String(usernameMatches[0].email).trim().toLowerCase()
-    }
+    if (usernameMatches.length === 1) return String(usernameMatches[0].email).trim().toLowerCase()
     if (usernameMatches.length > 1) {
       throw new Error('That username matches multiple staff. Please use your email address.')
     }
 
-    const fallback = rows.find(row => String(row?.name || '').trim().toLowerCase().startsWith(lowered))
+    // Try prefix match against staff with an email
+    const fallback = rows.find(row => String(row?.name || '').trim().toLowerCase().startsWith(lowered) && row?.email)
     if (fallback?.email) return String(fallback.email).trim().toLowerCase()
+
+    // No staff record found with an email — this may be a username-only account.
+    // Use the @login.local internal email that Supabase Auth has stored.
+    if (targetUsername) return `${targetUsername}@login.local`
 
     throw new Error('Username not found. Use format like sam.brenner, full name, or email address.')
   }
@@ -73,25 +82,50 @@ export default function Login() {
         return
       }
 
-      const { data: staffRows, error: staffError } = await supabase
-        .from('staff')
-        .select('is_assigned_this_season')
-        .eq('email', email)
-        .is('deleted_at', null)
-        .limit(1)
+      const isUsernameAccount = email.endsWith('@login.local')
+
+      const staffQuery = isUsernameAccount
+        ? supabase
+            .from('staff')
+            .select('is_assigned_this_season, name')
+            .is('deleted_at', null)
+        : supabase
+            .from('staff')
+            .select('is_assigned_this_season')
+            .eq('email', email)
+            .is('deleted_at', null)
+            .limit(1)
+
+      const { data: staffRows, error: staffError } = await staffQuery
 
       if (staffError) {
-        const missingColumn = String(staffError.message || '').toLowerCase().includes('is_assigned_this_season')
-          && String(staffError.message || '').toLowerCase().includes('does not exist')
+        const missingColumn =
+          String(staffError.message || '').toLowerCase().includes('is_assigned_this_season') &&
+          String(staffError.message || '').toLowerCase().includes('does not exist')
         if (!missingColumn) {
           throw new Error('Unable to verify camp assignment. Please try again.')
         }
-      } else if (Array.isArray(staffRows) && staffRows[0]?.is_assigned_this_season === false) {
-        setError('No camp assigned. Please contact admin.')
-        setLoading(false)
-        setShake(true)
-        setTimeout(() => setShake(false), 500)
-        return
+      } else {
+        let staffRow = null
+
+        if (isUsernameAccount) {
+          // Match by normalised username derived from the @login.local email
+          const targetUsername = email.replace('@login.local', '')
+          staffRow =
+            (Array.isArray(staffRows) ? staffRows : []).find(
+              row => normalizeUsername(row?.name) === targetUsername
+            ) || null
+        } else {
+          staffRow = Array.isArray(staffRows) ? staffRows[0] : null
+        }
+
+        if (staffRow?.is_assigned_this_season === false) {
+          setError('No camp assigned. Please contact admin.')
+          setLoading(false)
+          setShake(true)
+          setTimeout(() => setShake(false), 500)
+          return
+        }
       }
     } catch (lookupError) {
       setLoading(false)
