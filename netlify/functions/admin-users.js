@@ -110,6 +110,34 @@ async function listUsers(admin) {
   return users
 }
 
+/**
+ * Determines whether an identifier is a plain username (no @) or a real email.
+ * Returns { isUsername, email, username }
+ *
+ * For plain usernames (e.g. "john.smith"):
+ *   - email stored in Supabase: john.smith@login.local
+ *   - username stored in user_metadata.username: john.smith
+ *
+ * For real emails (e.g. "john@school.org"):
+ *   - email stored in Supabase: john@school.org
+ *   - username in user_metadata: null (login form uses email directly)
+ */
+function resolveIdentifier(raw) {
+  const trimmed = String(raw || '').trim().toLowerCase()
+  if (!trimmed) return { isUsername: false, email: '', username: '' }
+
+  if (trimmed.includes('@')) {
+    return { isUsername: false, email: trimmed, username: '' }
+  }
+
+  // Plain username — generate internal Supabase email
+  return {
+    isUsername: true,
+    email: `${trimmed}@login.local`,
+    username: trimmed,
+  }
+}
+
 export async function handler(event) {
   try {
     if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') {
@@ -154,9 +182,21 @@ export async function handler(event) {
           const row = permissionMap.get(user.id)
           const archivedByMetadata = !!user.user_metadata?.account_archived
           const archivedByBan = !!user.banned_until && new Date(user.banned_until).getTime() > Date.now()
+
+          // Recover the original identifier:
+          // If user_metadata.username is set, they log in with that username.
+          // Otherwise they log in with their real email.
+          const username = user.user_metadata?.username || ''
+          const displayEmail = user.email || ''
+
           return {
             id: user.id,
-            email: user.email || '',
+            // If this is a username-based account, email will be "name@login.local" —
+            // expose the username instead so the frontend shows the right thing.
+            email: username ? '' : displayEmail,
+            username,
+            // The internal Supabase email (always present, used for account management)
+            internalEmail: displayEmail,
             createdAt: user.created_at,
             lastSignInAt: user.last_sign_in_at,
             isArchived: archivedByMetadata || archivedByBan,
@@ -166,7 +206,11 @@ export async function handler(event) {
             allowedTabs: sanitizeAllowedTabs(row?.allowed_tabs),
           }
         })
-        .sort((a, b) => a.email.localeCompare(b.email))
+        .sort((a, b) => {
+          const aLabel = a.username || a.email
+          const bLabel = b.username || b.email
+          return aLabel.localeCompare(bLabel)
+        })
 
       return json(200, {
         currentUser: {
@@ -188,15 +232,18 @@ export async function handler(event) {
     const action = body.action
 
     if (action === 'create_user') {
-      const email = String(body.email || '').trim().toLowerCase()
+      // Accept either a real email or a plain username (firstname.lastname)
+      const rawIdentifier = String(body.email || body.username || '').trim()
       const password = String(body.password || '')
       const isAdminInput = !!body.isAdmin
       const canViewTimetableOverviewInput = !!body.canViewTimetableOverview
       const canEditTimetableInput = !!body.canEditTimetable
       const allowedTabs = sanitizeAllowedTabs(body.allowedTabs)
 
-      if (!email || !email.includes('@')) return json(400, { error: 'Valid email is required' })
+      if (!rawIdentifier) return json(400, { error: 'An email or username is required' })
       if (password.length < 8) return json(400, { error: 'Password must be at least 8 characters' })
+
+      const { isUsername, email, username } = resolveIdentifier(rawIdentifier)
 
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
@@ -204,6 +251,7 @@ export async function handler(event) {
         email_confirm: true,
         user_metadata: {
           must_change_password: true,
+          ...(isUsername ? { username } : {}),
         },
       })
 
@@ -235,7 +283,9 @@ export async function handler(event) {
         ok: true,
         user: {
           id: createdUser.id,
-          email: createdUser.email || '',
+          email: isUsername ? '' : email,
+          username: isUsername ? username : '',
+          internalEmail: email,
           isAdmin: isAdminInput,
           canViewTimetableOverview: canViewTimetableOverviewInput,
           canEditTimetable: canEditTimetableInput,
@@ -273,10 +323,10 @@ export async function handler(event) {
 
     if (action === 'update_user') {
       const userId = String(body.userId || '')
-      const email = String(body.email || '').trim().toLowerCase()
+      const rawIdentifier = String(body.email || body.username || '').trim()
 
       if (!userId) return json(400, { error: 'userId is required' })
-      if (!email || !email.includes('@')) return json(400, { error: 'Valid email is required' })
+      if (!rawIdentifier) return json(400, { error: 'An email or username is required' })
 
       const ownerEmail = (process.env.VITE_OWNER_EMAIL || '').toLowerCase()
       const { data: targetData, error: targetError } = await admin.auth.admin.getUserById(userId)
@@ -286,11 +336,23 @@ export async function handler(event) {
       if (!targetUser) return json(404, { error: 'User not found' })
 
       const targetEmail = (targetUser.email || '').toLowerCase()
-      if (ownerEmail && targetEmail === ownerEmail && email !== ownerEmail) {
-        return json(400, { error: 'Owner account email cannot be changed here' })
+      if (ownerEmail && targetEmail === ownerEmail) {
+        const { isUsername: newIsUsername, email: newEmail } = resolveIdentifier(rawIdentifier)
+        if (!newIsUsername && newEmail !== ownerEmail) {
+          return json(400, { error: 'Owner account email cannot be changed here' })
+        }
       }
 
-      const { error } = await admin.auth.admin.updateUserById(userId, { email })
+      const { isUsername, email, username } = resolveIdentifier(rawIdentifier)
+
+      const { error } = await admin.auth.admin.updateUserById(userId, {
+        email,
+        user_metadata: {
+          ...(targetUser.user_metadata || {}),
+          ...(isUsername ? { username } : { username: null }),
+        },
+      })
+
       if (error) {
         return json(500, { error: error.message })
       }
