@@ -417,6 +417,18 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
               )
             })}
           </tbody>
+                <tfoot>
+                  <tr className="bg-stone-50 font-bold">
+                    <td className="px-4 py-2 text-right">Total present</td>
+                    {days.map(day => {
+                      const presentCount = attendance.filter(a => a.date === day && a.signIn).length
+                      return (
+                        <td key={day} className="px-2 py-2 text-center">{presentCount}</td>
+                      )
+                    })}
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
         </table>
       </div>
       <div className="flex gap-4 text-xs text-stone-500 flex-wrap">
@@ -683,37 +695,34 @@ export default function AttendanceOverview({ participants, attendance, setAttend
   // ── Print handler ──────────────────────────────────────────────────────────
   function printAttendanceView() {
     const attendanceNode = document.querySelector('.fade-in.space-y-5')
-    if (!attendanceNode) {
-      window.print()
-      return
-    }
-    const html = `<!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <title>Attendance Overview</title>
-        <style>
-          body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
-          h2 { font-size: 20px; margin: 0 0 6px; }
-          .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
-          th { background: #f3f4f6; }
-          .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-        </style>
-      </head>
-      <body>
-        ${attendanceNode.innerHTML}
-        <script>window.print();</script>
-      </body>
-    </html>`
-    const win = window.open('', '_blank', 'width=1100,height=800')
-    if (!win) {
-      alert('Allow pop-ups to print this report.')
-      return
-    }
-    win.document.write(html)
-    win.document.close()
+        if (!attendanceNode) {
+          window.print()
+          return
+        }
+        const html = `<!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <title>Attendance Grid</title>
+            <style>
+              body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+              table { width: 100%; border-collapse: collapse; font-size: 12px; }
+              th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
+              th { background: #f3f4f6; }
+            </style>
+          </head>
+          <body>
+            ${attendanceNode.innerHTML}
+            <script>window.print();</script>
+          </body>
+        </html}`
+        const win = window.open('', '_blank', 'width=1100,height=800')
+        if (!win) {
+          alert('Allow pop-ups to print this report.')
+          return
+        }
+        win.document.write(html)
+        win.document.close()
   }
 
   return (
