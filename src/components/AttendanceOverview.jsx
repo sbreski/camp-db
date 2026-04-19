@@ -764,15 +764,52 @@ export default function AttendanceOverview({ participants, attendance, setAttend
         )}
       </div>
 
+
       <div className="flex justify-end">
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={printAttendanceView}
           className="btn-secondary text-xs py-1.5 inline-flex items-center gap-1.5"
         >
           <Printer size={13} /> Print
         </button>
       </div>
+// Print only the attendance view in a new window (like Medical tab)
+function printAttendanceView() {
+  // Find the attendance view DOM node
+  const attendanceNode = document.querySelector('.fade-in.space-y-5')
+  if (!attendanceNode) {
+    window.print()
+    return
+  }
+  const html = `<!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Attendance Overview</title>
+        <style>
+          body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+          h2 { font-size: 20px; margin: 0 0 6px; }
+          .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
+          th { background: #f3f4f6; }
+          .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        </style>
+      </head>
+      <body>
+        ${attendanceNode.innerHTML}
+        <script>window.print();</script>
+      </body>
+    </html>`
+  const win = window.open('', '_blank', 'width=1100,height=800')
+  if (!win) {
+    alert('Allow pop-ups to print this report.')
+    return
+  }
+  win.document.write(html)
+  win.document.close()
+}
 
       <div className="flex gap-2 flex-wrap">
         {TABS.map(t => (
