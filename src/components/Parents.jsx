@@ -182,6 +182,7 @@ export default function Parents({ participants, onUpdateParticipant }) {
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Email</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Phone</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Child</th>
+                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Pronouns</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Approved Adults</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Actions</th>
                 </tr>
@@ -202,9 +203,9 @@ export default function Parents({ participants, onUpdateParticipant }) {
                         />
                       </td>
                       <td className="py-3 px-4 text-sm font-medium text-forest-950">
-                        {p.parentName || '—'}
+                        {p.parentName || <span className="bg-red-100 text-red-700 px-1 rounded">Missing</span>}
                       </td>
-                      <td className="py-3 px-4 text-sm text-stone-700">
+                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.parentEmail ? 'bg-red-100 text-red-700' : ''}`}> 
                         {p.parentEmail ? (
                           <a
                             href={`mailto:?bcc=${encodeURIComponent(p.parentEmail)}`}
@@ -214,14 +215,14 @@ export default function Parents({ participants, onUpdateParticipant }) {
                           >
                             {p.parentEmail}
                           </a>
-                        ) : '—'}
+                        ) : 'Missing'}
                       </td>
-                      <td className="py-3 px-4 text-sm text-stone-700">
+                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.parentPhone ? 'bg-red-100 text-red-700' : ''}`}> 
                         {p.parentPhone ? (
                           <a href={`tel:${p.parentPhone}`} className="text-forest-600 hover:text-forest-800 hover:underline">
                             {p.parentPhone}
                           </a>
-                        ) : '—'}
+                        ) : 'Missing'}
                       </td>
                       <td className="py-3 px-4 text-sm text-stone-700">
                         <div className="flex items-center gap-2">
@@ -231,7 +232,10 @@ export default function Parents({ participants, onUpdateParticipant }) {
                           {p.name}
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-stone-700">
+                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.pronouns ? 'bg-red-100 text-red-700' : ''}`}> 
+                        {p.pronouns ? p.pronouns : 'Missing'}
+                      </td>
+                      <td className={`py-3 px-4 text-sm text-stone-700 ${adults.length === 0 ? 'bg-red-100 text-red-700' : ''}`}> 
                         {adults.length > 0 ? (
                           <div className="space-y-1">
                             {adults.map((adult, i) => (
@@ -243,7 +247,7 @@ export default function Parents({ participants, onUpdateParticipant }) {
                               </div>
                             ))}
                           </div>
-                        ) : '—'}
+                        ) : 'Missing'}
                       </td>
                       <td className="py-3 px-4 text-sm text-stone-700">
                         <button type="button" onClick={() => startEditing(p)}
