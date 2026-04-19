@@ -1,9 +1,12 @@
-  // Always (re)start inactivity timer when admin status is confirmed
-  useEffect(() => {
-    if (authed && isAdminUser) {
-      startInactivityTimer();
-    }
-  }, [authed, isAdminUser]);
+
+// ...existing code...
+
+// Always (re)start inactivity timer when admin status is confirmed
+useEffect(() => {
+  if (authed && isAdminUser) {
+    startInactivityTimer();
+  }
+}, [authed, isAdminUser]);
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabase'
