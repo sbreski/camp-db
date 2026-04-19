@@ -1449,18 +1449,20 @@ export default function Timetable({
                       const entriesWithSpan = entriesToRender.map(entry => {
                         const entryStart = timeToMinutes(entry.startTime || entry.start_time)
                         const entryEnd = timeToMinutes(entry.endTime || entry.end_time)
-                        const rowMinutes = Math.max(1, row.endMinutes - row.startMinutes)
-                        const startOffsetMinutes = Math.max(0, (entryStart ?? row.startMinutes) - row.startMinutes)
-                        const startOffsetPx = Math.round((startOffsetMinutes / rowMinutes) * 56)
-                        let rowSpan = 1
-                        for (let i = rowIdx + 1; i < timeRows.length; i++) {
-                          if (entryEnd > timeRows[i].startMinutes) rowSpan++
-                          else break
-                        }
-                        const endRow = timeRows[Math.min(timeRows.length - 1, rowIdx + rowSpan - 1)]
-                        const endRowMinutes = Math.max(1, endRow.endMinutes - endRow.startMinutes)
-                        const endOffsetMinutes = Math.max(0, endRow.endMinutes - (entryEnd ?? endRow.endMinutes))
-                        const endOffsetPx = Math.round((endOffsetMinutes / endRowMinutes) * 56)
+                        const BASE_MINUTES = 15
+const BASE_ROW_PX = 56
+const rowMinutes = Math.max(1, row.endMinutes - row.startMinutes)
+const rowPx = (rowMinutes / BASE_MINUTES) * BASE_ROW_PX
+const startOffsetPx = Math.round((startOffsetMinutes / rowMinutes) * rowPx)
+let rowSpan = 1
+for (let i = rowIdx + 1; i < timeRows.length; i++) {
+  if (entryEnd > timeRows[i].startMinutes) rowSpan++
+  else break
+}
+const endRow = timeRows[Math.min(timeRows.length - 1, rowIdx + rowSpan - 1)]
+const endRowMinutes = Math.max(1, endRow.endMinutes - endRow.startMinutes)
+const endRowPx = (endRowMinutes / BASE_MINUTES) * BASE_ROW_PX
+const endOffsetPx = Math.round((endOffsetMinutes / endRowMinutes) * endRowPx)
                         renderedEntries.add(entry.id)
                         return { entry, rowSpan, startOffsetPx, endOffsetPx }
                       })

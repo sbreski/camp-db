@@ -332,7 +332,6 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
         </div>
       ) : (
         <>
-
       {/* Weekly summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
         {stats.map(({ day, present, late }) => (
@@ -609,7 +608,7 @@ const TABS = ['Daily', 'Weekly', 'Participant']
 
 export default function AttendanceOverview({ participants, attendance, setAttendance, campPeriod, campPeriods }) {
   const [tab, setTab] = useState('Daily')
-  const [editingTime, setEditingTime] = useState(null) // { recordId, type: 'signIn' | 'signOut', currentTime, date }
+  const [editingTime, setEditingTime] = useState(null)
   const [timeInput, setTimeInput] = useState('')
   const [collectionDetail, setCollectionDetail] = useState(null)
   const includedParticipants = participants.filter(isIncludedThisSeason)
@@ -618,7 +617,6 @@ export default function AttendanceOverview({ participants, attendance, setAttend
   function startEditTime(recordId, type, currentTime, date) {
     const record = attendance.find(r => r.id === recordId)
     if (!record) return
-
     const timeString = `${new Date(currentTime).getHours().toString().padStart(2, '0')}:${new Date(currentTime).getMinutes().toString().padStart(2, '0')}`
     setEditingTime({ recordId, type, currentTime, date })
     setTimeInput(timeString)
@@ -626,22 +624,18 @@ export default function AttendanceOverview({ participants, attendance, setAttend
 
   function saveTime() {
     if (!editingTime) return
-
     const [hours, minutes] = timeInput.split(':').map(Number)
     if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
       alert('Please enter a valid time in HH:MM format')
       return
     }
-
     const record = attendance.find(r => r.id === editingTime.recordId)
     if (!record) return
-
     const dateTime = new Date(`${editingTime.date}T${timeInput}:00`)
     const updatedRecord = {
       ...record,
       [editingTime.type]: dateTime.toISOString()
     }
-
     setAttendance(prev => prev.map(r => r.id === record.id ? updatedRecord : r))
     setEditingTime(null)
     setTimeInput('')
@@ -659,12 +653,10 @@ export default function AttendanceOverview({ participants, attendance, setAttend
   function markPresent(participantId, date) {
     const existing = attendance.find(a => a.participantId === participantId && a.date === date)
     const signInIso = new Date(`${date}T10:00:00`).toISOString()
-
     if (existing) {
       setAttendance(prev => prev.map(r => r.id === existing.id ? { ...r, signIn: signInIso } : r))
       return
     }
-
     setAttendance(prev => [
       ...prev,
       {
@@ -681,12 +673,47 @@ export default function AttendanceOverview({ participants, attendance, setAttend
   function markAbsent(participantId, date) {
     const existing = attendance.find(a => a.participantId === participantId && a.date === date)
     if (!existing) return
-
     setAttendance(prev => prev.map(r => (
       r.id === existing.id
         ? { ...r, signIn: null, signOut: null, collectedBy: null }
         : r
     )))
+  }
+
+  // ── Print handler ──────────────────────────────────────────────────────────
+  function printAttendanceView() {
+    const attendanceNode = document.querySelector('.fade-in.space-y-5')
+    if (!attendanceNode) {
+      window.print()
+      return
+    }
+    const html = `<!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Attendance Overview</title>
+        <style>
+          body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+          h2 { font-size: 20px; margin: 0 0 6px; }
+          .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
+          th { background: #f3f4f6; }
+          .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        </style>
+      </head>
+      <body>
+        ${attendanceNode.innerHTML}
+        <script>window.print();</script>
+      </body>
+    </html>`
+    const win = window.open('', '_blank', 'width=1100,height=800')
+    if (!win) {
+      alert('Allow pop-ups to print this report.')
+      return
+    }
+    win.document.write(html)
+    win.document.close()
   }
 
   return (
@@ -764,7 +791,6 @@ export default function AttendanceOverview({ participants, attendance, setAttend
         )}
       </div>
 
-
       <div className="flex justify-end">
         <button
           type="button"
@@ -774,42 +800,6 @@ export default function AttendanceOverview({ participants, attendance, setAttend
           <Printer size={13} /> Print
         </button>
       </div>
-// Print only the attendance view in a new window (like Medical tab)
-function printAttendanceView() {
-  // Find the attendance view DOM node
-  const attendanceNode = document.querySelector('.fade-in.space-y-5')
-  if (!attendanceNode) {
-    window.print()
-    return
-  }
-  const html = `<!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <title>Attendance Overview</title>
-        <style>
-          body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
-          h2 { font-size: 20px; margin: 0 0 6px; }
-          .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
-          th { background: #f3f4f6; }
-          .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-        </style>
-      </head>
-      <body>
-        ${attendanceNode.innerHTML}
-        <script>window.print();</script>
-      </body>
-    </html>`
-  const win = window.open('', '_blank', 'width=1100,height=800')
-  if (!win) {
-    alert('Allow pop-ups to print this report.')
-    return
-  }
-  win.document.write(html)
-  win.document.close()
-}
 
       <div className="flex gap-2 flex-wrap">
         {TABS.map(t => (
