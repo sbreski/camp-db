@@ -408,7 +408,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
                   return (
                     <tr key={participant.id} className="hover:bg-stone-50/70">
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 border-b border-stone-100 whitespace-nowrap">
-                        <ParticipantNameText participant={participant} className="font-medium text-forest-950" />
+                        <ParticipantNameText participant={participant} showDiagnosedHighlight={false} className="font-medium text-forest-950" />
                       </td>
                       {dateKeys.map(dateKey => {
                         const key = `${participant.id}|${dateKey}`
