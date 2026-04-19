@@ -20,12 +20,14 @@ function formatParentLabel(name) {
   return clean ? `${clean} (Parent)` : ''
 }
 
+
 export default function Parents({ participants, onUpdateParticipant }) {
   const [search, setSearch] = useState('')
   const [selectedParents, setSelectedParents] = useState(new Set())
   const [editingId, setEditingId] = useState(null)
   const [editingAdults, setEditingAdults] = useState([])
   const [newAdult, setNewAdult] = useState('')
+  const [sortBy, setSortBy] = useState('parent') // 'parent' or 'child'
 
   function toggleParentSelection(parentId) {
     const newSelected = new Set(selectedParents)
@@ -102,7 +104,14 @@ export default function Parents({ participants, onUpdateParticipant }) {
         p.parentPhone?.toLowerCase().includes(query) ||
         p.name.toLowerCase().includes(query)
     })
-    .sort((a, b) => (a.parentName || '').localeCompare(b.parentName || ''))
+    .sort((a, b) => {
+      if (sortBy === 'parent') {
+        return (a.parentName || '').localeCompare(b.parentName || '')
+      } else {
+        return (a.name || '').localeCompare(b.name || '')
+      }
+    })
+
 
   return (
     <div className="fade-in space-y-5">
@@ -111,17 +120,30 @@ export default function Parents({ participants, onUpdateParticipant }) {
           <h2 className="text-2xl font-display font-bold text-forest-950">Parents & Guardians</h2>
           <p className="text-stone-500 text-sm">{filtered.length} parent contacts</p>
         </div>
-        {selectedParents.size > 0 && (
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm text-stone-600">{selectedParents.size} selected</span>
-            <button onClick={emailSelectedParents} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
-              <Mail size={14} /> Email Selected
-            </button>
-            <button onClick={clearSelection} className="btn-secondary text-sm w-full sm:w-auto">
-              Clear
-            </button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <label className="text-sm text-stone-700 flex items-center gap-1">
+            Sort by:
+            <select
+              className="input text-sm py-1 px-2 h-8"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+            >
+              <option value="parent">Parent A-Z</option>
+              <option value="child">Child A-Z</option>
+            </select>
+          </label>
+          {selectedParents.size > 0 && (
+            <>
+              <span className="text-sm text-stone-600">{selectedParents.size} selected</span>
+              <button onClick={emailSelectedParents} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
+                <Mail size={14} /> Email Selected
+              </button>
+              <button onClick={clearSelection} className="btn-secondary text-sm w-full sm:w-auto">
+                Clear
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="relative">
