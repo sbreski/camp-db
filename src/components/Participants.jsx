@@ -243,7 +243,7 @@ export default function Participants({ participants, setParticipants, onView }) 
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([])
-  const [subTab, setSubTab] = useState('included')
+  const [subTab, setSubTab] = useState('active')
 
   // Demographics / filter state
   const [ageSplits, setAgeSplits] = useState([10, 14, 18])
@@ -284,9 +284,9 @@ export default function Participants({ participants, setParticipants, onView }) 
       })
   ), [participants, search, genderFilter, ageGroupFilter, ageSplits])
 
-  const includedParticipants = filteredBySearch.filter(isIncludedThisSeason)
-  const notIncludedParticipants = filteredBySearch.filter(p => !isIncludedThisSeason(p))
-  const visibleParticipants = subTab === 'included' ? includedParticipants : notIncludedParticipants
+  const activeParticipants = filteredBySearch.filter(isIncludedThisSeason)
+  const inactiveParticipants = filteredBySearch.filter(p => !isIncludedThisSeason(p))
+  const visibleParticipants = subTab === 'active' ? activeParticipants : inactiveParticipants
 
   const selectedSet = new Set(selectedParticipantIds)
   const selectedVisibleParticipantIds = visibleParticipants.filter(p => selectedSet.has(p.id)).map(p => p.id)
@@ -397,24 +397,24 @@ export default function Participants({ participants, setParticipants, onView }) 
       {participants.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           <button
-            onClick={() => setSubTab('included')}
+            onClick={() => setSubTab('active')}
             className={`px-3 py-1.5 rounded-lg text-xs font-display font-semibold border transition-colors ${
-              subTab === 'included'
+              subTab === 'active'
                 ? 'bg-forest-900 text-white border-forest-900'
                 : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
             }`}
           >
-            Included ({includedParticipants.length})
+            Active ({activeParticipants.length})
           </button>
           <button
-            onClick={() => setSubTab('not-included')}
+            onClick={() => setSubTab('inactive')}
             className={`px-3 py-1.5 rounded-lg text-xs font-display font-semibold border transition-colors ${
-              subTab === 'not-included'
+              subTab === 'inactive'
                 ? 'bg-stone-700 text-white border-stone-700'
                 : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
             }`}
           >
-            Not Included ({notIncludedParticipants.length})
+            Inactive ({inactiveParticipants.length})
           </button>
         </div>
       )}
@@ -425,10 +425,10 @@ export default function Participants({ participants, setParticipants, onView }) 
             {allVisibleSelected ? 'Unselect All' : 'Select All'}
           </button>
           <button onClick={() => setIncludedForSelected(true)} className="btn-primary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
-            Included
+            Set Active
           </button>
           <button onClick={() => setIncludedForSelected(false)} className="btn-secondary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
-            Not Included
+            Set Inactive
           </button>
           <button onClick={clearSelection} className="btn-secondary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
             Clear
@@ -468,7 +468,7 @@ export default function Participants({ participants, setParticipants, onView }) 
                 </div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onView(p.id)}>
                   <div className="flex items-center gap-1.5">
-                    <ParticipantNameText participant={p} className="font-display font-semibold text-forest-950 group-hover:text-forest-700" />
+                    <ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-display font-semibold text-forest-950 group-hover:text-forest-700" />
                     {photoConsentMode(p.photoConsent) === 'no' && (
                       <CameraOff size={12} className="text-rose-700" title="No photo consent" />
                     )}
