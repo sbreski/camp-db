@@ -424,12 +424,16 @@ export default function Participants({ participants, setParticipants, onView }) 
           <button onClick={toggleSelectAllFiltered} className="btn-secondary text-xs py-1.5">
             {allVisibleSelected ? 'Unselect All' : 'Select All'}
           </button>
-          <button onClick={() => setIncludedForSelected(true)} className="btn-primary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
-            Set Active
-          </button>
-          <button onClick={() => setIncludedForSelected(false)} className="btn-secondary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
-            Set Inactive
-          </button>
+          {subTab === 'active' && (
+            <button onClick={() => setIncludedForSelected(false)} className="btn-secondary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
+              Set Inactive
+            </button>
+          )}
+          {subTab === 'inactive' && (
+            <button onClick={() => setIncludedForSelected(true)} className="btn-primary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
+              Set Active
+            </button>
+          )}
           <button onClick={clearSelection} className="btn-secondary text-xs py-1.5" disabled={selectedVisibleParticipantIds.length === 0}>
             Clear
           </button>
