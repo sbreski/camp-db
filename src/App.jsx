@@ -1,18 +1,5 @@
 
-// ...existing code...
 
-
-// ...existing code...
-
-export default function App() {
-  // ...existing code...
-  // Always (re)start inactivity timer when admin status is confirmed
-  useEffect(() => {
-    if (authed && isAdminUser) {
-      startInactivityTimer();
-    }
-  }, [authed, isAdminUser]);
-  // ...existing code...
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabase'
@@ -49,6 +36,18 @@ const AttendanceOverview = lazy(loadAttendanceOverview)
 const Staff = lazy(loadStaff)
 const DressingRooms = lazy(loadDressingRooms)
 const Documents = lazy(loadDocuments)
+
+export default function App() {
+  // ...existing code...
+  // Always (re)start inactivity timer when admin status is confirmed
+  useEffect(() => {
+    if (authed && isAdminUser) {
+      startInactivityTimer();
+    }
+  }, [authed, isAdminUser]);
+  // ...existing code...
+  // ...rest of your App component code...
+}
 
 export const CAMP_NAME = 'Impact Kidz Summer Camp'
 export const STAFF_PASSWORD = import.meta.env.VITE_STAFF_PASSWORD || ''
