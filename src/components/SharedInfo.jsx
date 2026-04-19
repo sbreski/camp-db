@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { isIncludedThisSeason } from './AttendanceOverview'
 import { AlertCircle, ClipboardList, RefreshCw } from 'lucide-react'
 import { supabase } from '../supabase'
 
@@ -34,13 +35,18 @@ export default function SharedInfo({ currentUser, participants }) {
     return map
   }, [items])
 
+  // Only include active participants
+  const activeParticipants = useMemo(
+    () => (participants || []).filter(isIncludedThisSeason),
+    [participants]
+  )
   const participantMap = useMemo(() => {
     const map = new Map()
-    for (const participant of participants || []) {
+    for (const participant of activeParticipants) {
       map.set(participant.id, participant)
     }
     return map
-  }, [participants])
+  }, [activeParticipants])
 
   async function loadSharedItems() {
     if (!currentUser?.id) {
@@ -124,6 +130,8 @@ export default function SharedInfo({ currentUser, participants }) {
         <div className="space-y-4">
           {[...grouped.entries()].map(([participantId, items]) => {
             const participant = participantMap.get(participantId)
+            // Only show if participant is active
+            if (!participant) return null
             // Filter items by category if not 'all'
             const filteredItems = activeCategory === 'all'
               ? items
