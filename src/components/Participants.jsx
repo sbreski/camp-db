@@ -286,7 +286,10 @@ export default function Participants({ participants, setParticipants, onView }) 
 
   const activeParticipants = filteredBySearch.filter(isIncludedThisSeason)
   const inactiveParticipants = filteredBySearch.filter(p => !isIncludedThisSeason(p))
-  const visibleParticipants = subTab === 'active' ? activeParticipants : inactiveParticipants
+  let visibleParticipants = []
+  if (subTab === 'active') visibleParticipants = activeParticipants
+  else if (subTab === 'inactive') visibleParticipants = inactiveParticipants
+  else visibleParticipants = filteredBySearch
 
   const selectedSet = new Set(selectedParticipantIds)
   const selectedVisibleParticipantIds = visibleParticipants.filter(p => selectedSet.has(p.id)).map(p => p.id)
@@ -416,6 +419,16 @@ export default function Participants({ participants, setParticipants, onView }) 
           >
             Inactive ({inactiveParticipants.length})
           </button>
+          <button
+            onClick={() => setSubTab('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-display font-semibold border transition-colors ${
+              subTab === 'all'
+                ? 'bg-amber-700 text-white border-amber-700'
+                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+            }`}
+          >
+            All ({filteredBySearch.length})
+          </button>
         </div>
       )}
 
@@ -497,11 +510,9 @@ export default function Participants({ participants, setParticipants, onView }) 
                   {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                   {p.sendNeeds && <span className="badge-send">S</span>}
                   {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
-                  {!isIncludedThisSeason(p) && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-600 border border-stone-200">
-                      Not Included
-                    </span>
-                  )}
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
+                    {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}
+                  </span>
                 </div>
                 <button
                   onClick={() => deleteParticipant(p.id)}
