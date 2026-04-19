@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X, Printer } from '
 import { buildDatesFromRanges } from '../utils/starOfDay'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 
-function isIncludedThisSeason(participant) {
+export function isIncludedThisSeason(participant) {
   const flag = participant?.isActiveThisSeason ?? participant?.is_active_this_season
   if (typeof flag === 'string') return flag.toLowerCase() !== 'false'
   return flag !== false
@@ -156,7 +156,7 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
               <div key={p.id} className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] sm:gap-2 sm:items-center px-4 py-2.5 ${!rec?.signIn ? 'opacity-50 bg-red-50/30' : ''}`}>
                 <div>
                   <div className="flex items-center gap-2">
-                    <ParticipantNameText participant={p} className="text-sm font-medium text-forest-950" />
+                    <ParticipantNameText participant={p} showDiagnosedHighlight={false} className="text-sm font-medium text-forest-950" />
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">Included</span>
                   </div>
                   {late > 0 && (
@@ -368,7 +368,7 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
                 <tr key={p.id} className="hover:bg-stone-50">
                   <td className="px-4 py-2 font-medium text-forest-950 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <ParticipantNameText participant={p} className="font-medium text-forest-950" />
+                      <ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-medium text-forest-950" />
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">Included</span>
                     </div>
                   </td>
@@ -729,6 +729,7 @@ export default function AttendanceOverview({ participants, attendance, setAttend
                 <ParticipantNameText
                   participant={participants.find(p => p.id === attendance.find(r => r.id === editingTime.recordId)?.participantId)}
                   className="text-sm text-stone-500 mt-0.5"
+                  showDiagnosedHighlight={false}
                 />
               </div>
               <button onClick={cancelEditTime} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
