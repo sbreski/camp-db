@@ -569,7 +569,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         ? data.email.trim().toLowerCase()
         : normalizeUsername(data.name)
 
-      await setStaffList(prev => [...prev, { ...data, id: newId }])
+const { createLoginAccount, tempPassword, ...staffData } = data
+await setStaffList(prev => [...prev, { ...staffData, id: newId }])
       setShowForm(false)
 
       if (data.createLoginAccount) {
