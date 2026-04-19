@@ -349,7 +349,7 @@ export default function Dashboard({
                 return (
                   <div key={p.id} className="flex items-center justify-between py-2 border-b border-stone-50 last:border-0">
                     <div>
-                      <ParticipantNameText participant={p} className="text-sm font-medium text-forest-950" />
+                      <ParticipantNameText participant={p} showDiagnosedHighlight={false} forceNoDiagnosedHighlight={true} className="text-sm font-medium text-forest-950" />
                       <p className="text-xs text-stone-400">{p.pronouns}{p.age ? ` · Age ${p.age}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-stone-500">
@@ -386,7 +386,7 @@ export default function Dashboard({
                       inc.severity === 'medium' ? 'bg-amber-500' : 'bg-green-500'
                     }`} />
                     <div>
-                      {p ? <ParticipantNameText participant={p} className="text-sm font-medium text-forest-950" /> : <p className="text-sm font-medium text-forest-950">Unknown</p>}
+                      {p ? <ParticipantNameText participant={p} showDiagnosedHighlight={false} forceNoDiagnosedHighlight={true} className="text-sm font-medium text-forest-950" /> : <p className="text-sm font-medium text-forest-950">Unknown</p>}
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">{inc.type || 'Other'}</span>
                         <span className="text-xs text-stone-400">{new Date(inc.createdAt).toLocaleDateString('en-GB')}</span>
