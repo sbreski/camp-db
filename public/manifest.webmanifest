@@ -7,15 +7,15 @@
   "theme_color": "#052e16",
   "icons": [
     {
-      "src": "/ik-logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/favicon-source.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/ik-logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/favicon-source.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "maskable"
     }
   ]
