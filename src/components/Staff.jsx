@@ -543,7 +543,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }))
   }
 
-  async function attemptCreateLoginAccount({ identifier, password, allowedTabs }) {
+  async function attemptCreateLoginAccount({ identifier, password, allowedTabs, fullName = '' }) {
     const token = await withAccessToken()
     const response = await fetch('/api/admin-users', {
       method: 'POST',
@@ -557,6 +557,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         password,
         isAdmin: false,
         allowedTabs: sanitizeAllowedTabs(allowedTabs || ['dashboard', 'signin']),
+        ...(fullName ? { fullName } : {}),
       }),
     })
     const payload = await response.json()
@@ -595,6 +596,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
             identifier: loginIdentifier,
             password: data.tempPassword,
             allowedTabs: ['dashboard', 'signin'],
+            fullName: data.name?.trim() || '',
           })
           if (data.email?.trim()) {
             await setStaffList(prev => prev.map(s =>
@@ -1323,7 +1325,10 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                   newPassword: '',
                   deleteConfirmed: false,
                 }
-                const linkedStaff = staffByEmail.get((user.email || '').toLowerCase()) || staffByEmail.get((user.internalEmail || '').toLowerCase())
+                const linkedStaff = staffByEmail.get((user.email || '').toLowerCase())
+                  || staffByEmail.get((user.internalEmail || '').toLowerCase())
+                  || (user.username ? staffList.find(m => normalizeUsername(m.name) === user.username) : null)
+                  || (user.fullName ? staffList.find(m => m.name === user.fullName) : null)
                 const isCurrentUser = (user.internalEmail || user.email || '').toLowerCase() === currentUserEmail
                 const pendingRequest = resetRequests.find(request =>
                   (request.requester_email || '').toLowerCase() === (user.email || '').toLowerCase()
