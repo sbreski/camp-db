@@ -1323,7 +1323,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                   newPassword: '',
                   deleteConfirmed: false,
                 }
-                const linkedStaff = staffByEmail.get((user.email || '').toLowerCase())
+                const linkedStaff = staffByEmail.get((user.email || '').toLowerCase()) || staffByEmail.get((user.internalEmail || '').toLowerCase())
                 const isCurrentUser = (user.internalEmail || user.email || '').toLowerCase() === currentUserEmail
                 const pendingRequest = resetRequests.find(request =>
                   (request.requester_email || '').toLowerCase() === (user.email || '').toLowerCase()
@@ -1459,7 +1459,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         className="btn-secondary text-sm flex items-center justify-center gap-2"
-                        onClick={() => savePermissions(user.id, linkedStaff?.name || '')}
+                        onClick={() => savePermissions(user.id, linkedStaff?.name || user.fullName || '')}
                         disabled={accessActionLoading}
                       >
                         <Save size={14} /> Save Permissions
