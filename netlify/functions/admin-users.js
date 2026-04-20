@@ -203,6 +203,8 @@ export async function handler(event) {
             isAdmin: !!row?.is_admin,
             canViewTimetableOverview: !!row?.can_view_timetable_overview,
             canEditTimetable: !!row?.can_edit_timetable,
+            canViewSafeguarding: !!row?.can_view_safeguarding,
+            fullName: user.user_metadata?.full_name || '',
             allowedTabs: sanitizeAllowedTabs(row?.allowed_tabs),
           }
         })
@@ -239,6 +241,7 @@ export async function handler(event) {
       const canViewTimetableOverviewInput = !!body.canViewTimetableOverview
       const canEditTimetableInput = !!body.canEditTimetable
       const allowedTabs = sanitizeAllowedTabs(body.allowedTabs)
+      const fullName = String(body.fullName || '').trim()
 
       if (!rawIdentifier) return json(400, { error: 'An email or username is required' })
       if (password.length < 8) return json(400, { error: 'Password must be at least 8 characters' })
@@ -252,6 +255,7 @@ export async function handler(event) {
         user_metadata: {
           must_change_password: true,
           ...(isUsername ? { username } : {}),
+          ...(fullName ? { full_name: fullName } : {}),
         },
       })
 
@@ -300,8 +304,18 @@ export async function handler(event) {
       const canViewTimetableOverviewInput = !!body.canViewTimetableOverview
       const canEditTimetableInput = !!body.canEditTimetable
       const allowedTabs = sanitizeAllowedTabs(body.allowedTabs)
+      const fullName = String(body.fullName || '').trim()
 
       if (!userId) return json(400, { error: 'userId is required' })
+
+      if (fullName) {
+        const { data: targetData } = await admin.auth.admin.getUserById(userId)
+        if (targetData?.user) {
+          await admin.auth.admin.updateUserById(userId, {
+            user_metadata: { ...(targetData.user.user_metadata || {}), full_name: fullName },
+          })
+        }
+      }
 
       const { error } = await admin.from('user_tab_permissions').upsert(
         {

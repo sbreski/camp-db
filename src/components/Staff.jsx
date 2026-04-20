@@ -299,6 +299,7 @@ function CreateAccountForm({ onSubmit, loading }) {
     isAdmin: false,
     canViewTimetableOverview: false,
     canEditTimetable: false,
+    canViewSafeguarding: false,
     allowedTabs: ['dashboard', 'signin'],
   })
 
@@ -407,6 +408,17 @@ function CreateAccountForm({ onSubmit, loading }) {
         Can edit timetable
       </label>
 
+      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={form.canViewSafeguarding}
+          onChange={e => updateField('canViewSafeguarding', e.target.checked)}
+          disabled={form.isAdmin}
+        />
+        Can view safeguarding information
+      </label>
+
       <div>
         <p className="label mb-2">Allowed Tabs</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -503,6 +515,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
           isAdmin: !!user.isAdmin,
           canViewTimetableOverview: !!user.canViewTimetableOverview,
           canEditTimetable: !!user.canEditTimetable,
+          canViewSafeguarding: !!user.canViewSafeguarding,
           allowedTabs: sanitizeAllowedTabs(user.allowedTabs),
           newPassword: '',
           deleteConfirmed: false,
@@ -661,7 +674,9 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
           isAdmin: form.isAdmin,
           canViewTimetableOverview: !!form.canViewTimetableOverview,
           canEditTimetable: !!form.canEditTimetable,
+          canViewSafeguarding: !!form.canViewSafeguarding,
           allowedTabs: sanitizeAllowedTabs(form.allowedTabs),
+          ...(form.name?.trim() ? { fullName: form.name.trim() } : {}),
         }),
       })
       const payload = await response.json()
@@ -703,7 +718,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function savePermissions(userId) {
+  async function savePermissions(userId, fullName = '') {
     const edit = accessEdits[userId]
     if (!edit) return
 
@@ -725,7 +740,9 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
           isAdmin: !!edit.isAdmin,
           canViewTimetableOverview: !!edit.canViewTimetableOverview,
           canEditTimetable: !!edit.canEditTimetable,
+          canViewSafeguarding: !!edit.canViewSafeguarding,
           allowedTabs: sanitizeAllowedTabs(edit.allowedTabs),
+          ...(fullName ? { fullName } : {}),
         }),
       })
       const payload = await response.json()
@@ -1442,7 +1459,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         className="btn-secondary text-sm flex items-center justify-center gap-2"
-                        onClick={() => savePermissions(user.id)}
+                        onClick={() => savePermissions(user.id, linkedStaff?.name || '')}
                         disabled={accessActionLoading}
                       >
                         <Save size={14} /> Save Permissions

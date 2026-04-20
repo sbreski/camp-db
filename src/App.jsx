@@ -1090,7 +1090,7 @@ export default function App() {
   const isOwnerUser = Boolean(OWNER_EMAIL && currentUserEmail === OWNER_EMAIL)
   const currentStaff = staffList.find(staff => String(staff.email || '').toLowerCase() === currentUserEmail) || null
 
-  const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '')
+  const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '') || (currentUser?.user_metadata?.full_name || '')
   const actorFirstName = firstNameFromName(actorFullName)
   const actorInitials = initialsFromName(actorFullName || currentUserEmail || 'Staff')
   const canViewSafeguarding = Boolean(
@@ -1430,7 +1430,7 @@ export default function App() {
           participants={participants}
           attendance={attendance}
           incidents={incidents}
-          greetingName={loadingS ? '' : actorFirstName}
+          greetingName={actorFirstName}
           onNavigate={navigate}
           allowedTabs={allowedTabIds}
           canManageUserResets={isOwnerUser || isAdminUser}
