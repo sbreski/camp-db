@@ -303,16 +303,7 @@ function toCamel(obj) {
 export default function App() {
   const location = useLocation()
   const routerNavigate = useNavigate()
-  useEffect(() => {
-    function handlePageShow(event) {
-      if (event.persisted) {
-        window.location.reload()
-      }
-    }
 
-    window.addEventListener('pageshow', handlePageShow)
-    return () => window.removeEventListener('pageshow', handlePageShow)
-  }, [])
   const [authed, setAuthed] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
   const [isAdminUser, setIsAdminUser] = useState(false)
@@ -1099,16 +1090,7 @@ export default function App() {
   const isOwnerUser = Boolean(OWNER_EMAIL && currentUserEmail === OWNER_EMAIL)
   const currentStaff = staffList.find(staff => String(staff.email || '').toLowerCase() === currentUserEmail) || null
 
-  // Derive a display name from the email prefix (e.g. "jane.smith@..." → "Jane") so the
-  // greeting is never blank on first render while staffList is still loading from Supabase.
-  // Once staffList arrives the proper staff record name takes precedence.
-  const emailFallbackName = (() => {
-    const prefix = currentUserEmail.split('@')[0] || ''
-    const firstPart = prefix.split(/[._-]/)[0] || ''
-    return firstPart ? firstPart.charAt(0).toUpperCase() + firstPart.slice(1) : ''
-  })()
-
-  const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '') || emailFallbackName
+  const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '')
   const actorFirstName = firstNameFromName(actorFullName)
   const actorInitials = initialsFromName(actorFullName || currentUserEmail || 'Staff')
   const canViewSafeguarding = Boolean(
@@ -1448,7 +1430,7 @@ export default function App() {
           participants={participants}
           attendance={attendance}
           incidents={incidents}
-          greetingName={actorFirstName}
+          greetingName={loadingS ? '' : actorFirstName}
           onNavigate={navigate}
           allowedTabs={allowedTabIds}
           canManageUserResets={isOwnerUser || isAdminUser}
