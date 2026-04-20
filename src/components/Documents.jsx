@@ -338,11 +338,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
       if (error) throw error
 
       const url = URL.createObjectURL(data)
-      const opened = window.open(url, '_blank', 'noopener,noreferrer')
-      if (!opened) {
-        URL.revokeObjectURL(url)
-        throw new Error('Popup blocked. Please allow popups for this site.')
-      }
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (error) {
       console.error('Error downloading document:', error)
@@ -351,15 +350,12 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   function downloadBlob(content, filename, mimeType = 'text/plain') {
-    void filename
     const blob = new Blob([content], { type: mimeType })
     const url = URL.createObjectURL(blob)
-    const opened = window.open(url, '_blank', 'noopener,noreferrer')
-    if (!opened) {
-      URL.revokeObjectURL(url)
-      alert('Popup blocked. Please allow popups for this site.')
-      return
-    }
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
     setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
 
