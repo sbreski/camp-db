@@ -49,7 +49,6 @@ function normalizeUsername(value) {
     .replace(/^\.+|\.+$/g, '')
 }
 
-// Returns the label used to identify a user account (username or email)
 function accountLabel(user) {
   return user.username || user.email || user.internalEmail || ''
 }
@@ -84,7 +83,6 @@ function StaffForm({ initial, onSave, onCancel }) {
   })
   function set(k, v) { setForm(p => ({ ...p, [k]: v })) }
 
-  // Derived: the login identifier that will be used if creating an account
   const derivedUsername = normalizeUsername(form.name)
   const loginIdentifier = form.email?.trim() ? form.email.trim() : derivedUsername
 
@@ -184,7 +182,6 @@ function StaffForm({ initial, onSave, onCancel }) {
             </div>
           </div>
 
-          {/* Login account creation — only shown when adding a new staff member */}
           {!initial?.id && (
             <div className="col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-3">
               <label className="inline-flex items-center gap-2 text-sm font-medium text-amber-900">
@@ -305,7 +302,6 @@ function CreateAccountForm({ onSubmit, loading }) {
     allowedTabs: ['dashboard', 'signin'],
   })
 
-  // Derived: show what the login identifier will be
   const resolvedIdentifier = form.identifier.trim()
     ? form.identifier.trim()
     : (form.name.trim() ? normalizeUsername(form.name) : '')
@@ -503,7 +499,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       const edits = {}
       users.forEach(user => {
         edits[user.id] = {
-          // For display/editing: show username if it exists, otherwise email
           identifier: user.username || user.email || '',
           isAdmin: !!user.isAdmin,
           canViewTimetableOverview: !!user.canViewTimetableOverview,
@@ -535,7 +530,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }))
   }
 
-  // Attempts to create a login account and returns { ok, loginIdentifier, error }
   async function attemptCreateLoginAccount({ identifier, password, allowedTabs }) {
     const token = await withAccessToken()
     const response = await fetch('/api/admin-users', {
@@ -546,7 +540,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       },
       body: JSON.stringify({
         action: 'create_user',
-        email: identifier, // backend resolves whether this is a username or email
+        email: identifier,
         password,
         isAdmin: false,
         allowedTabs: sanitizeAllowedTabs(allowedTabs || ['dashboard', 'signin']),
@@ -564,13 +558,12 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     try {
       const newId = crypto.randomUUID()
 
-      // Determine login identifier: prefer real email, fall back to firstname.lastname username
       const loginIdentifier = data.email?.trim()
         ? data.email.trim().toLowerCase()
         : normalizeUsername(data.name)
 
-const { createLoginAccount, tempPassword, ...staffData } = data
-await setStaffList(prev => [...prev, { ...staffData, id: newId }])
+      const { createLoginAccount, tempPassword, ...staffData } = data
+      await setStaffList(prev => [...prev, { ...staffData, id: newId }])
       setShowForm(false)
 
       if (data.createLoginAccount) {
@@ -590,8 +583,6 @@ await setStaffList(prev => [...prev, { ...staffData, id: newId }])
             password: data.tempPassword,
             allowedTabs: ['dashboard', 'signin'],
           })
-          // If identifier was a username (no @), no email to store back on the staff record.
-          // If it was a real email, make sure it's stored on the staff record.
           if (data.email?.trim()) {
             await setStaffList(prev => prev.map(s =>
               s.id === newId ? { ...s, email: data.email.trim().toLowerCase() } : s
@@ -622,8 +613,9 @@ await setStaffList(prev => [...prev, { ...staffData, id: newId }])
     setStaffError('')
     setStaffMessage('')
     try {
-      await setStaffList(prev => prev.map(s => s.id === selected.id ? { ...s, ...data } : s))
-      setSelected(s => ({ ...s, ...data }))
+      const { createLoginAccount, tempPassword, ...staffData } = data
+      await setStaffList(prev => prev.map(s => s.id === selected.id ? { ...s, ...staffData } : s))
+      setSelected(s => ({ ...s, ...staffData }))
       setEditing(false)
       setStaffMessage('Staff profile updated.')
     } catch (error) {
@@ -664,7 +656,7 @@ await setStaffList(prev => [...prev, { ...staffData, id: newId }])
         },
         body: JSON.stringify({
           action: 'create_user',
-          email: form.identifier, // backend resolves username vs email
+          email: form.identifier,
           password: form.password,
           isAdmin: form.isAdmin,
           canViewTimetableOverview: !!form.canViewTimetableOverview,
@@ -678,7 +670,6 @@ await setStaffList(prev => [...prev, { ...staffData, id: newId }])
         throw new Error(payload.error || 'Unable to create account')
       }
 
-      // Optionally create a staff profile if a name was given
       if (form.name.trim()) {
         const isEmail = form.identifier.includes('@')
         const exists = isEmail
@@ -771,7 +762,7 @@ await setStaffList(prev => [...prev, { ...staffData, id: newId }])
         body: JSON.stringify({
           action: 'update_user',
           userId,
-          email: edit.identifier, // backend resolves username vs email
+          email: edit.identifier,
         }),
       })
       const payload = await response.json()
@@ -1320,7 +1311,6 @@ await setStaffList(prev => [...prev, { ...staffData, id: newId }])
                 const pendingRequest = resetRequests.find(request =>
                   (request.requester_email || '').toLowerCase() === (user.email || '').toLowerCase()
                 )
-                // Username for display: prefer linked staff name, then stored username, then derive from email
                 const derivedUsername = linkedStaff?.name
                   ? normalizeUsername(linkedStaff.name)
                   : (user.username || normalizeUsername((user.email || '').split('@')[0] || ''))
@@ -1400,7 +1390,6 @@ await setStaffList(prev => [...prev, { ...staffData, id: newId }])
                       </button>
                     </div>
 
-                    {/* Staff linking — only relevant for email-based accounts */}
                     {!isUsernameAccount && (
                       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
                         <select
