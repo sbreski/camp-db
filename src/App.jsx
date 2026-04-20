@@ -321,6 +321,7 @@ export default function App() {
   const [allowedTabIds, setAllowedTabIds] = useState(BASIC_TABS)
     const [canViewTimetableOverview, setCanViewTimetableOverview] = useState(false)
   const [canEditTimetable, setCanEditTimetable] = useState(false)
+  const [canViewSafeguardingPerm, setCanViewSafeguardingPerm] = useState(false)
   const [showSessionWarning, setShowSessionWarning] = useState(false)
   const [warningCountdown, setWarningCountdown] = useState(SESSION_WARNING_SECONDS)
   const [forcePassword, setForcePassword] = useState('')
@@ -861,6 +862,7 @@ export default function App() {
       setIsAdminUser(false)
       setAllowedTabIds(BASIC_TABS)
       setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
       return
     }
@@ -870,6 +872,7 @@ export default function App() {
       setIsAdminUser(true)
       setAllowedTabIds(ALL_TABS)
       setCanViewTimetableOverview(true)
+      setCanViewSafeguardingPerm(true)
       setPermissionsLoading(false)
       return
     }
@@ -881,7 +884,7 @@ export default function App() {
       const primary = await Promise.race([
         supabase
           .from('user_tab_permissions')
-          .select('is_admin, allowed_tabs, can_view_timetable_overview, can_edit_timetable')
+          .select('is_admin, allowed_tabs, can_view_timetable_overview, can_edit_timetable, can_view_safeguarding')
           .eq('user_id', user.id)
           .maybeSingle(),
         new Promise((_, reject) => {
@@ -897,6 +900,7 @@ export default function App() {
         && (
           isMissingColumnError(error, 'can_view_timetable_overview')
           || isMissingColumnError(error, 'can_edit_timetable')
+          || isMissingColumnError(error, 'can_view_safeguarding')
         )
       ) {
         const fallback = await supabase
@@ -913,6 +917,7 @@ export default function App() {
         setIsAdminUser(false)
         setAllowedTabIds(BASIC_TABS)
         setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
         setPermissionsLoading(false)
         return
       }
@@ -921,6 +926,7 @@ export default function App() {
         setIsAdminUser(true)
         setAllowedTabIds(ALL_TABS)
         setCanViewTimetableOverview(true)
+        setCanViewSafeguardingPerm(true)
         setPermissionsLoading(false)
         return
       }
@@ -928,6 +934,7 @@ export default function App() {
       setIsAdminUser(false)
       setCanViewTimetableOverview(Boolean(data?.can_view_timetable_overview))
       setCanEditTimetable(Boolean(data?.can_edit_timetable))
+      setCanViewSafeguardingPerm(Boolean(data?.can_view_safeguarding))
 
       if (Array.isArray(data?.allowed_tabs) && data.allowed_tabs.length > 0) {
         setAllowedTabIds(sanitizeAllowedTabs(data.allowed_tabs))
@@ -940,6 +947,7 @@ export default function App() {
       setIsAdminUser(false)
       setAllowedTabIds(BASIC_TABS)
       setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
     }
   }
@@ -971,6 +979,7 @@ export default function App() {
           setPermissionsLoading(false)
           setAllowedTabIds(BASIC_TABS)
           setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
         }
       } catch (error) {
         console.error('AUTH SESSION EXCEPTION:', error?.message || error)
@@ -980,6 +989,7 @@ export default function App() {
         setIsAdminUser(false)
         setAllowedTabIds(BASIC_TABS)
         setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
         setPermissionsLoading(false)
         setAuthLoading(false)
       }
@@ -1000,6 +1010,7 @@ export default function App() {
         } else {
           setAllowedTabIds(BASIC_TABS)
           setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
           setPermissionsLoading(false)
         }
       } catch (error) {
@@ -1009,6 +1020,7 @@ export default function App() {
         setIsAdminUser(false)
         setAllowedTabIds(BASIC_TABS)
         setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
         setPermissionsLoading(false)
       }
     })
@@ -1033,6 +1045,7 @@ export default function App() {
       setIsAdminUser(false)
       setAllowedTabIds(BASIC_TABS)
       setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
       setAuthLoading(false)
     }, 20000)
@@ -1054,6 +1067,7 @@ export default function App() {
       setIsAdminUser(false)
       setAllowedTabIds(BASIC_TABS)
       setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
     }, 20000)
 
@@ -1070,6 +1084,7 @@ export default function App() {
     setIsAdminUser(false)
     setAllowedTabIds(BASIC_TABS)
     setCanViewTimetableOverview(false)
+      setCanViewSafeguardingPerm(false)
     setShowSessionWarning(false)
     setWarningCountdown(SESSION_WARNING_SECONDS)
   }
@@ -1083,12 +1098,23 @@ export default function App() {
   const currentUserEmail = (currentUser?.email || '').toLowerCase()
   const isOwnerUser = Boolean(OWNER_EMAIL && currentUserEmail === OWNER_EMAIL)
   const currentStaff = staffList.find(staff => String(staff.email || '').toLowerCase() === currentUserEmail) || null
-  const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '')
+
+  // Derive a display name from the email prefix (e.g. "jane.smith@..." → "Jane") so the
+  // greeting is never blank on first render while staffList is still loading from Supabase.
+  // Once staffList arrives the proper staff record name takes precedence.
+  const emailFallbackName = (() => {
+    const prefix = currentUserEmail.split('@')[0] || ''
+    const firstPart = prefix.split(/[._-]/)[0] || ''
+    return firstPart ? firstPart.charAt(0).toUpperCase() + firstPart.slice(1) : ''
+  })()
+
+  const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '') || emailFallbackName
   const actorFirstName = firstNameFromName(actorFullName)
   const actorInitials = initialsFromName(actorFullName || currentUserEmail || 'Staff')
   const canViewSafeguarding = Boolean(
     isOwnerUser
       || isAdminUser
+      || canViewSafeguardingPerm
       || ['camp coordinator', 'director'].includes(
         String(staffList.find(staff => String(staff.email || '').toLowerCase() === currentUserEmail)?.role || '').trim().toLowerCase()
       )
