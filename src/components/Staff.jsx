@@ -423,7 +423,7 @@ function CreateAccountForm({ onSubmit, loading }) {
   )
 }
 
-export default function Staff({ staffList, setStaffList, campPeriods, setCampPeriods, canManageCampPeriod = false }) {}
+export default function Staff({ staffList, setStaffList, campPeriods, setCampPeriods, canManageCampPeriod = false }) {
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -918,13 +918,13 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
 
 
-    if (!loginEmail) {
-      setAccessError('This login account has no email (username-only accounts cannot be linked by email).')
-      return
-    }
-
 const loginEmail = String(user.email || '').trim().toLowerCase()
 const loginUsername = String(user.username || '').trim().toLowerCase()
+
+if (!loginEmail && !loginUsername) {
+  setAccessError('This login account has no email or username.')
+  return
+}
 
 if (!loginEmail && !loginUsername) {
   setAccessError('This login account has no email or username.')
@@ -1491,4 +1491,4 @@ const staffByEmail = useMemo(() => {
       </section>
     </div>
   )
-}
+}}
