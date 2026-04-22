@@ -390,28 +390,6 @@ function CreateAccountForm({ onSubmit, loading }) {
         <input
           type="checkbox"
           className="h-4 w-4"
-          checked={form.canViewTimetableOverview}
-          onChange={e => updateField('canViewTimetableOverview', e.target.checked)}
-          disabled={form.isAdmin}
-        />
-        Can view timetable overviews
-      </label>
-
-      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-        <input
-          type="checkbox"
-          className="h-4 w-4"
-          checked={form.canEditTimetable}
-          onChange={e => updateField('canEditTimetable', e.target.checked)}
-          disabled={form.isAdmin}
-        />
-        Can edit timetable
-      </label>
-
-      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-        <input
-          type="checkbox"
-          className="h-4 w-4"
           checked={form.canViewSafeguarding}
           onChange={e => updateField('canViewSafeguarding', e.target.checked)}
           disabled={form.isAdmin}
