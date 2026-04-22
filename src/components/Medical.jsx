@@ -36,6 +36,8 @@ export default function Medical({ participants, setParticipants, actorInitials =
   const [loadingOps, setLoadingOps] = useState(false)
   const [savingMar, setSavingMar] = useState(false)
   const [uploadingForm, setUploadingForm] = useState(false)
+  const [editingMarId, setEditingMarId] = useState(null)
+  const [editMarDraft, setEditMarDraft] = useState(null)
 
   const [medicationPlans, setMedicationPlans] = useState([])
   const [medicationAdministration, setMedicationAdministration] = useState([])
@@ -187,6 +189,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
     }
 
     const selectedPlan = medicationPlans.find(plan => plan.id === marDraft.medicationPlanId)
+    const isAdHoc = !marDraft.medicationPlanId
     const payload = {
       id: crypto.randomUUID(),
       participant_id: marDraft.participantId,
@@ -207,6 +210,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
       parent_notification_notes: marDraft.parentNotified
         ? (marDraft.parentNotificationNotes.trim() || null)
         : null,
+      follow_up_required: isAdHoc,
     }
 
     setSavingMar(true)
@@ -220,8 +224,14 @@ export default function Medical({ participants, setParticipants, actorInitials =
           parent_notified_at,
           parent_notification_method,
           parent_notification_notes,
+          follow_up_required,
           ...fallbackPayload
         } = payload
+        const fallback = await supabase.from('medication_administration').insert(fallbackPayload)
+        error = fallback.error
+      }
+      if (error && isMissingColumnError(error, 'follow_up_required')) {
+        const { follow_up_required, ...fallbackPayload } = payload
         const fallback = await supabase.from('medication_administration').insert(fallbackPayload)
         error = fallback.error
       }
@@ -245,6 +255,66 @@ export default function Medical({ participants, setParticipants, actorInitials =
       alert(`Could not save MAR entry: ${error.message}`)
     } finally {
       setSavingMar(false)
+    }
+  }
+
+  function beginEditMar(row) {
+    setEditingMarId(row.id)
+    setEditMarDraft({
+      parentNotified: Boolean(row.parent_notified),
+      parentNotifiedAt: row.parent_notified_at
+        ? new Date(row.parent_notified_at).toISOString().slice(0, 16)
+        : '',
+      parentNotificationMethod: row.parent_notification_method || '',
+      parentNotificationNotes: row.parent_notification_notes || '',
+      notes: row.notes || '',
+      status: row.status || 'given',
+    })
+  }
+
+  function cancelEditMar() {
+    setEditingMarId(null)
+    setEditMarDraft(null)
+  }
+
+  async function saveMarEdit(rowId) {
+    if (!editMarDraft) return
+    const updates = {
+      parent_notified: Boolean(editMarDraft.parentNotified),
+      parent_notified_at: editMarDraft.parentNotified && editMarDraft.parentNotifiedAt
+        ? new Date(editMarDraft.parentNotifiedAt).toISOString()
+        : null,
+      parent_notification_method: editMarDraft.parentNotified
+        ? (editMarDraft.parentNotificationMethod.trim() || null)
+        : null,
+      parent_notification_notes: editMarDraft.parentNotified
+        ? (editMarDraft.parentNotificationNotes.trim() || null)
+        : null,
+      notes: editMarDraft.notes.trim() || null,
+      status: editMarDraft.status,
+    }
+    try {
+      const { error } = await supabase
+        .from('medication_administration')
+        .update(updates)
+        .eq('id', rowId)
+      if (error) throw error
+      await loadMedicalOperations()
+      cancelEditMar()
+    } catch (error) {
+      // If columns don't exist yet, update only what we can
+      const { parent_notified, parent_notified_at, parent_notification_method, parent_notification_notes, ...safeUpdates } = updates
+      try {
+        const { error: fallbackError } = await supabase
+          .from('medication_administration')
+          .update(safeUpdates)
+          .eq('id', rowId)
+        if (fallbackError) throw fallbackError
+        await loadMedicalOperations()
+        cancelEditMar()
+      } catch (fallbackErr) {
+        alert(`Could not save MAR edit: ${fallbackErr.message}`)
+      }
     }
   }
 
@@ -492,9 +562,22 @@ export default function Medical({ participants, setParticipants, actorInitials =
                 <select className="input" value={marDraft.medicationPlanId} onChange={e => updateMarDraft('medicationPlanId', e.target.value)}>
                   <option value="">None / ad-hoc</option>
                   {(plansByParticipant.get(marDraft.participantId) || []).map(plan => (
-                    <option key={plan.id} value={plan.id}>{plan.medication_name}</option>
+                    <option key={plan.id} value={plan.id}>{plan.medication_name}{plan.dose ? ` (${plan.dose})` : ''}</option>
                   ))}
+                  {(plansByParticipant.get(marDraft.participantId) || []).length === 0 && medicationPlans.length > 0 && (
+                    <optgroup label="All plans (no plans on file for this child — check Medical Plans tab)">
+                      {medicationPlans.map(plan => {
+                        const pName = participantsById.get(plan.participant_id)?.name
+                        return (
+                          <option key={plan.id} value={plan.id} disabled>{plan.medication_name}{pName ? ` — ${pName}` : ''}</option>
+                        )
+                      })}
+                    </optgroup>
+                  )}
                 </select>
+                {(plansByParticipant.get(marDraft.participantId) || []).length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No medication plans on file for this child. Add a plan in the Medication Plans section first, or record this as ad-hoc.</p>
+                )}
               </div>
               <div>
                 <label className="label">Dose Given</label>
@@ -567,38 +650,107 @@ export default function Medical({ participants, setParticipants, actorInitials =
             ) : marRows.length === 0 ? (
               <p className="text-sm text-stone-500">No MAR entries logged yet.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs font-semibold text-stone-500 uppercase tracking-wide border-b border-stone-100">
-                      <th className="pb-2 pr-3">Time</th>
-                      <th className="pb-2 pr-3">Participant</th>
-                      <th className="pb-2 pr-3">Medication</th>
-                      <th className="pb-2 pr-3">Dose</th>
-                      <th className="pb-2 pr-3">Status</th>
-                      <th className="pb-2 pr-3">Initials</th>
-                      <th className="pb-2">Parent Notified</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-50">
-                    {marRows.map(row => {
-                      const participantName = participantsById.get(row.participant_id)?.name || 'Unknown'
-                      const when = row.administered_at ? new Date(row.administered_at).toLocaleString('en-GB') : '—'
-                      const notified = row.parent_notified ? 'Yes' : 'No'
-                      return (
-                        <tr key={row.id}>
-                          <td className="py-2 pr-3 whitespace-nowrap">{when}</td>
-                          <td className="py-2 pr-3">{participantName}</td>
-                          <td className="py-2 pr-3">{row.medication_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'}</td>
-                          <td className="py-2 pr-3">{row.dose_given || '—'}</td>
-                          <td className="py-2 pr-3 capitalize">{row.status}</td>
-                          <td className="py-2 pr-3">{row.staff_initials}</td>
-                          <td className="py-2">{notified}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-3">
+                {marRows.map(row => {
+                  const participantName = participantsById.get(row.participant_id)?.name || 'Unknown'
+                  const when = row.administered_at ? new Date(row.administered_at).toLocaleString('en-GB') : '—'
+                  const medName = row.medication_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
+                  const isAdHoc = !row.medication_plan_id
+                  const needsFollowUp = isAdHoc && !row.follow_up_required === false
+                  const isEditing = editingMarId === row.id
+
+                  return (
+                    <div key={row.id} className={`rounded-xl border p-3 space-y-2 ${isAdHoc ? 'border-amber-200 bg-amber-50' : 'border-stone-200 bg-white'}`}>
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-forest-950">{participantName}</span>
+                            <span className="text-xs text-stone-500">{when}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full capitalize font-medium ${
+                              row.status === 'given' ? 'bg-green-100 text-green-700' :
+                              row.status === 'refused' ? 'bg-red-100 text-red-700' :
+                              'bg-stone-100 text-stone-600'
+                            }`}>{row.status}</span>
+                            {isAdHoc && (
+                              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">Ad-hoc · Follow Up</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-stone-600">{medName}{row.dose_given ? ` — ${row.dose_given}` : ''} · {row.staff_initials}</p>
+                        </div>
+                        {!isEditing && (
+                          <button
+                            type="button"
+                            onClick={() => beginEditMar(row)}
+                            className="text-xs text-forest-700 hover:text-forest-900 underline flex-shrink-0"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+
+                      {isEditing && editMarDraft ? (
+                        <div className="rounded-xl border border-forest-200 bg-white p-3 space-y-3">
+                          <p className="text-xs font-semibold text-forest-900">Edit MAR Entry</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="label">Status</label>
+                              <select className="input" value={editMarDraft.status} onChange={e => setEditMarDraft(prev => ({ ...prev, status: e.target.value }))}>
+                                <option value="given">Given</option>
+                                <option value="refused">Refused</option>
+                                <option value="missed">Missed dose</option>
+                                <option value="withheld">Withheld</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="label">Notes</label>
+                              <input className="input" value={editMarDraft.notes} onChange={e => setEditMarDraft(prev => ({ ...prev, notes: e.target.value }))} placeholder="Context / observations" />
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-stone-200 p-3 space-y-3">
+                            <label className="inline-flex items-center gap-2 text-sm text-forest-900">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={editMarDraft.parentNotified}
+                                onChange={e => setEditMarDraft(prev => ({ ...prev, parentNotified: e.target.checked }))}
+                              />
+                              Parent notified
+                            </label>
+                            {editMarDraft.parentNotified && (
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="label">Notified At</label>
+                                  <input type="datetime-local" className="input" value={editMarDraft.parentNotifiedAt} onChange={e => setEditMarDraft(prev => ({ ...prev, parentNotifiedAt: e.target.value }))} />
+                                </div>
+                                <div>
+                                  <label className="label">Method</label>
+                                  <input className="input" value={editMarDraft.parentNotificationMethod} onChange={e => setEditMarDraft(prev => ({ ...prev, parentNotificationMethod: e.target.value }))} placeholder="Phone / in-person / email" />
+                                </div>
+                                <div>
+                                  <label className="label">Notes</label>
+                                  <input className="input" value={editMarDraft.parentNotificationNotes} onChange={e => setEditMarDraft(prev => ({ ...prev, parentNotificationNotes: e.target.value }))} placeholder="Who was informed / outcome" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" className="btn-primary text-xs py-1.5 px-3" onClick={() => saveMarEdit(row.id)}>Save</button>
+                            <button type="button" className="btn-secondary text-xs py-1.5 px-3" onClick={cancelEditMar}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-3 text-xs text-stone-500">
+                          {row.notes && <span>Note: {row.notes}</span>}
+                          <span className={row.parent_notified ? 'text-green-700 font-medium' : ''}>
+                            {row.parent_notified
+                              ? `Parent notified${row.parent_notified_at ? ` at ${new Date(row.parent_notified_at).toLocaleString('en-GB')}` : ''}${row.parent_notification_method ? ` via ${row.parent_notification_method}` : ''}`
+                              : 'Parent not yet notified'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

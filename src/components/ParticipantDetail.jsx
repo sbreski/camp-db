@@ -69,6 +69,10 @@ export default function ParticipantDetail({
   const [editingIncidentId, setEditingIncidentId] = useState(null)
   const [saveNotice, setSaveNotice] = useState('')
   const [activeTab, setActiveTab] = useState('Overview')
+  const [medicationForms, setMedicationForms] = useState([])
+  const [medicationAdministration, setMedicationAdministration] = useState([])
+  const [medicationPlans, setMedicationPlans] = useState([])
+  const [loadingMedical, setLoadingMedical] = useState(false)
   const [shareUsers, setShareUsers] = useState([])
   const [shareItems, setShareItems] = useState([])
   const [shareCategories, setShareCategories] = useState(['send'])
@@ -917,6 +921,24 @@ export default function ParticipantDetail({
   }, [canManageShares, participantId])
 
   useEffect(() => {
+    if (activeTab !== 'Medical' || !participantId) return
+    setLoadingMedical(true)
+    Promise.all([
+      supabase.from('medication_forms').select('*').eq('participant_id', participantId).order('created_at', { ascending: false }),
+      supabase.from('medication_administration').select('*').eq('participant_id', participantId).order('administered_at', { ascending: false }),
+      supabase.from('medication_plans').select('*').eq('participant_id', participantId).order('created_at', { ascending: false }),
+    ]).then(([formsRes, adminRes, plansRes]) => {
+      if (!formsRes.error) setMedicationForms(formsRes.data || [])
+      if (!adminRes.error) setMedicationAdministration(adminRes.data || [])
+      if (!plansRes.error) setMedicationPlans(plansRes.data || [])
+    }).catch(err => {
+      console.error('Medical data load error:', err)
+    }).finally(() => {
+      setLoadingMedical(false)
+    })
+  }, [activeTab, participantId])
+
+  useEffect(() => {
     if (!canManageShares || !participant) return
     if (String(shareSummary || '').trim()) return
     if (shareCategories.length !== 1) return
@@ -1274,7 +1296,8 @@ export default function ParticipantDetail({
 
         {/* MEDICAL */}
         {activeTab === 'Medical' && (
-          <div className="card">
+          <div className="space-y-4">
+            <div className="card">
             <h3 className="font-display font-semibold text-forest-950 mb-4">Medical, Allergy & Dietary</h3>
             {hasMedical ? (
   <div className="space-y-4">
@@ -1323,6 +1346,113 @@ export default function ParticipantDetail({
                   Add via Edit →
                 </button>
               </div>
+            )}
+            </div>
+
+            {/* Medication Plans */}
+            {loadingMedical ? (
+              <div className="card"><p className="text-sm text-stone-500">Loading medical records...</p></div>
+            ) : (
+              <>
+                {medicationPlans.length > 0 && (
+                  <div className="card space-y-2">
+                    <h4 className="font-display font-semibold text-forest-950">Medication Plans</h4>
+                    {medicationPlans.map(plan => (
+                      <div key={plan.id} className="rounded-xl border border-stone-200 p-3 text-sm">
+                        <p className="font-medium text-forest-950">{plan.medication_name}</p>
+                        {plan.dose && <p className="text-xs text-stone-500">Dose: {plan.dose}</p>}
+                        {plan.instructions && <p className="text-xs text-stone-600 mt-1">{plan.instructions}</p>}
+                        {plan.valid_until && (
+                          <p className="text-xs text-stone-400 mt-1">Valid until {new Date(`${plan.valid_until}T12:00:00`).toLocaleDateString('en-GB')}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Medical Forms */}
+                <div className="card space-y-2">
+                  <h4 className="font-display font-semibold text-forest-950">Medical Forms</h4>
+                  {medicationForms.length === 0 ? (
+                    <p className="text-xs text-stone-500">No medical forms uploaded yet. Upload via the Medical tab.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {medicationForms.map(form => (
+                        <div key={form.id} className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 p-3">
+                          <div>
+                            <p className="text-sm font-medium text-forest-950">{form.form_name}</p>
+                            <p className="text-xs text-stone-500">
+                              Uploaded {new Date(form.created_at).toLocaleDateString('en-GB')}
+                              {form.valid_until ? ` · Valid until ${new Date(`${form.valid_until}T12:00:00`).toLocaleDateString('en-GB')}` : ''}
+                              {form.uploaded_by_initials ? ` · ${form.uploaded_by_initials}` : ''}
+                            </p>
+                            {form.notes && <p className="text-xs text-stone-400 mt-0.5">{form.notes}</p>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const { data, error } = await supabase.storage.from('documents').download(form.storage_path)
+                                if (error) throw error
+                                const url = URL.createObjectURL(data)
+                                const opened = window.open(url, '_blank', 'noopener,noreferrer')
+                                if (!opened) URL.revokeObjectURL(url)
+                                else setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                              } catch (err) {
+                                alert(`Could not open form: ${err.message}`)
+                              }
+                            }}
+                            className="btn-secondary text-xs"
+                          >
+                            Open
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* MAR Log */}
+                <div className="card space-y-2">
+                  <h4 className="font-display font-semibold text-forest-950">Medication Administration Log (MAR)</h4>
+                  {medicationAdministration.length === 0 ? (
+                    <p className="text-xs text-stone-500">No MAR entries recorded for this child yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {medicationAdministration.map(row => {
+                        const when = row.administered_at ? new Date(row.administered_at).toLocaleString('en-GB') : '—'
+                        const medName = row.medication_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
+                        const isAdHoc = !row.medication_plan_id
+                        return (
+                          <div key={row.id} className={`rounded-xl border p-3 text-sm ${isAdHoc ? 'border-amber-200 bg-amber-50' : 'border-stone-200 bg-stone-50'}`}>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-forest-950">{medName}</span>
+                                {row.dose_given && <span className="text-stone-500">· {row.dose_given}</span>}
+                                <span className={`text-xs px-2 py-0.5 rounded-full capitalize font-medium ${
+                                  row.status === 'given' ? 'bg-green-100 text-green-700' :
+                                  row.status === 'refused' ? 'bg-red-100 text-red-700' :
+                                  'bg-stone-100 text-stone-600'
+                                }`}>{row.status}</span>
+                                {isAdHoc && (
+                                  <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Ad-hoc · Follow Up</span>
+                                )}
+                              </div>
+                              <span className="text-xs text-stone-400">{when} · {row.staff_initials}</span>
+                            </div>
+                            {row.notes && <p className="text-xs text-stone-500 mt-1">{row.notes}</p>}
+                            <p className={`text-xs mt-1 ${row.parent_notified ? 'text-green-700 font-medium' : 'text-stone-400'}`}>
+                              {row.parent_notified
+                                ? `Parent notified${row.parent_notified_at ? ` at ${new Date(row.parent_notified_at).toLocaleString('en-GB')}` : ''}${row.parent_notification_method ? ` via ${row.parent_notification_method}` : ''}`
+                                : 'Parent not yet notified'}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
