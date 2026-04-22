@@ -646,8 +646,8 @@ export default function App() {
   async function setTimetableEntries(updater) {
     const currentEmail = (currentUser?.email || '').toLowerCase()
     const isOwner = Boolean(OWNER_EMAIL && currentEmail === OWNER_EMAIL)
-    if (!isOwner && !isAdminUser) {
-      throw new Error('Only owner/admin accounts can edit timetable entries')
+    if (!isOwner && !isAdminUser && !canEditTimetable) {
+      throw new Error('You do not have permission to edit timetable entries')
     }
 
     const next = typeof updater === 'function' ? updater(timetableEntries) : updater
@@ -690,8 +690,8 @@ export default function App() {
   async function setTimetableSpaces(updater) {
     const currentEmail = (currentUser?.email || '').toLowerCase()
     const isOwner = Boolean(OWNER_EMAIL && currentEmail === OWNER_EMAIL)
-    if (!isOwner && !isAdminUser) {
-      throw new Error('Only owner/admin accounts can edit timetable spaces')
+    if (!isOwner && !isAdminUser && !canEditTimetable) {
+      throw new Error('You do not have permission to edit timetable spaces')
     }
 
     const currentSpaces = timetableSpaces
@@ -908,7 +908,8 @@ export default function App() {
         setIsAdminUser(false)
         setAllowedTabIds(BASIC_TABS)
         setCanViewTimetableOverview(false)
-      setCanViewSafeguardingPerm(false)
+        setCanEditTimetable(false)
+        setCanViewSafeguardingPerm(false)
         setPermissionsLoading(false)
         return
       }
@@ -938,6 +939,7 @@ export default function App() {
       setIsAdminUser(false)
       setAllowedTabIds(BASIC_TABS)
       setCanViewTimetableOverview(false)
+      setCanEditTimetable(false)
       setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
     }
@@ -970,7 +972,8 @@ export default function App() {
           setPermissionsLoading(false)
           setAllowedTabIds(BASIC_TABS)
           setCanViewTimetableOverview(false)
-      setCanViewSafeguardingPerm(false)
+          setCanEditTimetable(false)
+          setCanViewSafeguardingPerm(false)
         }
       } catch (error) {
         console.error('AUTH SESSION EXCEPTION:', error?.message || error)
@@ -980,7 +983,8 @@ export default function App() {
         setIsAdminUser(false)
         setAllowedTabIds(BASIC_TABS)
         setCanViewTimetableOverview(false)
-      setCanViewSafeguardingPerm(false)
+        setCanEditTimetable(false)
+        setCanViewSafeguardingPerm(false)
         setPermissionsLoading(false)
         setAuthLoading(false)
       }
@@ -1001,7 +1005,8 @@ export default function App() {
         } else {
           setAllowedTabIds(BASIC_TABS)
           setCanViewTimetableOverview(false)
-      setCanViewSafeguardingPerm(false)
+          setCanEditTimetable(false)
+          setCanViewSafeguardingPerm(false)
           setPermissionsLoading(false)
         }
       } catch (error) {
@@ -1011,7 +1016,8 @@ export default function App() {
         setIsAdminUser(false)
         setAllowedTabIds(BASIC_TABS)
         setCanViewTimetableOverview(false)
-      setCanViewSafeguardingPerm(false)
+        setCanEditTimetable(false)
+        setCanViewSafeguardingPerm(false)
         setPermissionsLoading(false)
       }
     })
@@ -1036,6 +1042,7 @@ export default function App() {
       setIsAdminUser(false)
       setAllowedTabIds(BASIC_TABS)
       setCanViewTimetableOverview(false)
+      setCanEditTimetable(false)
       setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
       setAuthLoading(false)
