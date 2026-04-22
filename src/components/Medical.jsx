@@ -56,7 +56,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
 
   const [marDraft, setMarDraft] = useState(() => ({
     participantId: '',
-    medicationPlanId: '',
+    linkedFormId: '',
     medicationName: '',
     doseGiven: '',
     administeredAt: nowLocalDateTimeValue(),
@@ -160,6 +160,19 @@ export default function Medical({ participants, setParticipants, actorInitials =
     return byParticipant
   }, [medicationPlans])
 
+  // Forms grouped by participant — used as the MAR "linked form" dropdown source
+  const formsByParticipant = useMemo(() => {
+    const byParticipant = new Map()
+    for (const form of medicationForms) {
+      const key = form.participant_id
+      if (!key) continue
+      const list = byParticipant.get(key) || []
+      list.push(form)
+      byParticipant.set(key, list)
+    }
+    return byParticipant
+  }, [medicationForms])
+
   const filteredForms = useMemo(() => {
     if (!formParticipantId) return medicationForms
     return medicationForms.filter(form => form.participant_id === formParticipantId)
@@ -188,18 +201,18 @@ export default function Medical({ participants, setParticipants, actorInitials =
       return
     }
 
-    const selectedPlan = medicationPlans.find(plan => plan.id === marDraft.medicationPlanId)
-    const isAdHoc = !marDraft.medicationPlanId
+    const selectedForm = medicationForms.find(f => f.id === marDraft.linkedFormId)
+    const isAdHoc = !marDraft.linkedFormId
     const payload = {
       id: crypto.randomUUID(),
       participant_id: marDraft.participantId,
-      medication_plan_id: marDraft.medicationPlanId || null,
+      medication_plan_id: marDraft.linkedFormId || null,
       administered_at: new Date(marDraft.administeredAt).toISOString(),
       status: marDraft.status,
       staff_initials: marDraft.staffInitials.trim().toUpperCase(),
       notes: marDraft.notes.trim() || null,
       dose_given: marDraft.doseGiven.trim() || null,
-      medication_name: marDraft.medicationName.trim() || selectedPlan?.medication_name || null,
+      medication_name: marDraft.medicationName.trim() || selectedForm?.form_name || null,
       parent_notified: Boolean(marDraft.parentNotified),
       parent_notified_at: marDraft.parentNotified && marDraft.parentNotifiedAt
         ? new Date(marDraft.parentNotifiedAt).toISOString()
@@ -240,7 +253,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
       await loadMedicalOperations()
       setMarDraft(prev => ({
         ...prev,
-        medicationPlanId: '',
+        linkedFormId: '',
         medicationName: '',
         doseGiven: '',
         administeredAt: nowLocalDateTimeValue(),
@@ -558,25 +571,15 @@ export default function Medical({ participants, setParticipants, actorInitials =
                 </select>
               </div>
               <div>
-                <label className="label">Medication Plan</label>
-                <select className="input" value={marDraft.medicationPlanId} onChange={e => updateMarDraft('medicationPlanId', e.target.value)}>
+                <label className="label">Linked Medical Form</label>
+                <select className="input" value={marDraft.linkedFormId} onChange={e => updateMarDraft('linkedFormId', e.target.value)}>
                   <option value="">None / ad-hoc</option>
-                  {(plansByParticipant.get(marDraft.participantId) || []).map(plan => (
-                    <option key={plan.id} value={plan.id}>{plan.medication_name}{plan.dose ? ` (${plan.dose})` : ''}</option>
+                  {(formsByParticipant.get(marDraft.participantId) || []).map(form => (
+                    <option key={form.id} value={form.id}>{form.form_name}</option>
                   ))}
-                  {(plansByParticipant.get(marDraft.participantId) || []).length === 0 && medicationPlans.length > 0 && (
-                    <optgroup label="All plans (no plans on file for this child — check Medical Plans tab)">
-                      {medicationPlans.map(plan => {
-                        const pName = participantsById.get(plan.participant_id)?.name
-                        return (
-                          <option key={plan.id} value={plan.id} disabled>{plan.medication_name}{pName ? ` — ${pName}` : ''}</option>
-                        )
-                      })}
-                    </optgroup>
-                  )}
                 </select>
-                {(plansByParticipant.get(marDraft.participantId) || []).length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">No medication plans on file for this child. Add a plan in the Medication Plans section first, or record this as ad-hoc.</p>
+                {(formsByParticipant.get(marDraft.participantId) || []).length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No medical forms uploaded for this child yet — upload one in the Medical Forms tab first, or record as ad-hoc.</p>
                 )}
               </div>
               <div>
@@ -654,7 +657,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
                 {marRows.map(row => {
                   const participantName = participantsById.get(row.participant_id)?.name || 'Unknown'
                   const when = row.administered_at ? new Date(row.administered_at).toLocaleString('en-GB') : '—'
-                  const medName = row.medication_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
+                  const medName = row.medication_name || medicationForms.find(f => f.id === row.medication_plan_id)?.form_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
                   const isAdHoc = !row.medication_plan_id
                   const needsFollowUp = isAdHoc && !row.follow_up_required === false
                   const isEditing = editingMarId === row.id
