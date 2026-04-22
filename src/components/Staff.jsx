@@ -917,7 +917,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       return
     }
 
-    const loginEmail = String(user.email || '').trim().toLowerCase()
+
     if (!loginEmail) {
       setAccessError('This login account has no email (username-only accounts cannot be linked by email).')
       return
