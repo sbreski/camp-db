@@ -423,7 +423,7 @@ function CreateAccountForm({ onSubmit, loading }) {
   )
 }
 
-export default function Staff({ staffList, setStaffList, campPeriods, setCampPeriods, canManageCampPeriod = false }) {
+export default function Staff({ staffList, setStaffList, campPeriods, setCampPeriods, canManageCampPeriod = false }) {}
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -934,20 +934,25 @@ if (!loginEmail && !loginUsername) {
     setAccessActionLoading(true)
     setAccessError('')
     setAccessMessage('')
-    try {
-      await setStaffList(prev => prev.map(member => {
-        if (member.id === selectedStaffId) {
-          return { ...member, email: loginEmail }
-        }
-        return member
-      }))
-      setAccessMessage(`Linked ${selectedStaff.name} to ${loginEmail}`)
-    } catch (error) {
-      setAccessError(error.message || 'Unable to link staff to login email')
-    } finally {
-      setAccessActionLoading(false)
+try {
+  await setStaffList(prev => prev.map(member => {
+    if (member.id === selectedStaffId) {
+      return {
+        ...member,
+        email: loginEmail || member.email,          // keep existing if empty
+        username: loginUsername || member.username  // 👈 add this
+      }
     }
-  }
+    return member
+  }))
+
+  const identifier = loginEmail || loginUsername
+  setAccessMessage(`Linked ${selectedStaff.name} to ${identifier}`)
+} catch (error) {
+  setAccessError(error.message || 'Unable to link staff to login account')
+} finally {
+  setAccessActionLoading(false)
+}
 
   async function assignOwnerProfile() {
     if (!ownerEmail) {
