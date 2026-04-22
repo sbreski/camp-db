@@ -29,7 +29,7 @@ function isMissingColumnError(error, columnName) {
   return message.includes(String(columnName || '').toLowerCase()) && message.includes('does not exist')
 }
 
-export default function Medical({ participants, setParticipants, actorInitials = 'ST', onView }) {
+export default function Medical({ participants, setParticipants, actorInitials = 'ST', onView, medicationAdministration: medicationAdministrationProp, setMedicationAdministration: setMedicationAdministrationProp }) {
   const [selectedFilters, setSelectedFilters] = useState([])
   const [search, setSearch] = useState('')
   const [activeSection, setActiveSection] = useState('overview')
@@ -40,8 +40,17 @@ export default function Medical({ participants, setParticipants, actorInitials =
   const [editMarDraft, setEditMarDraft] = useState(null)
 
   const [medicationPlans, setMedicationPlans] = useState([])
-  const [medicationAdministration, setMedicationAdministration] = useState([])
+  const [medicationAdministrationLocal, setMedicationAdministrationLocal] = useState([])
   const [medicationForms, setMedicationForms] = useState([])
+
+  // Use lifted state if provided by parent, otherwise use local state
+  const medicationAdministration = medicationAdministrationProp ?? medicationAdministrationLocal
+  function setMedicationAdministration(updater) {
+    setMedicationAdministrationLocal(updater)
+    if (typeof setMedicationAdministrationProp === 'function') {
+      setMedicationAdministrationProp(updater)
+    }
+  }
 
   const [selectedMatrixParticipantId, setSelectedMatrixParticipantId] = useState('')
   const [allergenDraft, setAllergenDraft] = useState({})
@@ -103,7 +112,13 @@ export default function Medical({ participants, setParticipants, actorInitials =
       ])
 
       if (!plansRes.error) setMedicationPlans(plansRes.data || [])
-      if (!adminRes.error) setMedicationAdministration(adminRes.data || [])
+      if (!adminRes.error) {
+        const adminData = adminRes.data || []
+        setMedicationAdministrationLocal(adminData)
+        if (typeof setMedicationAdministrationProp === 'function') {
+          setMedicationAdministrationProp(() => adminData)
+        }
+      }
       if (!formsRes.error) setMedicationForms(formsRes.data || [])
     } catch (error) {
       console.error('MEDICAL OPS LOAD ERROR:', error)

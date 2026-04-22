@@ -204,7 +204,7 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
   )
 }
 
-export default function SignInOut({ participants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, canViewAdminFollowUps = false }) {
+export default function SignInOut({ participants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // all | in | not-in | follow-up
   const [flash, setFlash] = useState(null)
@@ -239,6 +239,36 @@ export default function SignInOut({ participants, attendance, setAttendance, act
           }
         : incident
     )))
+  }
+
+  function getPendingMarFollowUps(participantId) {
+    return medicationAdministration.filter(row =>
+      row.participant_id === participantId &&
+      row.follow_up_required &&
+      !row.follow_up_completed_at
+    )
+  }
+
+  async function completeMarFollowUp(marId) {
+    const completedAt = new Date().toISOString()
+    // Optimistic update locally
+    if (typeof setMedicationAdministration === 'function') {
+      setMedicationAdministration(prev => prev.map(row =>
+        row.id === marId
+          ? { ...row, follow_up_completed_at: completedAt, follow_up_completed_by: actorInitials }
+          : row
+      ))
+    }
+    // Also persist to Supabase if available
+    try {
+      const { supabase } = await import('../supabase')
+      await supabase
+        .from('medication_administration')
+        .update({ follow_up_completed_at: completedAt, follow_up_completed_by: actorInitials })
+        .eq('id', marId)
+    } catch (_) {
+      // Supabase update is best-effort; local state already updated
+    }
   }
 
   function getRecord(participantId) {
@@ -470,7 +500,8 @@ export default function SignInOut({ participants, attendance, setAttendance, act
   const participantsWithFollowUps = seasonParticipants.filter(p => {
     const hasIncidentFollowUp = getPendingFollowUps(p.id).length > 0
     const hasNoteFollowUp = canViewAdminFollowUps && hasParticipantNoteFollowUp(p.id)
-    return hasIncidentFollowUp || hasNoteFollowUp
+    const hasMarFollowUp = getPendingMarFollowUps(p.id).length > 0
+    return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
   }).length
 
   function printFireRecord() {
@@ -736,7 +767,8 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                 if (statusFilter === 'follow-up') {
                   const hasIncidentFollowUp = getPendingFollowUps(p.id).length > 0
                   const hasNoteFollowUp = canViewAdminFollowUps && hasParticipantNoteFollowUp(p.id)
-                  return hasIncidentFollowUp || hasNoteFollowUp
+                  const hasMarFollowUp = getPendingMarFollowUps(p.id).length > 0
+                  return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
                 }
                 const rec = getRecord(p.id)
                 const isInNow = !!(rec?.signIn && !rec?.signOut)
@@ -766,6 +798,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
               const hasSend = !!p.sendNeeds
               const hasSafeguarding = !!p.safeguardingFlag
               const pendingFollowUps = getPendingFollowUps(p.id)
+              const pendingMarFollowUps = getPendingMarFollowUps(p.id)
               const allergyTooltip = String(p.allergyDetails || '').trim() || 'No details recorded'
               const dietaryTooltip = [
                 String(p.dietaryType || '').trim(),
@@ -870,6 +903,31 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                               <button
                                 type="button"
                                 onClick={() => completeFollowUp(incident.id)}
+                                className="ml-auto rounded bg-white/80 px-2 py-0.5 text-[11px] font-semibold hover:bg-white"
+                              >
+                                Mark done
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {pendingMarFollowUps.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        {pendingMarFollowUps.map(row => {
+                          const when = row.administered_at ? new Date(row.administered_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
+                          const medLabel = row.medication_name || 'Ad-hoc medication'
+                          return (
+                            <div
+                              key={row.id}
+                              className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800"
+                            >
+                              <span>
+                                Medication Follow Up: {medLabel} given {when} — inform parent at pickup
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => completeMarFollowUp(row.id)}
                                 className="ml-auto rounded bg-white/80 px-2 py-0.5 text-[11px] font-semibold hover:bg-white"
                               >
                                 Mark done

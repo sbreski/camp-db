@@ -335,6 +335,7 @@ export default function App() {
   const needsParticipants = ['dashboard', 'signin', 'shared-info', 'attendance', 'star-of-day', 'participants', 'participant', 'parents', 'dressing-rooms', 'medical', 'incidents', 'behaviour'].includes(page)
   const needsAttendance = ['dashboard', 'signin', 'attendance', 'participant'].includes(page)
   const needsIncidents = ['dashboard', 'signin', 'participant', 'incidents', 'behaviour'].includes(page)
+  const needsMedicationAdministration = ['signin', 'medical'].includes(page)
   const needsBehaviourLogs = ['behaviour'].includes(page)
   const needsTimetable = ['timetable'].includes(page)
   const needsStarOfDay = ['star-of-day'].includes(page)
@@ -343,6 +344,7 @@ export default function App() {
   const [rawParticipants, , loadingP, reloadP] = useSupabaseTable('participants', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsParticipants, cacheScope: tableCacheScope })
   const [rawAttendance, , loadingA, reloadA] = useSupabaseTable('attendance', 'date', { enabled: tableQueriesEnabled && needsAttendance, cacheScope: tableCacheScope })
   const [rawIncidents, , loadingI, reloadI] = useSupabaseTable('incidents', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsIncidents, cacheScope: tableCacheScope })
+  const [rawMedicationAdministration, setRawMedicationAdministration, loadingMA] = useSupabaseTable('medication_administration', 'administered_at', { enabled: tableQueriesEnabled && needsMedicationAdministration, cacheScope: tableCacheScope })
   const [rawBehaviourLogs, , loadingBL, reloadBL] = useSupabaseTable('behaviour_logs', 'logged_at', { enabled: tableQueriesEnabled && needsBehaviourLogs, cacheScope: tableCacheScope })
   const [rawTimetableEntries, , loadingT, reloadT] = useSupabaseTable('daily_timetable_entries', 'day_date', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
   const [rawTimetableSpaces, , loadingTS, reloadTS] = useSupabaseTable('timetable_spaces', 'name', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
@@ -353,6 +355,7 @@ export default function App() {
   const participants = rawParticipants.map(toCamel)
   const attendance = rawAttendance.map(toCamel)
   const incidents = rawIncidents.map(toCamel)
+  const medicationAdministration = rawMedicationAdministration
   const behaviourLogs = rawBehaviourLogs.map(toCamel)
   const timetableEntries = rawTimetableEntries.map(toCamel)
   const timetableSpaces = rawTimetableSpaces.map(toCamel)
@@ -564,6 +567,13 @@ export default function App() {
       }
     }
     reloadI()
+  }
+
+  function setMedicationAdministration(updater) {
+    setRawMedicationAdministration(prev => {
+      const current = Array.isArray(prev) ? prev : []
+      return typeof updater === 'function' ? updater(current) : updater
+    })
   }
 
   async function setStaffList(updater) {
@@ -1442,7 +1452,7 @@ export default function App() {
           canManageUserResets={isOwnerUser || isAdminUser}
         />
       )
-      case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
+      case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} campPeriods={campPeriods} />
@@ -1472,7 +1482,7 @@ export default function App() {
           onBack={() => navigate('participants')}
         />
       )
-      case 'medical': return <Medical participants={participants} setParticipants={setParticipants} actorInitials={actorInitials} onView={(id) => navigate('participant', id)} />
+      case 'medical': return <Medical participants={participants} setParticipants={setParticipants} actorInitials={actorInitials} onView={(id) => navigate('participant', id)} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} />
       case 'behaviour': return <BehaviourLogs participants={participants} incidents={incidents} behaviourLogs={behaviourLogs} setBehaviourLogs={setBehaviourLogs} actorInitials={actorInitials} />
       case 'timetable': return (
         <Timetable
