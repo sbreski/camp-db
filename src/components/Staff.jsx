@@ -917,42 +917,35 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       return
     }
 
+    const loginEmail = String(user.email || '').trim().toLowerCase()
+    if (!loginEmail) {
+      setAccessError('This login account has no email (username-only accounts cannot be linked by email).')
+      return
+    }
 
-const loginEmail = String(user.email || '').trim().toLowerCase()
-const loginUsername = String(user.username || '').trim().toLowerCase()
-
-if (!loginEmail && !loginUsername) {
-  setAccessError('This login account has no email or username.')
-  return
-}
-
-if (!loginEmail && !loginUsername) {
-  setAccessError('This login account has no email or username.')
-  return
-}
+    const selectedStaff = staffList.find(member => member.id === selectedStaffId)
+    if (!selectedStaff) {
+      setAccessError('Selected staff profile no longer exists.')
+      return
+    }
 
     setAccessActionLoading(true)
     setAccessError('')
     setAccessMessage('')
-try {
-  await setStaffList(prev => prev.map(member => {
-    if (member.id === selectedStaffId) {
-      return {
-        ...member,
-        email: loginEmail || member.email,          // keep existing if empty
-        username: loginUsername || member.username  // 👈 add this
-      }
+    try {
+      await setStaffList(prev => prev.map(member => {
+        if (member.id === selectedStaffId) {
+          return { ...member, email: loginEmail }
+        }
+        return member
+      }))
+      setAccessMessage(`Linked ${selectedStaff.name} to ${loginEmail}`)
+    } catch (error) {
+      setAccessError(error.message || 'Unable to link staff to login account')
+    } finally {
+      setAccessActionLoading(false)
     }
-    return member
-  }))
-
-  const identifier = loginEmail || loginUsername
-  setAccessMessage(`Linked ${selectedStaff.name} to ${identifier}`)
-} catch (error) {
-  setAccessError(error.message || 'Unable to link staff to login account')
-} finally {
-  setAccessActionLoading(false)
-}
+  }
 
   async function assignOwnerProfile() {
     if (!ownerEmail) {
@@ -1033,21 +1026,14 @@ try {
     await setCampPeriods(prev => prev.filter(p => p.id !== id))
   }
 
-const staffByEmail = useMemo(() => {
-  const map = new Map()
-
-  staffList.forEach(member => {
-    const email = (member.email || '').toLowerCase()
-    const internalEmail = (member.internalEmail || '').toLowerCase()
-    const username = normalizeUsername(member.name)
-
-    if (email) map.set(email, member)
-    if (internalEmail) map.set(internalEmail, member)
-    if (username) map.set(username, member) // 👈 ADD THIS
-  })
-
-  return map
-}, [staffList])
+  const staffByEmail = useMemo(() => {
+    const map = new Map()
+    staffList.forEach(member => {
+      const email = (member.email || '').toLowerCase()
+      if (email) map.set(email, member)
+    })
+    return map
+  }, [staffList])
 
   return (
     <div className="fade-in space-y-6">
@@ -1491,4 +1477,4 @@ const staffByEmail = useMemo(() => {
       </section>
     </div>
   )
-}}
+}
