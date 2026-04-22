@@ -1300,8 +1300,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                 const edit = accessEdits[user.id] || {
                   identifier: user.username || user.email || '',
                   isAdmin: false,
-                  canViewTimetableOverview: false,
-                  canEditTimetable: false,
                   allowedTabs: ['dashboard', 'signin'],
                   newPassword: '',
                   deleteConfirmed: false,
@@ -1347,28 +1345,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                         Full admin
                       </label>
                     </div>
-
-                    <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={!!edit.canViewTimetableOverview}
-                        onChange={e => setEdit(user.id, { canViewTimetableOverview: e.target.checked })}
-                        disabled={!!edit.isAdmin}
-                      />
-                      Can view timetable overviews
-                    </label>
-
-                    <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={!!edit.canEditTimetable}
-                        onChange={e => setEdit(user.id, { canEditTimetable: e.target.checked })}
-                        disabled={!!edit.isAdmin}
-                      />
-                      Can edit timetable
-                    </label>
 
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
                       <div>
