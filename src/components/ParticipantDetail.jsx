@@ -1400,7 +1400,7 @@ export default function ParticipantDetail({
                         checked={shareTargetUserIds.includes(user.id)}
                         onChange={() => toggleShareTargetUser(user.id)}
                       />
-                      {user.username}
+                      {user.FullName}
                     </label>
                   ))}
                 </div>
