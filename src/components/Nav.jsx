@@ -13,6 +13,7 @@ export const NAV_ITEMS = [
   { id: 'dressing-rooms', label: 'Dressing Rooms', icon: Shirt },
   { id: 'medical', label: 'Medical', icon: Stethoscope },
   { id: 'behaviour', label: 'Behaviour Log', icon: FileText },
+  // { id: 'timetable', label: 'Timetable', icon: CalendarDays },
   { id: 'incidents', label: 'Reporting', icon: AlertTriangle },
   { id: 'staff', label: 'Staff', icon: UserCog },
   { id: 'documents', label: 'Documents', icon: FileText },
