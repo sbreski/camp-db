@@ -25,7 +25,7 @@ const TAB_OPTIONS = [
   { id: 'dressing-rooms', label: 'Dressing Rooms' },
   { id: 'medical', label: 'Medical' },
   { id: 'behaviour', label: 'Behaviour Log' },
-  { id: 'timetable', label: 'Timetable' },
+  // { id: 'timetable', label: 'Timetable' }, 
   { id: 'incidents', label: 'Reporting' },
   { id: 'staff', label: 'Staff' },
   { id: 'documents', label: 'Documents' },
