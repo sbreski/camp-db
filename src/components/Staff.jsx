@@ -923,11 +923,13 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       return
     }
 
-    const selectedStaff = staffList.find(member => member.id === selectedStaffId)
-    if (!selectedStaff) {
-      setAccessError('Selected staff profile no longer exists.')
-      return
-    }
+const loginEmail = String(user.email || '').trim().toLowerCase()
+const loginUsername = String(user.username || '').trim().toLowerCase()
+
+if (!loginEmail && !loginUsername) {
+  setAccessError('This login account has no email or username.')
+  return
+}
 
     setAccessActionLoading(true)
     setAccessError('')
@@ -1026,14 +1028,21 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     await setCampPeriods(prev => prev.filter(p => p.id !== id))
   }
 
-  const staffByEmail = useMemo(() => {
-    const map = new Map()
-    staffList.forEach(member => {
-      const email = (member.email || '').toLowerCase()
-      if (email) map.set(email, member)
-    })
-    return map
-  }, [staffList])
+const staffByEmail = useMemo(() => {
+  const map = new Map()
+
+  staffList.forEach(member => {
+    const email = (member.email || '').toLowerCase()
+    const internalEmail = (member.internalEmail || '').toLowerCase()
+    const username = normalizeUsername(member.name)
+
+    if (email) map.set(email, member)
+    if (internalEmail) map.set(internalEmail, member)
+    if (username) map.set(username, member) // 👈 ADD THIS
+  })
+
+  return map
+}, [staffList])
 
   return (
     <div className="fade-in space-y-6">
@@ -1304,8 +1313,10 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                   newPassword: '',
                   deleteConfirmed: false,
                 }
-                const linkedStaff = staffByEmail.get((user.email || '').toLowerCase())
+                const linkedStaff =
+                staffByEmail.get((user.email || '').toLowerCase())
                   || staffByEmail.get((user.internalEmail || '').toLowerCase())
+                  || staffByEmail.get((user.username || '').toLowerCase()) //
                   || (user.username ? staffList.find(m => normalizeUsername(m.name) === user.username) : null)
                   || (user.fullName ? staffList.find(m => m.name === user.fullName) : null)
                 const isCurrentUser = (user.internalEmail || user.email || '').toLowerCase() === currentUserEmail
