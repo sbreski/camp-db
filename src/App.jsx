@@ -994,9 +994,19 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
         const hasSession = !!session
+
+        // TOKEN_REFRESHED fires every time the browser regains focus and Supabase
+        // silently refreshes the JWT. We only need to update the user object —
+        // re-running the full permissions load causes a visible reload for non-admin
+        // users because permissionsLoading flips to true while the DB query runs.
+        if (event === 'TOKEN_REFRESHED') {
+          if (hasSession) setCurrentUser(session.user)
+          return
+        }
+
         setAuthed(hasSession)
         setCurrentUser(session?.user || null)
         setPermissionsLoading(hasSession)
