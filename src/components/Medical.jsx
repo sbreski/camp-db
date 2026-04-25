@@ -221,7 +221,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
     const payload = {
       id: crypto.randomUUID(),
       participant_id: marDraft.participantId,
-      medication_plan_id: marDraft.linkedFormId || null,
+      medication_form_id: marDraft.linkedFormId || null,
       administered_at: new Date(marDraft.administeredAt).toISOString(),
       status: marDraft.status,
       staff_initials: marDraft.staffInitials.trim().toUpperCase(),
@@ -404,7 +404,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
       const payload = {
         id: crypto.randomUUID(),
         participant_id: formParticipantId,
-        medication_plan_id: null,
+        medication_form_id: null,
         form_name: `${formType}: ${formFile.name}`,
         storage_path: storagePath,
         uploaded_by_initials: actorInitials,
@@ -672,8 +672,8 @@ export default function Medical({ participants, setParticipants, actorInitials =
                 {marRows.map(row => {
                   const participantName = participantsById.get(row.participant_id)?.name || 'Unknown'
                   const when = row.administered_at ? new Date(row.administered_at).toLocaleString('en-GB') : '—'
-                  const medName = row.medication_name || medicationForms.find(f => f.id === row.medication_plan_id)?.form_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
-                  const isAdHoc = !row.medication_plan_id
+                  const medName = row.medication_name || medicationForms.find(f => f.id === row.medication_form_id)?.form_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
+                  const isAdHoc = !row.medication_form_id && !row.medication_plan_id
                   const needsFollowUp = isAdHoc && !row.follow_up_required === false
                   const isEditing = editingMarId === row.id
 

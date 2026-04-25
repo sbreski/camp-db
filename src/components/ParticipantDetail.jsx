@@ -1421,8 +1421,8 @@ export default function ParticipantDetail({
                     <div className="space-y-2">
                       {medicationAdministration.map(row => {
                         const when = row.administered_at ? new Date(row.administered_at).toLocaleString('en-GB') : '—'
-                        const medName = row.medication_name || medicationForms.find(f => f.id === row.medication_plan_id)?.form_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
-                        const isAdHoc = !row.medication_plan_id
+                        const medName = row.medication_name || medicationForms.find(f => f.id === row.medication_form_id)?.form_name || medicationPlans.find(p => p.id === row.medication_plan_id)?.medication_name || '—'
+                        const isAdHoc = !row.medication_form_id && !row.medication_plan_id
                         return (
                           <div key={row.id} className={`rounded-xl border p-3 text-sm ${isAdHoc ? 'border-amber-200 bg-amber-50' : 'border-stone-200 bg-stone-50'}`}>
                             <div className="flex items-center justify-between gap-2 flex-wrap">
