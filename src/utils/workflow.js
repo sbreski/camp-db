@@ -18,6 +18,7 @@ export function getPendingFollowUpsForParticipant(incidents, participantId, date
   return (incidents || [])
     .filter((incident) => {
       if (incident.participantId !== participantId) return false
+      if (incident.followUpTiming === 'today') return false
       return getFollowUpStatus(incident, dateKey) !== null
     })
     .sort((a, b) => {
@@ -31,6 +32,7 @@ export function getPendingFollowUpsForParticipant(incidents, participantId, date
 export function getFollowUpsDue(incidents, participants, dateKey) {
   return (incidents || [])
     .map((incident) => {
+      if (incident.followUpTiming === 'today') return null
       const status = getFollowUpStatus(incident, dateKey)
       if (!status) return null
       return {

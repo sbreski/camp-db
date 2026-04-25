@@ -122,7 +122,13 @@ export default function IncidentForm({
 
       if (error) {
         lastError = error
-        if (/bucket not found/i.test(error.message || '')) {
+        if (
+          /bucket not found/i.test(error.message || '')
+          || /not found/i.test(error.message || '')
+          || /does not exist/i.test(error.message || '')
+          || String(error.statusCode || error.status || '') === '400'
+          || String(error.statusCode || error.status || '') === '404'
+        ) {
           continue
         }
         throw error
