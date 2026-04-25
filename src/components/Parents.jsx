@@ -178,11 +178,11 @@ export default function Parents({ participants, onUpdateParticipant }) {
                       className="rounded border-stone-300 text-forest-600 focus:ring-forest-500"
                     />
                   </th>
+                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Participant</th>
+                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Pronouns</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Parent Name</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Email</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Phone</th>
-                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Child</th>
-                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Pronouns</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Approved Adults</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Actions</th>
                 </tr>
@@ -201,6 +201,17 @@ export default function Parents({ participants, onUpdateParticipant }) {
                           onChange={() => toggleParentSelection(p.id)}
                           className="rounded border-stone-300 text-forest-600 focus:ring-forest-500"
                         />
+                      </td>
+                      <td className="py-3 px-4 text-sm text-stone-700">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-forest-900 flex items-center justify-center text-white font-display font-bold text-xs">
+                            {p.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </div>
+                          {p.name}
+                        </div>
+                      </td>
+                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.pronouns ? 'bg-red-100 text-red-700' : ''}`}> 
+                        {p.pronouns ? p.pronouns : 'Missing'}
                       </td>
                       <td className="py-3 px-4 text-sm font-medium text-forest-950">
                         {p.parentName || <span className="bg-red-100 text-red-700 px-1 rounded">Missing</span>}
@@ -223,17 +234,6 @@ export default function Parents({ participants, onUpdateParticipant }) {
                             {p.parentPhone}
                           </a>
                         ) : 'Missing'}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-stone-700">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-forest-900 flex items-center justify-center text-white font-display font-bold text-xs">
-                            {p.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </div>
-                          {p.name}
-                        </div>
-                      </td>
-                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.pronouns ? 'bg-red-100 text-red-700' : ''}`}> 
-                        {p.pronouns ? p.pronouns : 'Missing'}
                       </td>
                       <td className={`py-3 px-4 text-sm text-stone-700 ${adults.length === 0 ? 'bg-red-100 text-red-700' : ''}`}> 
                         {adults.length > 0 ? (

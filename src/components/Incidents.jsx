@@ -750,9 +750,9 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             return (
               <div key={inc.id} className="card hover:shadow-sm transition-shadow group cursor-pointer"
                 onClick={() => openIncidentReport(inc)}>
-                <div className="flex items-start gap-4">
-                  <div className="mt-1 w-2.5 h-2.5 rounded-full flex-shrink-0 bg-amber-400" />
-                  <div className="flex-1 min-w-0">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 bg-amber-400" />
+                  <div className="flex-1 min-w-0 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-display font-semibold text-forest-950 group-hover:text-forest-700">
                         {p?.name || 'Unknown Participant'}
@@ -775,7 +775,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                       )}
                       {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-stone-400">
                         {new Date(inc.createdAt).toLocaleDateString('en-GB', {
                           weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
@@ -805,8 +805,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         </span>
                       )}
                       {inc.pdfName && (
-                        <span className="flex items-center gap-1 text-xs text-forest-700 font-medium">
-                          <FileText size={11} /> {inc.pdfName}
+                        <span className="flex items-center gap-1 text-xs text-forest-700 font-medium max-w-[160px] sm:max-w-none">
+                          <FileText size={11} /> <span className="truncate">{inc.pdfName}</span>
                           {inc.type === 'Safeguarding' && !canViewSafeguarding ? (
                             <span className="ml-1 text-stone-500">Restricted</span>
                           ) : (
@@ -825,7 +825,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                     {p?.parentEmail && (
                       <button onClick={(e) => {
                         e.stopPropagation()
@@ -906,7 +906,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                           e.stopPropagation()
                           onView(p.id)
                         }}
-                        className="text-xs px-2 py-1 rounded-md border border-stone-200 text-stone-700 hover:text-forest-900 hover:border-forest-300 bg-white"
+                        className="text-xs px-2 py-1 rounded-md border border-stone-200 text-stone-700 hover:text-forest-900 hover:border-forest-300 bg-white hidden sm:block"
                       >
                         View Participant
                       </button>

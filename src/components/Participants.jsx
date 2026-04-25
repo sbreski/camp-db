@@ -484,7 +484,7 @@ export default function Participants({ participants, setParticipants, onView }) 
                   {participantDisplayName(p).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onView(p.id)}>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-display font-semibold text-forest-950 group-hover:text-forest-700" />
                     {photoConsentMode(p.photoConsent) === 'no' && (
                       <CameraOff size={12} className="text-rose-700" title="No photo consent" />
@@ -499,9 +499,23 @@ export default function Participants({ participants, setParticipants, onView }) 
                   <p className="text-xs text-stone-400 truncate">
                     {[p.pronouns, p.age ? `Age ${p.age}` : null, p.role].filter(Boolean).join(' · ')}
                   </p>
+                  {/* Badges inline on mobile below the name */}
+                  <div className="flex items-center gap-1 flex-wrap mt-1 sm:hidden">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold border ${gc.bg} ${gc.text} ${gc.border}`}>
+                      {g === 'm' ? 'M' : g === 'f' ? 'F' : 'NB'}
+                    </span>
+                    {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
+                    {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
+                    {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
+                    {p.sendNeeds && <span className="badge-send">S</span>}
+                    {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
+                      {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {/* Gender badge */}
+                {/* Badges on the right — desktop only */}
+                <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold border ${gc.bg} ${gc.text} ${gc.border}`}>
                     {g === 'm' ? 'M' : g === 'f' ? 'F' : 'NB'}
                   </span>

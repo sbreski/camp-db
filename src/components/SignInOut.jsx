@@ -251,25 +251,20 @@ export default function SignInOut({ participants, attendance, setAttendance, act
 
   async function completeMarFollowUp(marId) {
     const completedAt = new Date().toISOString()
-    const updates = {
-      follow_up_completed_at: completedAt,
-      follow_up_completed_by: actorInitials,
-      parent_notified: true,
-      parent_notified_at: completedAt,
-      parent_notification_method: 'verbal (at pickup)',
-    }
     // Optimistic update locally
     if (typeof setMedicationAdministration === 'function') {
       setMedicationAdministration(prev => prev.map(row =>
-        row.id === marId ? { ...row, ...updates } : row
+        row.id === marId
+          ? { ...row, follow_up_completed_at: completedAt, follow_up_completed_by: actorInitials }
+          : row
       ))
     }
-    // Persist to Supabase
+    // Also persist to Supabase if available
     try {
       const { supabase } = await import('../supabase')
       await supabase
         .from('medication_administration')
-        .update(updates)
+        .update({ follow_up_completed_at: completedAt, follow_up_completed_by: actorInitials })
         .eq('id', marId)
     } catch (_) {
       // Supabase update is best-effort; local state already updated
@@ -819,7 +814,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
 
               return (
                 <div key={p.id}
-                  className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:gap-2 sm:items-center px-4 py-3 transition-all ${
+                  className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:gap-2 sm:items-center px-3 py-3 transition-all ${
                     isFlashing ? 'bg-amber-50' : isIn ? 'bg-amber-50/40' : isOut ? 'bg-stone-50/60 opacity-75' : ''
                   }`}>
 
@@ -965,8 +960,24 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                     )}
                   </div>
 
-                  {/* Sign in time */}
-                  <div className="text-right sm:w-24 mt-2 sm:mt-0">
+                  {/* Sign in/out times — inline on mobile, columns on desktop */}
+                  <div className="sm:hidden flex items-center gap-3 mt-1 mb-1">
+                    {rec?.signIn && (
+                      <button onClick={() => startEditTime(p.id, 'signIn', rec.signIn)}
+                        className="text-xs font-mono text-green-700 font-semibold hover:bg-green-50 px-1.5 py-0.5 rounded">
+                        ↓ {fmt(rec?.signIn)}{isLate ? ' · Late' : ''}
+                      </button>
+                    )}
+                    {rec?.signOut && (
+                      <button onClick={() => startEditTime(p.id, 'signOut', rec.signOut)}
+                        className="text-xs font-mono text-blue-700 font-semibold hover:bg-blue-50 px-1.5 py-0.5 rounded">
+                        ↑ {fmt(rec?.signOut)}{isLatePickup ? ' · Late pickup' : ''}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sign in time — desktop only */}
+                  <div className="hidden sm:block text-right sm:w-24">
                     <div className="flex flex-col items-end gap-0.5">
                       {rec?.signIn ? (
                         <button
@@ -976,21 +987,15 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                           {fmt(rec?.signIn)}
                         </button>
                       ) : (
-                        <span className="text-xs font-mono text-stone-300">
-                          {fmt(rec?.signIn)}
-                        </span>
+                        <span className="text-xs font-mono text-stone-300">{fmt(rec?.signIn)}</span>
                       )}
-                      {isLate && (
-                        <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Late</span>
-                      )}
-                      {signInBy && (
-                        <span className="text-[10px] text-stone-500">by {signInBy}</span>
-                      )}
+                      {isLate && <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Late</span>}
+                      {signInBy && <span className="text-[10px] text-stone-500">by {signInBy}</span>}
                     </div>
                   </div>
 
-                  {/* Sign out time */}
-                  <div className="text-right sm:w-24 mt-2 sm:mt-0">
+                  {/* Sign out time — desktop only */}
+                  <div className="hidden sm:block text-right sm:w-24">
                     <div className="flex flex-col items-end gap-0.5">
                       {rec?.signOut ? (
                         <button
@@ -1000,56 +1005,49 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                           {fmt(rec?.signOut)}
                         </button>
                       ) : (
-                        <span className="text-xs font-mono text-stone-300">
-                          {fmt(rec?.signOut)}
-                        </span>
+                        <span className="text-xs font-mono text-stone-300">{fmt(rec?.signOut)}</span>
                       )}
-                      {signOutBy && (
-                        <span className="text-[10px] text-stone-500">by {signOutBy}</span>
-                      )}
-                      {isLatePickup && (
-                        <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Late pickup</span>
-                      )}
+                      {signOutBy && <span className="text-[10px] text-stone-500">by {signOutBy}</span>}
+                      {isLatePickup && <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Late pickup</span>}
                     </div>
                   </div>
 
                   {/* Buttons */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 justify-end sm:w-40 mt-2 sm:mt-0">
+                  <div className="flex flex-row sm:flex-row items-center gap-1.5 justify-start sm:justify-end sm:w-40 mt-2 sm:mt-0 flex-wrap">
                     {!rec?.signIn && (
                       <button onClick={() => signIn(p)}
-                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition-all w-full sm:w-auto">
+                        className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-display font-semibold bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition-all">
                         <LogIn size={12} /> In
                       </button>
                     )}
                     {rec?.signIn && !rec?.signOut && (
                       <>
-                        <button onClick={() => undoSignIn(p)} title="Undo sign-in"
-                          className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 transition-all self-end sm:self-auto">
-                          <RotateCcw size={13} />
-                        </button>
                         <button onClick={() => setCollectingFor(p)}
-                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-forest-900 hover:bg-forest-800 text-white active:scale-95 transition-all w-full sm:w-auto">
+                          className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-display font-semibold bg-forest-900 hover:bg-forest-800 text-white active:scale-95 transition-all">
                           <LogOut size={12} /> Out
+                        </button>
+                        <button onClick={() => undoSignIn(p)} title="Undo sign-in"
+                          className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 transition-all">
+                          <RotateCcw size={13} />
                         </button>
                       </>
                     )}
                     <button onClick={() => openNoteEditor(p)} title="Edit participant notes"
-                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all w-full sm:w-auto">
+                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all">
                       <FileText size={12} /> Notes
                     </button>
-                    <button
-                      onClick={() => openReasonEditor(p)}
-                      title="Add absence reason"
-                      className={`flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold active:scale-95 transition-all w-full sm:w-auto ${
-                        absenceReasonLocked ? 'bg-stone-50 text-stone-400 cursor-not-allowed opacity-50' : 'bg-amber-50 hover:bg-amber-100 text-amber-800'
-                      }`}
-                      disabled={absenceReasonLocked}
-                    >
-                      <Calendar size={12} /> Absence Reason
-                    </button>
+                    {!absenceReasonLocked && (
+                      <button
+                        onClick={() => openReasonEditor(p)}
+                        title="Add absence reason"
+                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold active:scale-95 transition-all bg-amber-50 hover:bg-amber-100 text-amber-800"
+                      >
+                        <Calendar size={12} /> <span className="sm:inline hidden">Absence Reason</span><span className="sm:hidden">Absent</span>
+                      </button>
+                    )}
                     {rec?.signOut && (
                       <button onClick={() => undoSignOut(p)} title="Undo sign-out"
-                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-medium bg-stone-100 hover:bg-red-100 hover:text-red-700 text-stone-500 active:scale-95 transition-all w-full sm:w-auto">
+                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-medium bg-stone-100 hover:bg-red-100 hover:text-red-700 text-stone-500 active:scale-95 transition-all">
                         <RotateCcw size={12} /> Undo
                       </button>
                     )}

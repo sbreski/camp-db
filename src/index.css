@@ -36,6 +36,13 @@
       bg-white font-body placeholder:text-stone-400 transition-all;
     font-size: 16px;
   }
+
+/* Prevent iOS Safari auto-zoom on select/textarea too */
+@media (max-width: 640px) {
+  select, textarea {
+    font-size: 16px !important;
+  }
+}
   .label {
     @apply block text-xs font-semibold font-display text-stone-500 uppercase tracking-wider mb-1.5;
   }
