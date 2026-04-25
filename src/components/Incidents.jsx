@@ -399,7 +399,15 @@ ${noteText}`
 
       if (error) {
         lastError = error
-        if (/bucket not found/i.test(error.message || '')) continue
+        const msg = error.message || ''
+        const status = error.statusCode || error.status || ''
+        if (
+          /bucket not found/i.test(msg)
+          || /not found/i.test(msg)
+          || /does not exist/i.test(msg)
+          || String(status) === '400'
+          || String(status) === '404'
+        ) continue
         throw error
       }
 
