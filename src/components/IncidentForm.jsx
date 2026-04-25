@@ -110,8 +110,6 @@ export default function IncidentForm({
   async function uploadPdfFile(file, fileDisplayName) {
     const fileName = `${crypto.randomUUID()}-${fileDisplayName}`
     const uploadTargets = [
-      { bucket: 'incidents', filePath: fileName },
-      // Fallback for projects that only have a documents bucket.
       { bucket: 'documents', filePath: `incidents/${fileName}` },
     ]
 

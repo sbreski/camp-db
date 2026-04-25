@@ -137,41 +137,9 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     ])
 
     const participantName = participants.find(p => p.id === selectedParticipant)?.name || 'participant'
-    const todayKey = getTodayKey()
-
-    // If "follow up today" — write a handover note to today's attendance record
-    if (timing === 'today' && setAttendance) {
-      const incidentType = data.type || 'Incident'
-      const noteText = `⚠️ ${incidentType} report filed — please inform parent/carer at pickup today.`
-      setAttendance(prev => {
-        const existing = prev.find(r => r.participantId === selectedParticipant && r.date === todayKey)
-        if (existing) {
-          const combinedNote = existing.exceptionNotes
-            ? `${existing.exceptionNotes}
-${noteText}`
-            : noteText
-          return prev.map(r => r.id === existing.id ? { ...r, exceptionNotes: combinedNote } : r)
-        }
-        return [
-          ...prev,
-          {
-            id: `${selectedParticipant}-${todayKey}`,
-            participantId: selectedParticipant,
-            date: todayKey,
-            signIn: null,
-            signOut: null,
-            signInBy: null,
-            signOutBy: null,
-            collectedBy: null,
-            exceptionReason: null,
-            exceptionNotes: noteText,
-          },
-        ]
-      })
-    }
 
     const noticeDetail = timing === 'today'
-      ? "Pickup handover note added to today's sign in/out tab."
+      ? 'Follow up today flagged on sign in/out tab.'
       : timing === 'tomorrow'
       ? "Follow up flagged for tomorrow's register."
       : ''
@@ -388,7 +356,6 @@ ${noteText}`
     const safeName = String(file?.name || 'attachment').replace(/\s+/g, '-')
     const filePath = `${crypto.randomUUID()}-${safeName}`
     const uploadTargets = [
-      { bucket: 'incidents', filePath },
       { bucket: 'documents', filePath: `incidents/${filePath}` },
     ]
 

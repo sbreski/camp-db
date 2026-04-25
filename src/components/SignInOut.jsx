@@ -884,21 +884,26 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                     {pendingFollowUps.length > 0 && (
                       <div className="mt-2 space-y-1.5">
                         {pendingFollowUps.map(incident => {
+                          const isToday = incident.followUpTiming === 'today'
                           const isOverdue = incident.followUpDueDate < selectedDate
                           return (
                             <div
                               key={incident.id}
                               className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
-                                isOverdue
+                                isToday
+                                  ? 'border-orange-200 bg-orange-50 text-orange-800'
+                                  : isOverdue
                                   ? 'border-red-200 bg-red-50 text-red-800'
                                   : 'border-amber-200 bg-amber-50 text-amber-800'
                               }`}
                             >
                               <span>
-                                Follow Up: {incident.type}
-                                {isOverdue
-                                  ? ` (overdue since ${new Date(incident.followUpDueDate + 'T12:00:00').toLocaleDateString('en-GB')})`
-                                  : ` (due ${new Date(incident.followUpDueDate + 'T12:00:00').toLocaleDateString('en-GB')})`}
+                                {isToday
+                                  ? `⚠️ ${incident.type} — inform parent/carer at pickup today`
+                                  : `Follow Up: ${incident.type}${isOverdue
+                                      ? ` (overdue since ${new Date(incident.followUpDueDate + 'T12:00:00').toLocaleDateString('en-GB')})`
+                                      : ` (due ${new Date(incident.followUpDueDate + 'T12:00:00').toLocaleDateString('en-GB')})`}`
+                                }
                               </span>
                               <button
                                 type="button"
