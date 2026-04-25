@@ -370,7 +370,12 @@ export default function App() {
 
   function isMissingColumnError(error, columnName) {
     const message = String(error?.message || '').toLowerCase()
-    return message.includes(String(columnName || '').toLowerCase()) && message.includes('does not exist')
+    const col = String(columnName || '').toLowerCase()
+    return (
+      (message.includes(col) && message.includes('does not exist')) ||
+      (message.includes(col) && message.includes('schema cache')) ||
+      (message.includes(col) && message.includes('could not find'))
+    )
   }
 
   function initialsFromName(name) {
@@ -506,6 +511,7 @@ export default function App() {
         || isMissingColumnError(error, 'incident_notes')
         || isMissingColumnError(error, 'incident_documents')
         || isMissingColumnError(error, 'follow_up_timing')
+        || isMissingColumnError(error, 'followUpTiming')
       )) {
         const {
           created_by_initials,
@@ -540,6 +546,7 @@ export default function App() {
         || isMissingColumnError(error, 'incident_notes')
         || isMissingColumnError(error, 'incident_documents')
         || isMissingColumnError(error, 'follow_up_timing')
+        || isMissingColumnError(error, 'followUpTiming')
       )) {
         // Backward-compatible fallback before the updated_at migration is applied.
         const {
