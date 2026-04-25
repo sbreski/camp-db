@@ -3,6 +3,19 @@ import { X, Plus } from 'lucide-react'
 import ParticipantNameText from './ParticipantNameText'
 import { isIncludedThisSeason } from './AttendanceOverview'
 
+function genderOf(p) {
+  const pr = String(p.pronouns || '').trim().toLowerCase()
+  if (pr === 'he/him') return 'm'
+  if (pr === 'she/her') return 'f'
+  return 'nb'
+}
+
+const GENDER_COLORS = {
+  m:  { bg: 'bg-blue-50',   text: 'text-blue-800',   border: 'border-blue-200' },
+  f:  { bg: 'bg-pink-50',   text: 'text-pink-800',   border: 'border-pink-200' },
+  nb: { bg: 'bg-violet-50', text: 'text-violet-800', border: 'border-violet-200' },
+}
+
 export default function DressingRooms({ participants }) {
     // Memoized list of included participants
     const includedParticipants = useMemo(() => participants.filter(isIncludedThisSeason), [participants])
@@ -128,7 +141,18 @@ export default function DressingRooms({ participants }) {
                 <tr key={p.id} className="border-t border-stone-100">
                   <td className="px-3 py-2"><ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-medium text-sm text-stone-900" /></td>
                   <td className="px-3 py-2">{getAge(p) !== null ? getAge(p) : <span className="text-stone-400">—</span>}</td>
-                  <td className="px-3 py-2">{p.pronouns ? <span className="text-sm text-stone-700">{p.pronouns}</span> : <span className="text-stone-400">—</span>}</td>
+                  <td className="px-3 py-2">
+                    {p.pronouns
+                      ? (() => {
+                          const c = GENDER_COLORS[genderOf(p)]
+                          return (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${c.bg} ${c.text} ${c.border}`}>
+                              {p.pronouns}
+                            </span>
+                          )
+                        })()
+                      : <span className="text-stone-400">—</span>}
+                  </td>
                   <td className="px-3 py-2">
                     <select
                       className="input"
