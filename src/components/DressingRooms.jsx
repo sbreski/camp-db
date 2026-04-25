@@ -119,6 +119,7 @@ export default function DressingRooms({ participants }) {
               <tr className="bg-stone-50">
                 <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Name</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Age</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Pronouns</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Room</th>
               </tr>
             </thead>
@@ -127,6 +128,7 @@ export default function DressingRooms({ participants }) {
                 <tr key={p.id} className="border-t border-stone-100">
                   <td className="px-3 py-2"><ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-medium text-sm text-stone-900" /></td>
                   <td className="px-3 py-2">{getAge(p) !== null ? getAge(p) : <span className="text-stone-400">—</span>}</td>
+                  <td className="px-3 py-2">{p.pronouns ? <span className="text-sm text-stone-700">{p.pronouns}</span> : <span className="text-stone-400">—</span>}</td>
                   <td className="px-3 py-2">
                     <select
                       className="input"
