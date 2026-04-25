@@ -198,6 +198,7 @@ function toSnake(obj) {
     incidentNotes: 'incident_notes', incidentDocuments: 'incident_documents',
     followUpRequired: 'follow_up_required', followUpDueDate: 'follow_up_due_date',
     followUpCompletedAt: 'follow_up_completed_at', followUpCompletedBy: 'follow_up_completed_by',
+    followUpTiming: 'follow_up_timing',
     resolvedAt: 'resolved_at', resolvedBy: 'resolved_by',
     createdByInitials: 'created_by_initials', updatedByInitials: 'updated_by_initials',
     createdByUserId: 'created_by_user_id', updatedByUserId: 'updated_by_user_id',
