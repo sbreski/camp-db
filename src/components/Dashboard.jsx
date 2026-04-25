@@ -23,6 +23,8 @@ export default function Dashboard({
   attendance,
   incidents,
   setIncidents,
+  medicationAdministration = [],
+  setMedicationAdministration,
   greetingName = '',
   onNavigate,
   allowedTabs = [],
@@ -45,6 +47,14 @@ export default function Dashboard({
         note: String(row.exceptionNotes || row.exception_notes || '').trim(),
       }))
     : []
+
+  const marFollowUpsDue = medicationAdministration.filter(row =>
+    row.follow_up_required && !row.follow_up_completed_at
+  ).map(row => ({
+    ...row,
+    participant: participants.find(p => p.id === row.participant_id) || null,
+  }))
+
   function completeFollowUp(incidentId) {
     if (!setIncidents) return
     setIncidents(prev => prev.map(inc => (
@@ -52,6 +62,26 @@ export default function Dashboard({
         ? { ...inc, followUpCompletedAt: new Date().toISOString(), followUpCompletedBy: 'Dashboard' }
         : inc
     )))
+  }
+
+  async function completeMarFollowUp(marId) {
+    const completedAt = new Date().toISOString()
+    const updates = {
+      follow_up_completed_at: completedAt,
+      follow_up_completed_by: 'Dashboard',
+      parent_notified: true,
+      parent_notified_at: completedAt,
+      parent_notification_method: 'verbal (at pickup)',
+    }
+    if (typeof setMedicationAdministration === 'function') {
+      setMedicationAdministration(prev => prev.map(row =>
+        row.id === marId ? { ...row, ...updates } : row
+      ))
+    }
+    try {
+      const { supabase } = await import('../supabase')
+      await supabase.from('medication_administration').update(updates).eq('id', marId)
+    } catch (_) {}
   }
 
   const [resetRequests, setResetRequests] = useState([])
@@ -293,6 +323,33 @@ export default function Dashboard({
                   <p className="text-xs text-indigo-800 mt-0.5 whitespace-pre-wrap">{item.note}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {marFollowUpsDue.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
+              <p className="text-xs font-semibold text-stone-600 uppercase tracking-wide">Medication Follow Ups</p>
+              {marFollowUpsDue.slice(0, 6).map(row => {
+                const when = row.administered_at
+                  ? new Date(row.administered_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  : '—'
+                const medLabel = row.medication_name || 'Ad-hoc medication'
+                return (
+                  <div key={row.id} className="rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-amber-900">{row.participant ? row.participant.name : 'Unknown participant'}</p>
+                      <p className="text-xs text-amber-800 mt-0.5">{medLabel} given {when} — parent to be informed at pickup</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => completeMarFollowUp(row.id)}
+                      className="shrink-0 rounded bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-200 transition-colors"
+                    >
+                      Mark done
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

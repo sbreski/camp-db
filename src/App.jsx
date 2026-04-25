@@ -198,7 +198,6 @@ function toSnake(obj) {
     incidentNotes: 'incident_notes', incidentDocuments: 'incident_documents',
     followUpRequired: 'follow_up_required', followUpDueDate: 'follow_up_due_date',
     followUpCompletedAt: 'follow_up_completed_at', followUpCompletedBy: 'follow_up_completed_by',
-    followUpTiming: 'follow_up_timing',
     resolvedAt: 'resolved_at', resolvedBy: 'resolved_by',
     createdByInitials: 'created_by_initials', updatedByInitials: 'updated_by_initials',
     createdByUserId: 'created_by_user_id', updatedByUserId: 'updated_by_user_id',
@@ -336,6 +335,7 @@ export default function App() {
   const needsParticipants = ['dashboard', 'signin', 'shared-info', 'attendance', 'star-of-day', 'participants', 'participant', 'parents', 'dressing-rooms', 'medical', 'incidents', 'behaviour'].includes(page)
   const needsAttendance = ['dashboard', 'signin', 'attendance', 'participant'].includes(page)
   const needsIncidents = ['dashboard', 'signin', 'participant', 'incidents', 'behaviour'].includes(page)
+  const needsMedicationAdministration = ['signin', 'medical', 'dashboard'].includes(page)
   const needsBehaviourLogs = ['behaviour'].includes(page)
   const needsTimetable = ['timetable'].includes(page)
   const needsStarOfDay = ['star-of-day'].includes(page)
@@ -344,6 +344,7 @@ export default function App() {
   const [rawParticipants, , loadingP, reloadP] = useSupabaseTable('participants', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsParticipants, cacheScope: tableCacheScope })
   const [rawAttendance, , loadingA, reloadA] = useSupabaseTable('attendance', 'date', { enabled: tableQueriesEnabled && needsAttendance, cacheScope: tableCacheScope })
   const [rawIncidents, , loadingI, reloadI] = useSupabaseTable('incidents', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsIncidents, cacheScope: tableCacheScope })
+  const [rawMedicationAdministration, setRawMedicationAdministration, loadingMA] = useSupabaseTable('medication_administration', 'administered_at', { enabled: tableQueriesEnabled && needsMedicationAdministration, cacheScope: tableCacheScope })
   const [rawBehaviourLogs, , loadingBL, reloadBL] = useSupabaseTable('behaviour_logs', 'logged_at', { enabled: tableQueriesEnabled && needsBehaviourLogs, cacheScope: tableCacheScope })
   const [rawTimetableEntries, , loadingT, reloadT] = useSupabaseTable('daily_timetable_entries', 'day_date', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
   const [rawTimetableSpaces, , loadingTS, reloadTS] = useSupabaseTable('timetable_spaces', 'name', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
@@ -354,6 +355,7 @@ export default function App() {
   const participants = rawParticipants.map(toCamel)
   const attendance = rawAttendance.map(toCamel)
   const incidents = rawIncidents.map(toCamel)
+  const medicationAdministration = rawMedicationAdministration
   const behaviourLogs = rawBehaviourLogs.map(toCamel)
   const timetableEntries = rawTimetableEntries.map(toCamel)
   const timetableSpaces = rawTimetableSpaces.map(toCamel)
@@ -371,12 +373,7 @@ export default function App() {
 
   function isMissingColumnError(error, columnName) {
     const message = String(error?.message || '').toLowerCase()
-    const col = String(columnName || '').toLowerCase()
-    return (
-      (message.includes(col) && message.includes('does not exist')) ||
-      (message.includes(col) && message.includes('schema cache')) ||
-      (message.includes(col) && message.includes('could not find'))
-    )
+    return message.includes(String(columnName || '').toLowerCase()) && message.includes('does not exist')
   }
 
   function initialsFromName(name) {
@@ -511,8 +508,6 @@ export default function App() {
         || isMissingColumnError(error, 'resolved_by')
         || isMissingColumnError(error, 'incident_notes')
         || isMissingColumnError(error, 'incident_documents')
-        || isMissingColumnError(error, 'follow_up_timing')
-        || isMissingColumnError(error, 'followUpTiming')
       )) {
         const {
           created_by_initials,
@@ -523,7 +518,6 @@ export default function App() {
           resolved_by,
           incident_notes,
           incident_documents,
-          follow_up_timing,
           ...fallbackRest
         } = rest
         const fallback = await supabase.from('incidents').insert({ id: inc.id, ...fallbackRest })
@@ -546,8 +540,6 @@ export default function App() {
         || isMissingColumnError(error, 'resolved_by')
         || isMissingColumnError(error, 'incident_notes')
         || isMissingColumnError(error, 'incident_documents')
-        || isMissingColumnError(error, 'follow_up_timing')
-        || isMissingColumnError(error, 'followUpTiming')
       )) {
         // Backward-compatible fallback before the updated_at migration is applied.
         const {
@@ -557,7 +549,6 @@ export default function App() {
           resolved_by,
           incident_notes,
           incident_documents,
-          follow_up_timing,
           ...fallbackRest
         } = rest
         const fallback = await supabase.from('incidents').update(fallbackRest).eq('id', inc.id)
@@ -576,6 +567,13 @@ export default function App() {
       }
     }
     reloadI()
+  }
+
+  function setMedicationAdministration(updater) {
+    setRawMedicationAdministration(prev => {
+      const current = Array.isArray(prev) ? prev : []
+      return typeof updater === 'function' ? updater(current) : updater
+    })
   }
 
   async function setStaffList(updater) {
@@ -1449,13 +1447,15 @@ export default function App() {
           attendance={attendance}
           incidents={incidents}
           setIncidents={setIncidents}
+          medicationAdministration={medicationAdministration}
+          setMedicationAdministration={setMedicationAdministration}
           greetingName={actorFirstName}
           onNavigate={navigate}
           allowedTabs={allowedTabIds}
           canManageUserResets={isOwnerUser || isAdminUser}
         />
       )
-      case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
+      case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} campPeriods={campPeriods} />
@@ -1485,7 +1485,7 @@ export default function App() {
           onBack={() => navigate('participants')}
         />
       )
-      case 'medical': return <Medical participants={participants} setParticipants={setParticipants} actorInitials={actorInitials} onView={(id) => navigate('participant', id)} />
+      case 'medical': return <Medical participants={participants} setParticipants={setParticipants} actorInitials={actorInitials} onView={(id) => navigate('participant', id)} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} />
       case 'behaviour': return <BehaviourLogs participants={participants} incidents={incidents} behaviourLogs={behaviourLogs} setBehaviourLogs={setBehaviourLogs} actorInitials={actorInitials} />
       case 'timetable': return (
         <Timetable
@@ -1503,7 +1503,7 @@ export default function App() {
           canEditTimetable={canEditTimetable}
         />
       )
-      case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} setParticipants={setParticipants} attendance={attendance} setAttendance={setAttendance} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onNavigate={navigate} onView={(id) => navigate('participant', id)} />
+      case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} setParticipants={setParticipants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onNavigate={navigate} onView={(id) => navigate('participant', id)} />
       case 'staff': return <Staff staffList={staffList} setStaffList={setStaffList} campPeriods={campPeriods} setCampPeriods={setCampPeriods} canManageCampPeriod={isOwnerUser || isAdminUser} />
       default: return null
     }

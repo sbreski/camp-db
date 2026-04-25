@@ -251,20 +251,25 @@ export default function SignInOut({ participants, attendance, setAttendance, act
 
   async function completeMarFollowUp(marId) {
     const completedAt = new Date().toISOString()
+    const updates = {
+      follow_up_completed_at: completedAt,
+      follow_up_completed_by: actorInitials,
+      parent_notified: true,
+      parent_notified_at: completedAt,
+      parent_notification_method: 'verbal (at pickup)',
+    }
     // Optimistic update locally
     if (typeof setMedicationAdministration === 'function') {
       setMedicationAdministration(prev => prev.map(row =>
-        row.id === marId
-          ? { ...row, follow_up_completed_at: completedAt, follow_up_completed_by: actorInitials }
-          : row
+        row.id === marId ? { ...row, ...updates } : row
       ))
     }
-    // Also persist to Supabase if available
+    // Persist to Supabase
     try {
       const { supabase } = await import('../supabase')
       await supabase
         .from('medication_administration')
-        .update({ follow_up_completed_at: completedAt, follow_up_completed_by: actorInitials })
+        .update(updates)
         .eq('id', marId)
     } catch (_) {
       // Supabase update is best-effort; local state already updated
