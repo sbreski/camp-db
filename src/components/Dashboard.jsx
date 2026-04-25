@@ -22,6 +22,7 @@ export default function Dashboard({
   participants,
   attendance,
   incidents,
+  setIncidents,
   greetingName = '',
   onNavigate,
   allowedTabs = [],
@@ -44,6 +45,15 @@ export default function Dashboard({
         note: String(row.exceptionNotes || row.exception_notes || '').trim(),
       }))
     : []
+  function completeFollowUp(incidentId) {
+    if (!setIncidents) return
+    setIncidents(prev => prev.map(inc => (
+      inc.id === incidentId
+        ? { ...inc, followUpCompletedAt: new Date().toISOString(), followUpCompletedBy: 'Dashboard' }
+        : inc
+    )))
+  }
+
   const [resetRequests, setResetRequests] = useState([])
   const [resetRequestsLoading, setResetRequestsLoading] = useState(false)
   const [resetRequestsError, setResetRequestsError] = useState('')
@@ -252,12 +262,23 @@ export default function Dashboard({
           ) : (
             <div className="space-y-2">
               {followUpsDue.slice(0, 6).map(inc => (
-                <div key={inc.id} className="rounded-xl border border-stone-200 px-3 py-2">
-                  <p className="text-sm font-medium text-forest-900">{inc.participant ? inc.participant.name : 'Unknown participant'}</p>
-                  <p className="text-xs text-stone-500">{inc.type}</p>
-                  <p className={`text-xs mt-1 font-semibold ${inc.status === 'overdue' ? 'text-red-700' : 'text-amber-700'}`}>
-                    {inc.status === 'overdue' ? 'Overdue' : 'Due today'} · {new Date((inc.dueDate || today) + 'T12:00:00').toLocaleDateString('en-GB')}
-                  </p>
+                <div key={inc.id} className="rounded-xl border border-stone-200 px-3 py-2 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-forest-900">{inc.participant ? inc.participant.name : 'Unknown participant'}</p>
+                    <p className="text-xs text-stone-500">{inc.type}</p>
+                    <p className={`text-xs mt-1 font-semibold ${inc.status === 'overdue' ? 'text-red-700' : 'text-amber-700'}`}>
+                      {inc.status === 'overdue' ? 'Overdue' : 'Due today'} · {new Date((inc.dueDate || today) + 'T12:00:00').toLocaleDateString('en-GB')}
+                    </p>
+                  </div>
+                  {setIncidents && (
+                    <button
+                      type="button"
+                      onClick={() => completeFollowUp(inc.id)}
+                      className="shrink-0 rounded bg-forest-100 px-2 py-1 text-[11px] font-semibold text-forest-800 hover:bg-forest-200 transition-colors"
+                    >
+                      Mark done
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

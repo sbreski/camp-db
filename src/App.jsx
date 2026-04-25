@@ -1448,6 +1448,7 @@ export default function App() {
           participants={participants}
           attendance={attendance}
           incidents={incidents}
+          setIncidents={setIncidents}
           greetingName={actorFirstName}
           onNavigate={navigate}
           allowedTabs={allowedTabIds}
