@@ -11,6 +11,10 @@ function getNextDateKey(isoString) {
   return date.toISOString().slice(0, 10)
 }
 
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 function normalizeInitials(value) {
   return String(value || '').trim().toUpperCase()
 }
@@ -42,7 +46,7 @@ function incidentDocumentsForIncident(incident) {
   return Array.isArray(docs) ? docs : []
 }
 
-export default function Incidents({ incidents, setIncidents, participants, setParticipants, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onNavigate, onView }) {
+export default function Incidents({ incidents, setIncidents, participants, setParticipants, attendance = [], setAttendance, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onNavigate, onView }) {
   const [showForm, setShowForm] = useState(false)
   const [selectedParticipant, setSelectedParticipant] = useState('')
   const [editingIncidentId, setEditingIncidentId] = useState(null)
@@ -78,7 +82,11 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       await setIncidents(prev => prev.map(inc => {
         if (inc.id !== editingIncident.id) return inc
 
-        const followUpRequired = Boolean(data.followUpRequired)
+        const timing = data.followUpTiming || (data.followUpRequired ? 'tomorrow' : 'none')
+        const followUpRequired = timing !== 'none'
+        const followUpDueDate = timing === 'tomorrow'
+          ? (inc.followUpDueDate || getNextDateKey(inc.createdAt))
+          : timing === 'today' ? getTodayKey() : null
         return {
           ...inc,
           ...data,
@@ -88,7 +96,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
           participantId: inc.participantId,
           createdAt: inc.createdAt,
           followUpRequired,
-          followUpDueDate: followUpRequired ? (inc.followUpDueDate || getNextDateKey(inc.createdAt)) : null,
+          followUpTiming: timing,
+          followUpDueDate,
           followUpCompletedAt: followUpRequired ? inc.followUpCompletedAt : null,
           followUpCompletedBy: followUpRequired ? inc.followUpCompletedBy : null,
         }
@@ -100,6 +109,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }
 
     const createdAt = new Date().toISOString()
+    const timing = data.followUpTiming || (data.followUpRequired ? 'tomorrow' : 'none')
+    const followUpRequired = timing !== 'none'
+    const followUpDueDate = timing === 'tomorrow' ? getNextDateKey(createdAt) : timing === 'today' ? getTodayKey() : null
+
     await setIncidents(prev => [
       ...prev,
       {
@@ -111,7 +124,9 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         updatedByUserId: actorUserId || null,
         participantId: selectedParticipant,
         createdAt,
-        followUpDueDate: data.followUpRequired ? getNextDateKey(createdAt) : null,
+        followUpRequired,
+        followUpTiming: timing,
+        followUpDueDate,
         followUpCompletedAt: null,
         followUpCompletedBy: null,
         resolvedAt: null,
@@ -120,8 +135,47 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         incidentDocuments: [],
       },
     ])
+
     const participantName = participants.find(p => p.id === selectedParticipant)?.name || 'participant'
-    setSaveNotice(`Report saved for ${participantName}. Pickup handover note was added for today.`)
+    const todayKey = getTodayKey()
+
+    // If "follow up today" — write a handover note to today's attendance record
+    if (timing === 'today' && setAttendance) {
+      const incidentType = data.type || 'Incident'
+      const noteText = `⚠️ ${incidentType} report filed — please inform parent/carer at pickup today.`
+      setAttendance(prev => {
+        const existing = prev.find(r => r.participantId === selectedParticipant && r.date === todayKey)
+        if (existing) {
+          const combinedNote = existing.exceptionNotes
+            ? `${existing.exceptionNotes}
+${noteText}`
+            : noteText
+          return prev.map(r => r.id === existing.id ? { ...r, exceptionNotes: combinedNote } : r)
+        }
+        return [
+          ...prev,
+          {
+            id: `${selectedParticipant}-${todayKey}`,
+            participantId: selectedParticipant,
+            date: todayKey,
+            signIn: null,
+            signOut: null,
+            signInBy: null,
+            signOutBy: null,
+            collectedBy: null,
+            exceptionReason: null,
+            exceptionNotes: noteText,
+          },
+        ]
+      })
+    }
+
+    const noticeDetail = timing === 'today'
+      ? "Pickup handover note added to today's sign in/out tab."
+      : timing === 'tomorrow'
+      ? "Follow up flagged for tomorrow's register."
+      : ''
+    setSaveNotice(`Report saved for ${participantName}. ${noticeDetail}`.trim())
     setShowForm(false)
     setSelectedParticipant('')
   }

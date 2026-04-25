@@ -26,7 +26,7 @@ export default function IncidentForm({
   const [form, setForm] = useState(() => ({
     type: 'Incident/Accident',
     staffMember: defaultStaff,
-    followUpRequired: false,
+    followUpTiming: 'none',  // 'none' | 'today' | 'tomorrow'
     pdfName: null,
     pdfData: null,
     ...(initial || {}),
@@ -86,7 +86,7 @@ export default function IncidentForm({
     const nextStaff = initial?.staffMember || defaultStaff
     setForm({
       ...(initial || {}),
-      followUpRequired: Boolean(initial?.followUpRequired),
+      followUpTiming: initial?.followUpTiming || (initial?.followUpRequired ? 'tomorrow' : 'none'),
       pdfName: initial?.pdfName || null,
       pdfData: initial?.pdfData || null,
       id: initial?.id,
@@ -97,7 +97,7 @@ export default function IncidentForm({
     formTypeRef.current = nextType
     setSelectedTemplateKey(templateKeyForType(nextType, templates))
     setUploadNotice('')
-  }, [initial?.id, initial?.type, initial?.staffMember, initial?.pdfName, initial?.pdfData, initial?.followUpRequired, defaultStaff, templates])
+  }, [initial?.id, initial?.type, initial?.staffMember, initial?.pdfName, initial?.pdfData, initial?.followUpRequired, initial?.followUpTiming, defaultStaff, templates])
 
   function set(field, value) {
     setForm(prev => {
@@ -364,15 +364,32 @@ export default function IncidentForm({
           </div>
         </div>
 
-        <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-700">
-          <input
-            type="checkbox"
-            checked={form.followUpRequired}
-            onChange={e => set('followUpRequired', e.target.checked)}
-            className="h-4 w-4"
-          />
-          Follow Up needed on tomorrow's register
-        </label>
+        <div className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 space-y-2">
+          <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">Follow Up</p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {[
+              { value: 'none', label: 'No follow up needed' },
+              { value: 'today', label: "Follow up today — notify at pickup" },
+              { value: 'tomorrow', label: "Follow up tomorrow's register" },
+            ].map(opt => (
+              <label key={opt.value} className={`flex items-center gap-2 flex-1 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                form.followUpTiming === opt.value
+                  ? 'border-forest-500 bg-forest-50 text-forest-800'
+                  : 'border-stone-200 text-stone-700 hover:border-forest-300'
+              }`}>
+                <input
+                  type="radio"
+                  name="followUpTiming"
+                  value={opt.value}
+                  checked={form.followUpTiming === opt.value}
+                  onChange={() => set('followUpTiming', opt.value)}
+                  className="h-4 w-4 accent-forest-600"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
 
         <div>
           <label className="label">Step 1: Complete an interactive form</label>
