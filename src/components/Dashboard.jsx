@@ -545,7 +545,7 @@ export default function Dashboard({
           )}
           {/* Timetable is always visible */}
           <a
-            href="https://YOUR_GOOGLE_SHEETS_URL_HERE"
+            href="https://docs.google.com/spreadsheets/d/1Ts4Z2fneVbuid-KLp8AjJzUlgEB2vUOIfs1aaLTSVGI/edit?usp=sharing"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
