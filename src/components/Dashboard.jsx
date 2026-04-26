@@ -544,9 +544,14 @@ export default function Dashboard({
             </button>
           )}
           {/* Timetable is always visible */}
-          <button onClick={() => onNavigate('timetable')} className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto">
+          <a
+            href="https://YOUR_GOOGLE_SHEETS_URL_HERE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
             <Clock size={15} /> Timetable
-          </button>
+          </a>
         </div>
       </div>
 
