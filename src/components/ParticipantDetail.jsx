@@ -592,9 +592,9 @@ export default function ParticipantDetail({
   const participantIncidents = incidents
     .filter(i => i.participantId === participantId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  const participantNoteHistory = participantNotesForParticipant(participant)
+  const participantnote_history = participantNotesForParticipant(participant)
   const participantDocuments = participantDocumentsForParticipant(participant)
-  const activeParticipantNotes = participantNoteHistory.filter(note => !note.deletedAt)
+  const activeParticipantNotes = participantnote_history.filter(note => !note.deletedAt)
   const activeParticipantDocuments = participantDocuments.filter(doc => !doc.deletedAt)
 
   const hasMedical = participant.medicalType?.length > 0 || participant.medicalDetails
@@ -1122,11 +1122,11 @@ export default function ParticipantDetail({
                 {activeParticipantNotes.length > 0 && (
                   <p className="text-xs text-stone-500">{activeParticipantNotes.length} active note(s)</p>
                 )}
-                {participantNoteHistory.length === 0 ? (
+                {participantnote_history.length === 0 ? (
                   <p className="text-xs text-stone-500">No participant notes yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {participantNoteHistory.map(note => {
+                    {participantnote_history.map(note => {
                       const isEditing = editingParticipantNote?.noteId === note.id
                       const isDeleted = Boolean(note.deletedAt)
                       return (

@@ -328,7 +328,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     const existing = getRecord(participant.id)
     setNoteEditor(participant)
     setNoteInput(existing?.exceptionNotes || existing?.exception_notes || '')
-    setKeepOnRecord(Boolean(participant.registerNote))
+    setKeepOnRecord(Boolean(participant.register_note))
   }
 
   function cancelNoteEditor() {
@@ -371,7 +371,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     if (nextNote && typeof setParticipants === 'function') {
       setParticipants(prev => prev.map(p => {
         if (p.id !== noteEditor.id) return p
-        const existingHistory = Array.isArray(p.noteHistory) ? p.noteHistory : []
+        const existingHistory = Array.isArray(p.note_history) ? p.note_history : []
         const newEntry = {
           note: nextNote,
           date: selectedDate,
@@ -380,15 +380,15 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         }
         return {
           ...p,
-          noteHistory: [...existingHistory, newEntry],
-          registerNote: keepOnRecord ? nextNote : (p.registerNote || null),
+          note_history: [...existingHistory, newEntry],
+          register_note: keepOnRecord ? nextNote : (p.register_note || null),
         }
       }))
     } else if (!nextNote && typeof setParticipants === 'function') {
-      // If note cleared and keepOnRecord was on for this note, also clear registerNote
+      // If note cleared and keepOnRecord was on for this note, also clear register_note
       setParticipants(prev => prev.map(p => {
         if (p.id !== noteEditor.id) return p
-        return { ...p, registerNote: keepOnRecord ? null : p.registerNote }
+        return { ...p, register_note: keepOnRecord ? null : p.register_note }
       }))
     }
 
@@ -400,11 +400,11 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     setKeepOnRecord(false)
   }
 
-  function removeRegisterNote(participantId) {
+  function removeregister_note(participantId) {
     if (!window.confirm('Remove the pinned note from this child\'s register? It will remain in their note history.')) return
     if (typeof setParticipants === 'function') {
       setParticipants(prev => prev.map(p =>
-        p.id === participantId ? { ...p, registerNote: null } : p
+        p.id === participantId ? { ...p, register_note: null } : p
       ))
     }
   }
@@ -657,13 +657,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                 </div>
               </label>
               {/* Show existing pinned note if different from current input */}
-              {noteEditor.registerNote && noteEditor.registerNote !== noteInput && (
+              {noteEditor.register_note && noteEditor.register_note !== noteInput && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-start gap-2">
                   <span className="text-xs font-bold text-amber-700 mt-0.5 shrink-0">📌 Pinned</span>
-                  <p className="text-xs text-amber-900 flex-1">{noteEditor.registerNote}</p>
+                  <p className="text-xs text-amber-900 flex-1">{noteEditor.register_note}</p>
                   <button
                     type="button"
-                    onClick={() => removeRegisterNote(noteEditor.id)}
+                    onClick={() => removeregister_note(noteEditor.id)}
                     className="text-amber-500 hover:text-amber-700 shrink-0"
                     title="Remove pinned note"
                   >
@@ -672,11 +672,11 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                 </div>
               )}
               {/* Note history */}
-              {Array.isArray(noteEditor.noteHistory) && noteEditor.noteHistory.length > 0 && (
+              {Array.isArray(noteEditor.note_history) && noteEditor.note_history.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Note History</p>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {[...noteEditor.noteHistory].reverse().map((entry, i) => (
+                    {[...noteEditor.note_history].reverse().map((entry, i) => (
                       <div key={i} className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
                         <p className="text-xs text-stone-700">{entry.note}</p>
                         <p className="text-[10px] text-stone-400 mt-1">
@@ -981,13 +981,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       </p>
                     )}
                     {/* Pinned register note */}
-                    {p.registerNote && (
+                    {p.register_note && (
                       <div className="mt-1.5 flex items-start gap-1.5">
                         <span className="text-amber-500 shrink-0 mt-0.5" title="Pinned note — kept on record">📌</span>
-                        <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 flex-1">{p.registerNote}</span>
+                        <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 flex-1">{p.register_note}</span>
                         <button
                           type="button"
-                          onClick={() => removeRegisterNote(p.id)}
+                          onClick={() => removeregister_note(p.id)}
                           className="shrink-0 text-stone-300 hover:text-red-500 transition-colors mt-0.5"
                           title="Remove pinned note"
                         >
