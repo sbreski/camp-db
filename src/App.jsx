@@ -1455,7 +1455,7 @@ export default function App() {
           canManageUserResets={isOwnerUser || isAdminUser}
         />
       )
-      case 'signin': return <SignInOut participants={participants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
+      case 'signin': return <SignInOut participants={participants} setParticipants={setParticipants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} canViewAdminFollowUps={isOwnerUser || isAdminUser} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} campPeriods={campPeriods} />

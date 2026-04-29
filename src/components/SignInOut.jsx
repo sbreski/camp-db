@@ -204,13 +204,14 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
   )
 }
 
-export default function SignInOut({ participants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
+export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // all | in | not-in | follow-up
   const [flash, setFlash] = useState(null)
   const [collectingFor, setCollectingFor] = useState(null)
   const [noteEditor, setNoteEditor] = useState(null)
   const [noteInput, setNoteInput] = useState('')
+  const [keepOnRecord, setKeepOnRecord] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayKey())
   const [editingTime, setEditingTime] = useState(null) // { participantId, type: 'signIn' | 'signOut', currentTime }
   const [timeInput, setTimeInput] = useState('')
@@ -327,11 +328,13 @@ export default function SignInOut({ participants, attendance, setAttendance, act
     const existing = getRecord(participant.id)
     setNoteEditor(participant)
     setNoteInput(existing?.exceptionNotes || existing?.exception_notes || '')
+    setKeepOnRecord(Boolean(participant.registerNote))
   }
 
   function cancelNoteEditor() {
     setNoteEditor(null)
     setNoteInput('')
+    setKeepOnRecord(false)
   }
 
   function saveNoteEditor() {
@@ -339,6 +342,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
     const existing = getRecord(noteEditor.id)
     const nextNote = noteInput.trim() || null
 
+    // Save to today's attendance record as before
     if (existing) {
       setAttendance(prev => prev.map(r => (
         r.id === existing.id
@@ -363,11 +367,46 @@ export default function SignInOut({ participants, attendance, setAttendance, act
       ])
     }
 
+    // Persist note history and optional "keep on record" to participant
+    if (nextNote && typeof setParticipants === 'function') {
+      setParticipants(prev => prev.map(p => {
+        if (p.id !== noteEditor.id) return p
+        const existingHistory = Array.isArray(p.noteHistory) ? p.noteHistory : []
+        const newEntry = {
+          note: nextNote,
+          date: selectedDate,
+          addedBy: actorInitials,
+          savedAt: new Date().toISOString(),
+        }
+        return {
+          ...p,
+          noteHistory: [...existingHistory, newEntry],
+          registerNote: keepOnRecord ? nextNote : (p.registerNote || null),
+        }
+      }))
+    } else if (!nextNote && typeof setParticipants === 'function') {
+      // If note cleared and keepOnRecord was on for this note, also clear registerNote
+      setParticipants(prev => prev.map(p => {
+        if (p.id !== noteEditor.id) return p
+        return { ...p, registerNote: keepOnRecord ? null : p.registerNote }
+      }))
+    }
+
     cancelNoteEditor()
   }
 
   function clearNoteEditor() {
     setNoteInput('')
+    setKeepOnRecord(false)
+  }
+
+  function removeRegisterNote(participantId) {
+    if (!window.confirm('Remove the pinned note from this child\'s register? It will remain in their note history.')) return
+    if (typeof setParticipants === 'function') {
+      setParticipants(prev => prev.map(p =>
+        p.id === participantId ? { ...p, registerNote: null } : p
+      ))
+    }
   }
 
   function hasParticipantNoteFollowUp(participantId) {
@@ -516,6 +555,7 @@ export default function SignInOut({ participants, attendance, setAttendance, act
       const rec = getRecord(p.id)
       return `
         <tr>
+          <td class="check-cell"><span class="checkbox"></span></td>
           <td>${participantDisplayName(p)}</td>
           <td>${p.pronouns || '—'}</td>
           <td>${p.age ? `Age ${p.age}` : '—'}</td>
@@ -532,22 +572,36 @@ export default function SignInOut({ participants, attendance, setAttendance, act
           <title>Fire Register</title>
           <style>
             body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
-            h1 { margin: 0 0 6px; font-size: 22px; }
-            .meta { margin-bottom: 14px; color: #6b7280; font-size: 12px; }
+            h1 { margin: 0 0 4px; font-size: 22px; }
+            .meta { margin-bottom: 6px; color: #6b7280; font-size: 12px; }
+            .instruction { margin-bottom: 14px; font-size: 11px; color: #9ca3af; font-style: italic; }
             table { width: 100%; border-collapse: collapse; font-size: 12px; }
             th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
             th { background: #f3f4f6; }
+            .check-cell { width: 36px; text-align: center; }
+            .checkbox {
+              display: inline-block;
+              width: 18px;
+              height: 18px;
+              border: 2px solid #374151;
+              border-radius: 3px;
+              vertical-align: middle;
+            }
+            @media print {
+              body { margin: 12px; }
+            }
           </style>
         </head>
         <body>
-          <h1>Fire Record - On Site Register</h1>
-          <div class="meta">Date: ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB')} · Generated: ${new Date().toLocaleString('en-GB')}</div>
+          <h1>🔥 Fire Record — On Site Register</h1>
+          <div class="meta">Date: ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB')} · Generated: ${new Date().toLocaleString('en-GB')} · Total on site: ${onSiteList.length}</div>
+          <div class="instruction">Tick each box as you account for each person at the assembly point.</div>
           <table>
             <thead>
-              <tr><th>Participant</th><th>Pronouns</th><th>Age</th><th>Signed In</th></tr>
+              <tr><th class="check-cell">✓</th><th>Participant</th><th>Pronouns</th><th>Age</th><th>Signed In</th></tr>
             </thead>
             <tbody>
-              ${rows || '<tr><td colspan="4">No participants currently signed in.</td></tr>'}
+              ${rows || '<tr><td colspan="5">No participants currently signed in.</td></tr>'}
             </tbody>
           </table>
           <script>window.print();</script>
@@ -581,14 +635,59 @@ export default function SignInOut({ participants, attendance, setAttendance, act
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="label">Notes</label>
+                <label className="label">Today's Note</label>
                 <textarea
-                  className="input min-h-[120px]"
+                  className="input min-h-[100px]"
                   value={noteInput}
                   onChange={e => setNoteInput(e.target.value)}
                   placeholder="Add handover notes, follow-up reminders, or important context for this participant."
                 />
               </div>
+              {/* Keep on Record checkbox */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={keepOnRecord}
+                  onChange={e => setKeepOnRecord(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
+                />
+                <div>
+                  <span className="text-sm font-medium text-stone-800 group-hover:text-forest-900">Keep on record</span>
+                  <p className="text-xs text-stone-500 mt-0.5">This note will appear on this child's register row every session until manually removed.</p>
+                </div>
+              </label>
+              {/* Show existing pinned note if different from current input */}
+              {noteEditor.registerNote && noteEditor.registerNote !== noteInput && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-start gap-2">
+                  <span className="text-xs font-bold text-amber-700 mt-0.5 shrink-0">📌 Pinned</span>
+                  <p className="text-xs text-amber-900 flex-1">{noteEditor.registerNote}</p>
+                  <button
+                    type="button"
+                    onClick={() => removeRegisterNote(noteEditor.id)}
+                    className="text-amber-500 hover:text-amber-700 shrink-0"
+                    title="Remove pinned note"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {/* Note history */}
+              {Array.isArray(noteEditor.noteHistory) && noteEditor.noteHistory.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Note History</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {[...noteEditor.noteHistory].reverse().map((entry, i) => (
+                      <div key={i} className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
+                        <p className="text-xs text-stone-700">{entry.note}</p>
+                        <p className="text-[10px] text-stone-400 mt-1">
+                          {new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB')}
+                          {entry.addedBy ? ` · ${entry.addedBy}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="p-5 pt-0 flex gap-2">
               <button onClick={saveNoteEditor} className="btn-primary flex-1">Save Note</button>
@@ -880,6 +979,21 @@ export default function SignInOut({ participants, attendance, setAttendance, act
                       <p className="text-xs mt-1 text-amber-700">
                         Absence Reason: <span className="font-medium">{reasonLabel}</span>{reasonNotes ? ` - ${reasonNotes}` : ''}
                       </p>
+                    )}
+                    {/* Pinned register note */}
+                    {p.registerNote && (
+                      <div className="mt-1.5 flex items-start gap-1.5">
+                        <span className="text-amber-500 shrink-0 mt-0.5" title="Pinned note — kept on record">📌</span>
+                        <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 flex-1">{p.registerNote}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeRegisterNote(p.id)}
+                          className="shrink-0 text-stone-300 hover:text-red-500 transition-colors mt-0.5"
+                          title="Remove pinned note"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
                     )}
                     {pendingFollowUps.length > 0 && (
                       <div className="mt-2 space-y-1.5">
