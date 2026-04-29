@@ -592,10 +592,18 @@ export default function ParticipantDetail({
   const participantIncidents = incidents
     .filter(i => i.participantId === participantId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  const participantnote_history = participantNotesForParticipant(participant)
+  const participantNoteHistory = participantNotesForParticipant(participant)
   const participantDocuments = participantDocumentsForParticipant(participant)
-  const activeParticipantNotes = participantnote_history.filter(note => !note.deletedAt)
+  const activeParticipantNotes = participantNoteHistory.filter(note => !note.deletedAt)
   const activeParticipantDocuments = participantDocuments.filter(doc => !doc.deletedAt)
+
+  // Register notes (from Sign In/Out tab)
+  const registerNote = participant.register_note || participant.registerNote || null
+  const registerNoteHistory = Array.isArray(participant.note_history)
+    ? participant.note_history
+    : Array.isArray(participant.noteHistory)
+      ? participant.noteHistory
+      : []
 
   const hasMedical = participant.medicalType?.length > 0 || participant.medicalDetails
   const hasConsents = Boolean(
@@ -1122,11 +1130,11 @@ export default function ParticipantDetail({
                 {activeParticipantNotes.length > 0 && (
                   <p className="text-xs text-stone-500">{activeParticipantNotes.length} active note(s)</p>
                 )}
-                {participantnote_history.length === 0 ? (
+                {participantNoteHistory.length === 0 ? (
                   <p className="text-xs text-stone-500">No participant notes yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {participantnote_history.map(note => {
+                    {participantNoteHistory.map(note => {
                       const isEditing = editingParticipantNote?.noteId === note.id
                       const isDeleted = Boolean(note.deletedAt)
                       return (
@@ -1226,6 +1234,39 @@ export default function ParticipantDetail({
                   </button>
                 </div>
               </div>
+
+              {/* Register Notes — from Sign In/Out */}
+              {(registerNote || registerNoteHistory.length > 0) && (
+                <div className="space-y-2">
+                  <h4 className="font-display font-semibold text-forest-900 flex items-center gap-2">
+                    <FileText size={14} className="text-amber-600" /> Register Notes
+                    <span className="text-xs font-normal text-stone-400">(from Sign In / Out)</span>
+                  </h4>
+                  {registerNote && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <span className="text-amber-500 shrink-0 mt-0.5">📌</span>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-amber-700 mb-0.5">Currently pinned to register</p>
+                        <p className="text-sm text-amber-900">{registerNote}</p>
+                      </div>
+                    </div>
+                  )}
+                  {registerNoteHistory.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Session Note History</p>
+                      {[...registerNoteHistory].reverse().map((entry, i) => (
+                        <div key={i} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                          <p className="text-sm text-stone-800 whitespace-pre-wrap">{entry.note}</p>
+                          <p className="text-[11px] text-stone-400 mt-1">
+                            {entry.date ? new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                            {entry.addedBy ? ` · ${entry.addedBy}` : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <h4 className="font-display font-semibold text-forest-900 flex items-center gap-2">
