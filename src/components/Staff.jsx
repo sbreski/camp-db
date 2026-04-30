@@ -1,75 +1,95 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import {
-  AlertCircle,
-  Check,
-  ChevronRight,
-  Edit2,
-  Plus,
-  RefreshCw,
-  Save,
-  Shield,
-  Trash2,
-  User,
-  X,
+  AlertCircle, Check, ChevronRight, Edit2, Plus, RefreshCw, Save,
+  Shield, Trash2, User, X, FileText, Upload, Download, Eye, EyeOff,
+  Key, Lock, Unlock, Star, Heart, Award, ChevronDown, ChevronUp,
+  Paperclip, Calendar, Phone, Mail, AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '../supabase'
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const TAB_OPTIONS = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'signin', label: 'Sign In / Out' },
-  { id: 'shared-info', label: 'Shared Info' },
-  { id: 'attendance', label: 'Attendance' },
-  { id: 'star-of-day', label: 'Star of the Day' },
-  { id: 'participants', label: 'Participants' },
-  { id: 'parents', label: 'Parents' },
+  { id: 'dashboard',      label: 'Dashboard' },
+  { id: 'signin',         label: 'Sign In / Out' },
+  { id: 'shared-info',    label: 'Shared Info' },
+  { id: 'attendance',     label: 'Attendance' },
+  { id: 'star-of-day',    label: 'Star of the Day' },
+  { id: 'participants',   label: 'Participants' },
+  { id: 'parents',        label: 'Parents' },
   { id: 'dressing-rooms', label: 'Dressing Rooms' },
-  { id: 'medical', label: 'Medical' },
-  { id: 'behaviour', label: 'Behaviour Log' },
-  // { id: 'timetable', label: 'Timetable' }, 
-  { id: 'incidents', label: 'Reporting' },
-  { id: 'staff', label: 'Staff' },
-  { id: 'documents', label: 'Documents' },
+  { id: 'medical',        label: 'Medical' },
+  { id: 'behaviour',      label: 'Behaviour Log' },
+  { id: 'incidents',      label: 'Reporting' },
+  { id: 'staff',          label: 'Staff' },
+  { id: 'documents',      label: 'Documents' },
 ]
 
+const ALWAYS_ALLOWED = ['dashboard', 'signin', 'shared-info']
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function sanitizeAllowedTabs(tabIds) {
-  const valid = (Array.isArray(tabIds) ? tabIds : []).filter(tab => TAB_OPTIONS.some(option => option.id === tab))
-  if (!valid.includes('dashboard')) valid.unshift('dashboard')
-  if (!valid.includes('signin')) valid.unshift('signin')
-  if (!valid.includes('shared-info')) valid.unshift('shared-info')
+  const valid = (Array.isArray(tabIds) ? tabIds : []).filter(tab =>
+    TAB_OPTIONS.some(o => o.id === tab)
+  )
+  ALWAYS_ALLOWED.forEach(id => { if (!valid.includes(id)) valid.unshift(id) })
   return [...new Set(valid)]
 }
 
 function normalizeUsername(value) {
   return String(value || '')
-    .trim()
-    .toLowerCase()
+    .trim().toLowerCase()
     .replace(/[']/g, '')
     .replace(/[^a-z0-9]+/g, '.')
     .replace(/\.{2,}/g, '.')
     .replace(/^\.+|\.+$/g, '')
 }
 
-function accountLabel(user) {
-  return user.username || user.email || user.internalEmail || ''
+function initials(name) {
+  return String(name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 }
 
-function StaffForm({ initial, onSave, onCancel }) {
+function expiryStatus(dateStr) {
+  if (!dateStr) return null
+  const today = new Date()
+  const exp = new Date(dateStr)
+  const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return 'expired'
+  if (diffDays <= 60) return 'soon'
+  return 'ok'
+}
+
+function ExpiryBadge({ dateStr }) {
+  const status = expiryStatus(dateStr)
+  if (!status) return null
+  const color = status === 'expired' ? 'bg-red-100 text-red-700 border-red-200'
+    : status === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200'
+    : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  const label = status === 'expired' ? `Expired ${dateStr}`
+    : status === 'soon' ? `Expires ${dateStr}`
+    : `Valid to ${dateStr}`
+  return (
+    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${color}`}>{label}</span>
+  )
+}
+
+// ─── Staff Profile Form ────────────────────────────────────────────────────────
+
+function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
   const empty = {
-    name: '',
-    role: '',
-    phone: '',
-    email: '',
-    emergencyContact: '',
-    emergencyPhone: '',
-    notes: '',
-    firstAidTrained: false,
-    safeguardingTrained: false,
-    firstAidExpiresOn: '',
-    safeguardingExpiresOn: '',
+    name: '', role: '', phone: '', email: '',
+    emergencyContact: '', emergencyPhone: '', notes: '',
+    firstAidTrained: false, safeguardingTrained: false,
+    firstAidExpiresOn: '', safeguardingExpiresOn: '',
     isAssignedThisSeason: true,
-    createLoginAccount: false,
+    // login
     tempPassword: '',
+    // permissions
+    isAdmin: false, canViewSafeguarding: false,
+    allowedTabs: ['dashboard', 'signin', 'shared-info'],
   }
+
   const [form, setForm] = useState({
     ...empty,
     ...initial,
@@ -78,154 +98,248 @@ function StaffForm({ initial, onSave, onCancel }) {
     firstAidExpiresOn: initial?.firstAidExpiresOn || '',
     safeguardingExpiresOn: initial?.safeguardingExpiresOn || '',
     isAssignedThisSeason: (initial?.isAssignedThisSeason ?? initial?.is_assigned_this_season) !== false,
-    createLoginAccount: false,
+    isAdmin: Boolean(initial?.isAdmin),
+    canViewSafeguarding: Boolean(initial?.canViewSafeguarding),
+    allowedTabs: sanitizeAllowedTabs(initial?.allowedTabs || ['dashboard', 'signin', 'shared-info']),
     tempPassword: '',
   })
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [section, setSection] = useState('profile') // profile | login | permissions
+
   function set(k, v) { setForm(p => ({ ...p, [k]: v })) }
 
-  const derivedUsername = normalizeUsername(form.name)
-  const loginIdentifier = form.email?.trim() ? form.email.trim() : derivedUsername
+  function toggleTab(id) {
+    if (ALWAYS_ALLOWED.includes(id)) return
+    const next = form.allowedTabs.includes(id)
+      ? form.allowedTabs.filter(t => t !== id)
+      : [...form.allowedTabs, id]
+    set('allowedTabs', sanitizeAllowedTabs(next))
+  }
 
-  async function submit(e) {
+  const loginId = form.email?.trim()
+    ? form.email.trim().toLowerCase()
+    : normalizeUsername(form.name)
+
+  function submit(e) {
     e.preventDefault()
     if (!form.name.trim()) return
-    if (form.createLoginAccount && form.tempPassword.length < 8) return
-    await onSave(form)
+    if (isNew && form.tempPassword && form.tempPassword.length < 8) return
+    onSave(form)
   }
+
+  const tabs = [
+    { id: 'profile', label: 'Profile & Training' },
+    { id: 'login', label: 'Login Account' },
+    { id: 'permissions', label: 'Permissions & Views' },
+  ]
 
   return (
     <div className="card border-2 border-forest-200 fade-in">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display font-bold text-forest-950">{initial?.id ? 'Edit Staff Member' : 'Add Staff Member'}</h3>
-        <button onClick={onCancel} className="text-stone-400 hover:text-stone-600"><X size={18} /></button>
+        <h3 className="font-display font-bold text-forest-950 text-lg">
+          {isNew ? 'Add Staff Member' : `Edit — ${initial?.name || 'Staff'}`}
+        </h3>
+        <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 p-1"><X size={18} /></button>
       </div>
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 sm:col-span-1">
-            <label className="label">Full Name *</label>
-            <input className="input" value={form.name} onChange={e => set('name', e.target.value)} required placeholder="First Last" />
-          </div>
-          <div>
-            <label className="label">Role</label>
-            <input className="input" value={form.role} onChange={e => set('role', e.target.value)} placeholder="e.g. Coordinator, Assistant" />
-          </div>
-          <div>
-            <label className="label">Phone</label>
-            <input className="input" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+44 7700 000000" />
-          </div>
-          <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="staff@email.com" />
-          </div>
-          <div>
-            <label className="label">Emergency Contact Name</label>
-            <input className="input" value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} placeholder="Name (Relationship)" />
-          </div>
-          <div>
-            <label className="label">Emergency Contact Phone</label>
-            <input className="input" type="tel" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} placeholder="+44 7700 000000" />
-          </div>
-          <div className="col-span-2">
-            <label className="label">Notes</label>
-            <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
-          </div>
-          <div className="col-span-2">
-            <label className="inline-flex items-center gap-2 text-sm text-stone-700">
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={form.isAssignedThisSeason !== false}
-                onChange={e => set('isAssignedThisSeason', e.target.checked)}
-              />
-              Assigned to current season (can sign in)
-            </label>
-          </div>
-          <div className="col-span-2">
-            <p className="label mb-2">Training & Expiry</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-              <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={form.firstAidTrained}
-                  onChange={e => set('firstAidTrained', e.target.checked)}
-                />
-                First aid trained
-              </label>
-              <div>
-                <label className="label">First aid expiry</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={form.firstAidExpiresOn || ''}
-                  onChange={e => set('firstAidExpiresOn', e.target.value)}
-                />
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={form.safeguardingTrained}
-                  onChange={e => set('safeguardingTrained', e.target.checked)}
-                />
-                Safeguarding trained
-              </label>
-              <div>
-                <label className="label">Safeguarding expiry</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={form.safeguardingExpiresOn || ''}
-                  onChange={e => set('safeguardingExpiresOn', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
 
-          {!initial?.id && (
-            <div className="col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-3">
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-amber-900">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={form.createLoginAccount}
-                  onChange={e => set('createLoginAccount', e.target.checked)}
-                />
-                Also create a login account for this staff member
-              </label>
-              {form.createLoginAccount && (
-                <div className="space-y-2 pt-1">
-                  <div className="rounded-lg bg-amber-100 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-                    <span className="font-semibold">Login identifier: </span>
-                    {loginIdentifier
-                      ? <span className="font-mono">{loginIdentifier}</span>
-                      : <span className="italic">enter a name above to generate</span>}
-                    {!form.email?.trim() && derivedUsername && (
-                      <span className="ml-1">(auto-generated from name — no email provided)</span>
-                    )}
-                  </div>
-                  <div>
-                    <label className="label">Temporary Password *</label>
-                    <input
-                      className="input"
-                      type="text"
-                      minLength={8}
-                      placeholder="Min 8 characters — share this with the staff member"
-                      value={form.tempPassword}
-                      onChange={e => set('tempPassword', e.target.value)}
-                      required={form.createLoginAccount}
-                    />
-                    {form.createLoginAccount && form.tempPassword.length > 0 && form.tempPassword.length < 8 && (
-                      <p className="text-xs text-red-600 mt-1">Password must be at least 8 characters</p>
-                    )}
-                  </div>
-                </div>
-              )}
+      {/* Section tabs */}
+      <div className="flex gap-1 mb-5 border-b border-stone-100 pb-3">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setSection(t.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              section === t.id
+                ? 'bg-forest-900 text-white'
+                : 'text-stone-500 hover:text-stone-700 hover:bg-stone-100'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={submit} className="space-y-4">
+
+        {/* ── Profile & Training ── */}
+        {section === 'profile' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="label">Full Name *</label>
+                <input className="input" value={form.name} onChange={e => set('name', e.target.value)} required placeholder="First Last" />
+              </div>
+              <div>
+                <label className="label">Role</label>
+                <input className="input" value={form.role} onChange={e => set('role', e.target.value)} placeholder="e.g. Coordinator, Assistant" />
+              </div>
+              <div>
+                <label className="label">Phone</label>
+                <input className="input" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+44 7700 000000" />
+              </div>
+              <div>
+                <label className="label">Email</label>
+                <input className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="staff@email.com" />
+                <p className="text-xs text-stone-400 mt-1">Also used as login identifier</p>
+              </div>
+              <div>
+                <label className="label">Emergency Contact</label>
+                <input className="input" value={form.emergencyContact} onChange={e => set('emergencyContact', e.target.value)} placeholder="Name (Relationship)" />
+              </div>
+              <div>
+                <label className="label">Emergency Phone</label>
+                <input className="input" type="tel" value={form.emergencyPhone} onChange={e => set('emergencyPhone', e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Notes</label>
+                <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional information..." />
+              </div>
             </div>
-          )}
-        </div>
-        <div className="flex gap-3">
-          <button type="submit" className="btn-primary flex-1">{initial?.id ? 'Save Changes' : 'Add Staff Member'}</button>
+
+            {/* Season assignment */}
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-stone-800 cursor-pointer">
+                <input type="checkbox" className="h-4 w-4" checked={form.isAssignedThisSeason !== false}
+                  onChange={e => set('isAssignedThisSeason', e.target.checked)} />
+                <Calendar size={14} className="text-forest-600" />
+                Active this season — can log in
+              </label>
+              <p className="text-xs text-stone-400 mt-1 ml-6">Uncheck to retain the profile but disable login access for this season.</p>
+            </div>
+
+            {/* Training */}
+            <div>
+              <p className="label mb-2">Training & Qualifications</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-forest-900 cursor-pointer">
+                    <input type="checkbox" className="h-4 w-4" checked={form.firstAidTrained}
+                      onChange={e => set('firstAidTrained', e.target.checked)} />
+                    <Heart size={13} className="text-rose-500" /> First aid trained
+                  </label>
+                  {form.firstAidTrained && (
+                    <div className="ml-6">
+                      <label className="label">Expiry date</label>
+                      <input type="date" className="input" value={form.firstAidExpiresOn}
+                        onChange={e => set('firstAidExpiresOn', e.target.value)} />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-forest-900 cursor-pointer">
+                    <input type="checkbox" className="h-4 w-4" checked={form.safeguardingTrained}
+                      onChange={e => set('safeguardingTrained', e.target.checked)} />
+                    <Shield size={13} className="text-blue-500" /> Safeguarding trained
+                  </label>
+                  {form.safeguardingTrained && (
+                    <div className="ml-6">
+                      <label className="label">Expiry date</label>
+                      <input type="date" className="input" value={form.safeguardingExpiresOn}
+                        onChange={e => set('safeguardingExpiresOn', e.target.value)} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Login Account ── */}
+        {section === 'login' && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-forest-200 bg-forest-50 p-4 space-y-1">
+              <p className="text-sm font-semibold text-forest-900">Login identifier</p>
+              <p className="font-mono text-forest-800 text-sm">{loginId || <span className="italic text-stone-400">enter a name or email above</span>}</p>
+              <p className="text-xs text-stone-500">
+                {form.email?.trim() ? 'Using email address as login.' : 'Auto-generated from name (no email set).'}
+              </p>
+            </div>
+
+            {isNew ? (
+              <div>
+                <label className="label">Temporary Password *</label>
+                <div className="relative">
+                  <input
+                    className="input pr-10"
+                    type={showPassword ? 'text' : 'password'}
+                    minLength={8}
+                    placeholder="Min 8 characters — share with staff member"
+                    value={form.tempPassword}
+                    onChange={e => set('tempPassword', e.target.value)}
+                  />
+                  <button type="button" onClick={() => setShowPassword(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                {form.tempPassword.length > 0 && form.tempPassword.length < 8 && (
+                  <p className="text-xs text-red-600 mt-1">Must be at least 8 characters</p>
+                )}
+                <p className="text-xs text-stone-400 mt-1">Leave blank to create staff profile without a login account.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-3">
+                <p className="text-sm font-medium text-stone-700">Password Management</p>
+                <p className="text-xs text-stone-500">To reset this staff member's password, use the password field in the account section below the staff list, found in the access management panel.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Permissions ── */}
+        {section === 'permissions' && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-3">
+              <p className="label">Access Level</p>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" className="h-4 w-4 mt-0.5" checked={form.isAdmin}
+                  onChange={e => set('isAdmin', e.target.checked)} />
+                <div>
+                  <span className="text-sm font-semibold text-forest-900 flex items-center gap-1.5">
+                    <Star size={13} className="text-amber-500" /> Full admin access
+                  </span>
+                  <p className="text-xs text-stone-400 mt-0.5">Can access all tabs, manage users, and view all information.</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input type="checkbox" className="h-4 w-4 mt-0.5" checked={form.canViewSafeguarding}
+                  onChange={e => set('canViewSafeguarding', e.target.checked)}
+                  disabled={form.isAdmin} />
+                <div>
+                  <span className={`text-sm font-semibold flex items-center gap-1.5 ${form.isAdmin ? 'text-stone-400' : 'text-forest-900'}`}>
+                    <Shield size={13} className="text-blue-500" /> View safeguarding reports
+                  </span>
+                  <p className="text-xs text-stone-400 mt-0.5">Can access confidential safeguarding incident records.</p>
+                </div>
+              </label>
+            </div>
+
+            {!form.isAdmin && (
+              <div>
+                <p className="label mb-2">Allowed Tabs</p>
+                <p className="text-xs text-stone-400 mb-3">Dashboard, Sign In/Out, and Shared Info are always available.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {TAB_OPTIONS.map(tab => {
+                    const locked = ALWAYS_ALLOWED.includes(tab.id)
+                    return (
+                      <label key={tab.id} className={`flex items-center gap-2 text-sm cursor-pointer ${locked ? 'text-stone-400' : 'text-forest-800'}`}>
+                        <input type="checkbox" className="h-4 w-4"
+                          checked={form.allowedTabs.includes(tab.id) || locked}
+                          onChange={() => toggleTab(tab.id)}
+                          disabled={locked || form.isAdmin} />
+                        {tab.label}
+                        {locked && <span className="text-[10px] text-stone-300">(always)</span>}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-2 border-t border-stone-100">
+          <button type="submit" className="btn-primary flex-1">
+            {isNew ? 'Add Staff Member' : 'Save Changes'}
+          </button>
           <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
         </div>
       </form>
@@ -233,200 +347,432 @@ function StaffForm({ initial, onSave, onCancel }) {
   )
 }
 
-function StaffDetail({ member, onEdit, onClose }) {
-  const username = normalizeUsername(member.name)
+// ─── Staff Detail Panel ───────────────────────────────────────────────────────
+
+function StaffDetailPanel({
+  member, loginUser, onEdit, onClose, onDelete,
+  onSavePermissions, onResetPassword, onToggleArchive, onDeleteAccount,
+  accessActionLoading, canManageAccess, currentUserEmail,
+  accessEdits, setAccessEdit,
+}) {
+  const [activeTab, setActiveTab] = useState('overview')
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const fileRef = useRef()
+
+  const isCurrentUser = loginUser
+    ? (loginUser.internalEmail || loginUser.email || '').toLowerCase() === currentUserEmail
+    : false
+
+  const edit = loginUser ? (accessEdits[loginUser.id] || {
+    isAdmin: !!loginUser.isAdmin,
+    canViewSafeguarding: !!loginUser.canViewSafeguarding,
+    allowedTabs: sanitizeAllowedTabs(loginUser.allowedTabs),
+    newPassword: '',
+    deleteConfirmed: false,
+  }) : null
+
+  function setEdit(nextState) {
+    if (!loginUser) return
+    setAccessEdit(loginUser.id, nextState)
+  }
+
+  function toggleTab(id) {
+    if (!edit || ALWAYS_ALLOWED.includes(id)) return
+    const next = edit.allowedTabs.includes(id)
+      ? edit.allowedTabs.filter(t => t !== id)
+      : [...edit.allowedTabs, id]
+    setEdit({ allowedTabs: sanitizeAllowedTabs(next) })
+  }
+
+  async function uploadDocument(file) {
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) { alert('File must be under 8MB.'); return }
+    setUploadingDoc(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `staff-documents/${member.id}/${crypto.randomUUID()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(path, file, { upsert: false })
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+      const doc = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        url: urlData.publicUrl,
+        uploadedAt: new Date().toISOString(),
+        size: file.size,
+      }
+
+      const existing = Array.isArray(member.staffDocuments) ? member.staffDocuments : []
+      onEdit({ ...member, staffDocuments: [...existing, doc] }, true) // true = save only
+    } catch (err) {
+      alert(err.message || 'Upload failed')
+    } finally {
+      setUploadingDoc(false)
+    }
+  }
+
+  function removeDocument(docId) {
+    if (!window.confirm('Remove this document?')) return
+    const existing = Array.isArray(member.staffDocuments) ? member.staffDocuments : []
+    onEdit({ ...member, staffDocuments: existing.filter(d => d.id !== docId) }, true)
+  }
+
+  const staffDocuments = Array.isArray(member.staffDocuments) ? member.staffDocuments : []
+  const faExpiry = expiryStatus(member.firstAidExpiresOn)
+  const sgExpiry = expiryStatus(member.safeguardingExpiresOn)
+
+  const detailTabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'permissions', label: 'Login & Permissions' },
+    { id: 'documents', label: `Documents${staffDocuments.length > 0 ? ` (${staffDocuments.length})` : ''}` },
+  ]
+
   return (
-    <div className="card fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-forest-900 flex items-center justify-center text-white font-display font-bold text-lg">
-            {member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+    <div className="card fade-in space-y-0 p-0 overflow-hidden">
+      {/* Header */}
+      <div className="bg-forest-900 text-white p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-white font-display font-bold text-xl flex-shrink-0">
+              {initials(member.name)}
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-xl leading-tight">{member.name}</h3>
+              {member.role && <p className="text-forest-200 text-sm mt-0.5">{member.role}</p>}
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {member.firstAidTrained && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                    faExpiry === 'expired' ? 'bg-red-900/40 text-red-200 border-red-700'
+                    : faExpiry === 'soon' ? 'bg-amber-900/40 text-amber-200 border-amber-700'
+                    : 'bg-emerald-900/40 text-emerald-200 border-emerald-700'
+                  }`}>
+                    <Heart size={9} /> First Aid
+                    {faExpiry === 'expired' && ' · EXPIRED'}
+                    {faExpiry === 'soon' && ' · Expiring soon'}
+                  </span>
+                )}
+                {member.safeguardingTrained && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                    sgExpiry === 'expired' ? 'bg-red-900/40 text-red-200 border-red-700'
+                    : sgExpiry === 'soon' ? 'bg-amber-900/40 text-amber-200 border-amber-700'
+                    : 'bg-emerald-900/40 text-emerald-200 border-emerald-700'
+                  }`}>
+                    <Shield size={9} /> Safeguarding
+                    {sgExpiry === 'expired' && ' · EXPIRED'}
+                    {sgExpiry === 'soon' && ' · Expiring soon'}
+                  </span>
+                )}
+                {member.isAssignedThisSeason === false && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-900/40 text-rose-200 border border-rose-700">
+                    Not active this season
+                  </span>
+                )}
+                {loginUser?.isArchived && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-200 border border-amber-700">
+                    Login archived
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="font-display font-bold text-forest-950 text-lg">{member.name}</h3>
-            {member.role && <p className="text-sm text-stone-500">{member.role}</p>}
+          <div className="flex gap-2 flex-shrink-0">
+            <button onClick={() => onEdit(member, false)} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white">
+              <Edit2 size={15} />
+            </button>
+            <button onClick={onClose} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white">
+              <X size={15} />
+            </button>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={onEdit} className="btn-secondary flex items-center gap-1.5 text-xs py-1.5"><Edit2 size={13} /> Edit</button>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 p-1"><X size={18} /></button>
         </div>
       </div>
-      <div className="space-y-3 text-sm">
-        <p className="flex items-center gap-2 text-forest-700"><span className="text-stone-500 w-28 flex-shrink-0">Username</span>{username || '—'}</p>
-        {member.phone && <p className="flex items-center gap-2 text-forest-700"><span className="text-stone-500 w-28 flex-shrink-0">Phone</span>{member.phone}</p>}
-        {member.email && <p className="flex items-center gap-2 text-forest-700"><span className="text-stone-500 w-28 flex-shrink-0">Email</span>{member.email}</p>}
-        {member.emergencyContact && (
-          <p className="flex items-center gap-2 text-stone-700"><span className="text-stone-500 w-28 flex-shrink-0">Emergency</span>{member.emergencyContact}</p>
-        )}
-        {member.emergencyPhone && (
-          <p className="flex items-center gap-2 text-forest-700"><span className="text-stone-500 w-28 flex-shrink-0">Emerg. Phone</span>{member.emergencyPhone}</p>
-        )}
-        {member.notes && (
-          <div className="mt-3 pt-3 border-t border-stone-100">
-            <p className="label mb-1">Notes</p>
-            <p className="text-stone-700 leading-relaxed">{member.notes}</p>
+
+      {/* Detail tabs */}
+      <div className="flex border-b border-stone-100 bg-stone-50">
+        {detailTabs.map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)}
+            className={`px-4 py-3 text-xs font-medium border-b-2 transition-all ${
+              activeTab === t.id
+                ? 'border-forest-700 text-forest-900'
+                : 'border-transparent text-stone-500 hover:text-stone-700'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-5 space-y-4">
+
+        {/* ── Overview ── */}
+        {activeTab === 'overview' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {member.email && (
+                <div>
+                  <p className="label mb-0.5">Email / Login</p>
+                  <p className="text-forest-700 flex items-center gap-1.5"><Mail size={13} /> {member.email}</p>
+                </div>
+              )}
+              {member.phone && (
+                <div>
+                  <p className="label mb-0.5">Phone</p>
+                  <p className="text-forest-700 flex items-center gap-1.5"><Phone size={13} /> {member.phone}</p>
+                </div>
+              )}
+              {member.emergencyContact && (
+                <div>
+                  <p className="label mb-0.5">Emergency Contact</p>
+                  <p className="text-stone-700">{member.emergencyContact}</p>
+                </div>
+              )}
+              {member.emergencyPhone && (
+                <div>
+                  <p className="label mb-0.5">Emergency Phone</p>
+                  <p className="text-forest-700 flex items-center gap-1.5"><Phone size={13} /> {member.emergencyPhone}</p>
+                </div>
+              )}
+            </div>
+
+            {member.notes && (
+              <div className="pt-3 border-t border-stone-100">
+                <p className="label mb-1">Notes</p>
+                <p className="text-sm text-stone-700 leading-relaxed">{member.notes}</p>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-stone-100 space-y-3">
+              <p className="label">Training & Qualifications</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className={`rounded-xl border p-3 ${member.firstAidTrained ? 'border-emerald-200 bg-emerald-50' : 'border-stone-200 bg-stone-50'}`}>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Heart size={14} className={member.firstAidTrained ? 'text-rose-500' : 'text-stone-300'} />
+                    <span className={member.firstAidTrained ? 'text-emerald-900' : 'text-stone-400'}>
+                      {member.firstAidTrained ? 'First Aid Trained' : 'No First Aid'}
+                    </span>
+                  </div>
+                  {member.firstAidTrained && <ExpiryBadge dateStr={member.firstAidExpiresOn} />}
+                </div>
+                <div className={`rounded-xl border p-3 ${member.safeguardingTrained ? 'border-blue-200 bg-blue-50' : 'border-stone-200 bg-stone-50'}`}>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Shield size={14} className={member.safeguardingTrained ? 'text-blue-500' : 'text-stone-300'} />
+                    <span className={member.safeguardingTrained ? 'text-blue-900' : 'text-stone-400'}>
+                      {member.safeguardingTrained ? 'Safeguarding Trained' : 'No Safeguarding'}
+                    </span>
+                  </div>
+                  {member.safeguardingTrained && <ExpiryBadge dateStr={member.safeguardingExpiresOn} />}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-stone-100 flex flex-wrap gap-2">
+              <button onClick={() => onDelete(member.id)}
+                className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors border border-red-200">
+                <Trash2 size={13} /> Remove Staff Profile
+              </button>
+            </div>
           </div>
         )}
-        <p className="flex items-center gap-2 text-stone-700">
-          <span className="text-stone-500 w-28 flex-shrink-0">Season</span>
-          <span>{member.isAssignedThisSeason === false ? 'Not assigned' : 'Assigned'}</span>
-        </p>
-        <div className="mt-3 pt-3 border-t border-stone-100 space-y-2">
-          <p className="label">Training & Expiry</p>
-          <p className="flex items-center gap-2 text-stone-700">
-            <span className="text-stone-500 w-28 flex-shrink-0">First Aid</span>
-            <span>{member.firstAidTrained ? 'Yes' : 'No'}</span>
-            {member.firstAidExpiresOn && <span className="text-xs text-stone-500">(expires {member.firstAidExpiresOn})</span>}
-          </p>
-          <p className="flex items-center gap-2 text-stone-700">
-            <span className="text-stone-500 w-28 flex-shrink-0">Safeguarding</span>
-            <span>{member.safeguardingTrained ? 'Yes' : 'No'}</span>
-            {member.safeguardingExpiresOn && <span className="text-xs text-stone-500">(expires {member.safeguardingExpiresOn})</span>}
-          </p>
-        </div>
+
+        {/* ── Login & Permissions ── */}
+        {activeTab === 'permissions' && (
+          <div className="space-y-5">
+            {!canManageAccess ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Only admin users can manage login permissions. Sign in with an admin account to make changes.
+              </div>
+            ) : !loginUser ? (
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-3">
+                <p className="text-sm font-medium text-stone-700">No login account linked</p>
+                <p className="text-xs text-stone-500">This staff member doesn't have a login account. Edit their profile and set a temporary password to create one.</p>
+                <button onClick={() => onEdit(member, false)}
+                  className="btn-secondary text-xs flex items-center gap-1.5">
+                  <Key size={13} /> Add Login Account
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Login info */}
+                <div className="rounded-xl border border-forest-200 bg-forest-50 p-4 space-y-1">
+                  <p className="text-xs font-semibold text-forest-700 uppercase tracking-wide">Login Account</p>
+                  <p className="font-mono text-sm text-forest-900">{loginUser.email || loginUser.username || '—'}</p>
+                  <p className="text-xs text-stone-500">User ID: {loginUser.id}</p>
+                  {loginUser.isArchived && (
+                    <p className="text-xs text-amber-700 font-medium">⚠ Login currently archived (disabled)</p>
+                  )}
+                </div>
+
+                {/* Admin / safeguarding toggles */}
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input type="checkbox" className="h-4 w-4 mt-0.5"
+                      checked={!!edit.isAdmin}
+                      onChange={e => setEdit({ isAdmin: e.target.checked })}
+                      disabled={isCurrentUser} />
+                    <div>
+                      <span className="text-sm font-semibold text-forest-900 flex items-center gap-1.5">
+                        <Star size={13} className="text-amber-500" /> Full admin access
+                      </span>
+                      <p className="text-xs text-stone-400 mt-0.5">Access all tabs, manage staff, and view all information.</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" className="h-4 w-4 mt-0.5"
+                      checked={!!edit.canViewSafeguarding}
+                      onChange={e => setEdit({ canViewSafeguarding: e.target.checked })}
+                      disabled={!!edit.isAdmin} />
+                    <div>
+                      <span className="text-sm font-semibold text-forest-900 flex items-center gap-1.5">
+                        <Shield size={13} className="text-blue-500" /> View safeguarding reports
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Allowed tabs */}
+                {!edit.isAdmin && (
+                  <div>
+                    <p className="label mb-2">Allowed Tabs</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {TAB_OPTIONS.map(tab => {
+                        const locked = ALWAYS_ALLOWED.includes(tab.id)
+                        return (
+                          <label key={tab.id} className={`flex items-center gap-2 text-sm ${locked ? 'text-stone-400 cursor-default' : 'text-forest-800 cursor-pointer'}`}>
+                            <input type="checkbox" className="h-4 w-4"
+                              checked={edit.allowedTabs.includes(tab.id) || locked}
+                              onChange={() => toggleTab(tab.id)}
+                              disabled={locked} />
+                            {tab.label}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Season access toggle — shown here too */}
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-stone-800 cursor-pointer">
+                    <input type="checkbox" className="h-4 w-4"
+                      checked={!loginUser.isArchived}
+                      onChange={e => onToggleArchive(loginUser, !e.target.checked)}
+                      disabled={accessActionLoading || isCurrentUser} />
+                    <Calendar size={14} className="text-forest-600" />
+                    Login account active (not archived)
+                  </label>
+                  <p className="text-xs text-stone-400 mt-1 ml-6">Uncheck to archive this login without deleting the account.</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="btn-primary text-sm flex items-center gap-1.5"
+                    onClick={() => onSavePermissions(loginUser.id, member.name)}
+                    disabled={accessActionLoading}>
+                    <Save size={14} /> Save Permissions
+                  </button>
+                </div>
+
+                {/* Password reset */}
+                <div className="pt-4 border-t border-stone-100 space-y-2">
+                  <p className="label">Reset Password</p>
+                  <div className="flex gap-2">
+                    <input
+                      className="input flex-1"
+                      placeholder="New password (min 8 chars)"
+                      value={edit.newPassword || ''}
+                      onChange={e => setEdit({ newPassword: e.target.value })}
+                    />
+                    <button className="btn-secondary text-sm"
+                      onClick={() => onResetPassword(loginUser.id)}
+                      disabled={accessActionLoading}>
+                      Reset
+                    </button>
+                  </div>
+                </div>
+
+                {/* Permanent delete */}
+                {!isCurrentUser && (
+                  <div className="pt-4 border-t border-stone-100 space-y-2">
+                    <p className="label text-red-700">Danger Zone</p>
+                    <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
+                      <input type="checkbox" className="h-4 w-4"
+                        checked={!!edit.deleteConfirmed}
+                        onChange={e => setEdit({ deleteConfirmed: e.target.checked })} />
+                      I understand this permanently deletes the login account.
+                    </label>
+                    <button
+                      className="btn-secondary text-sm text-red-700 border-red-200"
+                      onClick={() => onDeleteAccount(loginUser)}
+                      disabled={accessActionLoading || !edit.deleteConfirmed}>
+                      Permanently Delete Login Account
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Documents ── */}
+        {activeTab === 'documents' && (
+          <div className="space-y-4">
+            <p className="text-xs text-stone-500">Upload first aid certificates, DBS checks, incident forms, and other staff documents.</p>
+
+            {staffDocuments.length === 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-stone-200 p-8 text-center">
+                <Paperclip size={24} className="text-stone-300 mx-auto mb-2" />
+                <p className="text-sm text-stone-400">No documents uploaded yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {staffDocuments.map(doc => (
+                  <div key={doc.id} className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+                    <FileText size={14} className="text-forest-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-stone-800 truncate">{doc.name}</p>
+                      {doc.uploadedAt && (
+                        <p className="text-xs text-stone-400">
+                          {new Date(doc.uploadedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                    <a href={doc.url} target="_blank" rel="noreferrer"
+                      className="p-1.5 text-forest-600 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors">
+                      <Download size={14} />
+                    </a>
+                    <button onClick={() => removeDocument(doc.id)}
+                      className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div>
+              <input ref={fileRef} type="file" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadDocument(f); e.target.value = '' }} />
+              <button onClick={() => fileRef.current?.click()}
+                disabled={uploadingDoc}
+                className="btn-secondary text-sm flex items-center gap-2">
+                <Upload size={14} /> {uploadingDoc ? 'Uploading...' : 'Upload Document'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function CreateAccountForm({ onSubmit, loading }) {
-  const [form, setForm] = useState({
-    identifier: '',
-    password: '',
-    name: '',
-    role: '',
-    isAdmin: false,
-    canViewTimetableOverview: false,
-    canEditTimetable: false,
-    canViewSafeguarding: false,
-    allowedTabs: ['dashboard', 'signin'],
-  })
-
-  const resolvedIdentifier = form.identifier.trim()
-    ? form.identifier.trim()
-    : (form.name.trim() ? normalizeUsername(form.name) : '')
-
-  const identifierIsEmail = resolvedIdentifier.includes('@')
-
-  function updateField(key, value) {
-    setForm(prev => ({ ...prev, [key]: value }))
-  }
-
-  function toggleTab(tabId) {
-    setForm(prev => {
-      const nextTabs = prev.allowedTabs.includes(tabId)
-        ? prev.allowedTabs.filter(tab => tab !== tabId)
-        : [...prev.allowedTabs, tabId]
-      return { ...prev, allowedTabs: sanitizeAllowedTabs(nextTabs) }
-    })
-  }
-
-  function submit(e) {
-    e.preventDefault()
-    onSubmit({ ...form, identifier: resolvedIdentifier })
-  }
-
-  return (
-    <form onSubmit={submit} className="card border-2 border-amber-200 space-y-4">
-      <div>
-        <h3 className="font-display font-bold text-forest-950 text-lg">Create Login Account</h3>
-        <p className="text-sm text-stone-500">Creates a Supabase auth user and permission row in one action.</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="label">Staff Name (optional)</label>
-          <input className="input" value={form.name} onChange={e => updateField('name', e.target.value)} placeholder="Used to auto-generate username" />
-        </div>
-        <div>
-          <label className="label">Role (optional)</label>
-          <input className="input" value={form.role} onChange={e => updateField('role', e.target.value)} />
-        </div>
-        <div className="col-span-1 sm:col-span-2">
-          <label className="label">Email or Username</label>
-          <input
-            className="input"
-            type="text"
-            value={form.identifier}
-            onChange={e => updateField('identifier', e.target.value)}
-            placeholder="email@example.com or firstname.lastname"
-          />
-          {resolvedIdentifier && (
-            <p className="text-xs text-stone-500 mt-1">
-              Login identifier: <span className="font-mono font-semibold text-forest-800">{resolvedIdentifier}</span>
-              {!identifierIsEmail && <span className="ml-1 text-amber-700">(username — no email)</span>}
-            </p>
-          )}
-          {!form.identifier.trim() && form.name.trim() && (
-            <p className="text-xs text-amber-700 mt-1">Auto-generated from name. Enter an identifier above to override.</p>
-          )}
-        </div>
-        <div className="col-span-1 sm:col-span-2">
-          <label className="label">Temporary Password *</label>
-          <input
-            className="input"
-            type="text"
-            minLength={8}
-            value={form.password}
-            onChange={e => updateField('password', e.target.value)}
-            placeholder="Min 8 characters — share this with the staff member"
-            required
-          />
-        </div>
-      </div>
-
-      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-        <input
-          type="checkbox"
-          className="h-4 w-4"
-          checked={form.isAdmin}
-          onChange={e => updateField('isAdmin', e.target.checked)}
-        />
-        Full admin access
-      </label>
-
-      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-        <input
-          type="checkbox"
-          className="h-4 w-4"
-          checked={form.canViewSafeguarding}
-          onChange={e => updateField('canViewSafeguarding', e.target.checked)}
-          disabled={form.isAdmin}
-        />
-        Can view safeguarding information
-      </label>
-
-      <div>
-        <p className="label mb-2">Allowed Tabs</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {TAB_OPTIONS.map(tab => (
-            <label key={tab.id} className="inline-flex items-center gap-2 text-sm text-forest-800">
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={form.allowedTabs.includes(tab.id)}
-                onChange={() => toggleTab(tab.id)}
-                disabled={form.isAdmin}
-              />
-              {tab.label}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <button type="submit" className="btn-primary flex items-center gap-2" disabled={loading}>
-        <Plus size={15} />
-        {loading ? 'Creating...' : 'Create Account'}
-      </button>
-    </form>
-  )
-}
+// ─── Main Staff Component ─────────────────────────────────────────────────────
 
 export default function Staff({ staffList, setStaffList, campPeriods, setCampPeriods, canManageCampPeriod = false }) {
   const [showForm, setShowForm] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [editing, setEditing] = useState(false)
+  const [editingMember, setEditingMember] = useState(null)
 
   const [currentUserEmail, setCurrentUserEmail] = useState('')
   const [canManageAccess, setCanManageAccess] = useState(false)
@@ -437,20 +783,25 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   const [accessError, setAccessError] = useState('')
   const [accessMessage, setAccessMessage] = useState('')
   const [resetRequests, setResetRequests] = useState([])
+
   const [staffActionLoading, setStaffActionLoading] = useState(false)
   const [staffMessage, setStaffMessage] = useState('')
   const [staffError, setStaffError] = useState('')
+
   const [campPeriodDrafts, setCampPeriodDrafts] = useState([])
   const [newPeriodDraft, setNewPeriodDraft] = useState({ label: '', startDate: '', endDate: '' })
   const [campPeriodSaving, setCampPeriodSaving] = useState(false)
   const [campPeriodMessage, setCampPeriodMessage] = useState('')
   const [campPeriodError, setCampPeriodError] = useState('')
+
+  const [search, setSearch] = useState('')
+  const [filterSeason, setFilterSeason] = useState('all') // all | active | inactive
+
   const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 
   useEffect(() => {
     setCampPeriodDrafts(campPeriods?.map(p => ({
-      id: p.id,
-      label: p.label || '',
+      id: p.id, label: p.label || '',
       startDate: p.startDate || p.start_date || '',
       endDate: p.endDate || p.end_date || '',
     })) || [])
@@ -458,9 +809,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
 
   async function withAccessToken() {
     const { data, error } = await supabase.auth.getSession()
-    if (error || !data.session?.access_token) {
-      throw new Error('No active auth session')
-    }
+    if (error || !data.session?.access_token) throw new Error('No active auth session')
     setCurrentUserEmail((data.session.user?.email || '').toLowerCase())
     return data.session.access_token
   }
@@ -469,17 +818,11 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     setAccessLoading(true)
     setAccessError('')
     setAccessMessage('')
-
     try {
       const token = await withAccessToken()
-      const response = await fetch('/api/admin-users', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const response = await fetch('/api/admin-users', { headers: { Authorization: `Bearer ${token}` } })
       const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to load users')
-      }
+      if (!response.ok) throw new Error(payload.error || 'Unable to load users')
 
       const users = payload.users || []
       setCanManageAccess(!!payload.currentUser?.isAdmin)
@@ -491,8 +834,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         edits[user.id] = {
           identifier: user.username || user.email || '',
           isAdmin: !!user.isAdmin,
-          canViewTimetableOverview: !!user.canViewTimetableOverview,
-          canEditTimetable: !!user.canEditTimetable,
           canViewSafeguarding: !!user.canViewSafeguarding,
           allowedTabs: sanitizeAllowedTabs(user.allowedTabs),
           newPassword: '',
@@ -510,33 +851,47 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  useEffect(() => {
-    loadAccessUsers()
-  }, [])
+  useEffect(() => { loadAccessUsers() }, [])
 
-  function setEdit(userId, nextState) {
-    setAccessEdits(prev => ({
-      ...prev,
-      [userId]: { ...prev[userId], ...nextState },
-    }))
+  function setAccessEdit(userId, nextState) {
+    setAccessEdits(prev => ({ ...prev, [userId]: { ...prev[userId], ...nextState } }))
   }
 
-  async function attemptCreateLoginAccount({ identifier, password, allowedTabs, fullName = '' }) {
+  // Build email→loginUser map
+  const loginUserByEmail = useMemo(() => {
+    const map = new Map()
+    accessUsers.forEach(user => {
+      if (user.email) map.set(user.email.toLowerCase(), user)
+      if (user.internalEmail) map.set(user.internalEmail.toLowerCase(), user)
+      if (user.username) map.set(user.username.toLowerCase(), user)
+    })
+    return map
+  }, [accessUsers])
+
+  function getLinkedLoginUser(member) {
+    if (!member) return null
+    if (member.email) {
+      const u = loginUserByEmail.get(member.email.toLowerCase())
+      if (u) return u
+    }
+    const byUsername = loginUserByEmail.get(normalizeUsername(member.name))
+    if (byUsername) return byUsername
+    return null
+  }
+
+  async function attemptCreateLoginAccount({ identifier, password, allowedTabs, isAdmin, canViewSafeguarding, fullName }) {
     const token = await withAccessToken()
     const response = await fetch('/api/admin-users', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         action: 'create_user',
         email: identifier,
         password,
-        isAdmin: false,
+        isAdmin: !!isAdmin,
         canViewTimetableOverview: false,
         canEditTimetable: false,
-        canViewSafeguarding: false,
+        canViewSafeguarding: !!canViewSafeguarding,
         allowedTabs: sanitizeAllowedTabs(allowedTabs || ['dashboard', 'signin']),
         ...(fullName ? { fullName } : {}),
       }),
@@ -552,49 +907,32 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     setStaffMessage('')
     try {
       const newId = crypto.randomUUID()
-
       const loginIdentifier = data.email?.trim()
         ? data.email.trim().toLowerCase()
         : normalizeUsername(data.name)
 
-      const { createLoginAccount, tempPassword, ...staffData } = data
+      const { tempPassword, ...staffData } = data
       await setStaffList(prev => [...prev, { ...staffData, id: newId }])
       setShowForm(false)
 
-      if (data.createLoginAccount) {
-        if (!data.tempPassword || data.tempPassword.length < 8) {
-          setStaffError('Login account not created: temporary password must be at least 8 characters.')
-          setStaffMessage('Staff profile added.')
-          return
-        }
-        if (!loginIdentifier) {
-          setStaffError('Login account not created: could not determine a login identifier.')
-          setStaffMessage('Staff profile added.')
-          return
-        }
+      if (data.tempPassword && data.tempPassword.length >= 8 && loginIdentifier) {
         try {
           await attemptCreateLoginAccount({
             identifier: loginIdentifier,
             password: data.tempPassword,
-            allowedTabs: ['dashboard', 'signin'],
+            allowedTabs: data.allowedTabs,
+            isAdmin: data.isAdmin,
+            canViewSafeguarding: data.canViewSafeguarding,
             fullName: data.name?.trim() || '',
           })
-          if (data.email?.trim()) {
-            await setStaffList(prev => prev.map(s =>
-              s.id === newId ? { ...s, email: data.email.trim().toLowerCase() } : s
-            ))
-          }
-          setStaffMessage(
-            `Staff profile added and login account created. ` +
-            `Login: ${loginIdentifier} · Password: ${data.tempPassword}`
-          )
+          setStaffMessage(`Staff profile and login account created. Login: ${loginIdentifier} · Password: ${data.tempPassword}`)
           await loadAccessUsers()
         } catch (accountError) {
           setStaffMessage('Staff profile added.')
           setStaffError(`Login account error: ${accountError.message}`)
         }
       } else {
-        setStaffMessage('Staff profile added.')
+        setStaffMessage('Staff profile added. No login account created (no password provided).')
       }
     } catch (error) {
       setStaffError(error.message || 'Unable to add staff profile')
@@ -603,17 +941,18 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function saveEdit(data) {
-    if (!selected) return
+  async function saveEditStaff(data, saveOnly = false) {
+    if (!editingMember && !saveOnly) return
+    const target = saveOnly ? data : editingMember
     setStaffActionLoading(true)
-    setStaffError('')
-    setStaffMessage('')
     try {
-      const { createLoginAccount, tempPassword, ...staffData } = data
-      await setStaffList(prev => prev.map(s => s.id === selected.id ? { ...s, ...staffData } : s))
-      setSelected(s => ({ ...s, ...staffData }))
-      setEditing(false)
-      setStaffMessage('Staff profile updated.')
+      const { tempPassword, ...staffData } = data
+      await setStaffList(prev => prev.map(s => s.id === target.id ? { ...s, ...staffData } : s))
+      if (selected?.id === target.id) setSelected(s => ({ ...s, ...staffData }))
+      if (!saveOnly) {
+        setEditingMember(null)
+        setStaffMessage('Staff profile updated.')
+      }
     } catch (error) {
       setStaffError(error.message || 'Unable to update staff profile')
     } finally {
@@ -622,119 +961,44 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   }
 
   async function deleteStaff(id) {
-    if (!window.confirm('Remove this staff member?')) return
+    if (!window.confirm('Remove this staff member from the system?')) return
     setStaffActionLoading(true)
-    setStaffError('')
-    setStaffMessage('')
     try {
       await setStaffList(prev => prev.filter(s => s.id !== id))
-      setSelected(null)
+      if (selected?.id === id) setSelected(null)
       setStaffMessage('Staff profile removed.')
     } catch (error) {
-      setStaffError(error.message || 'Unable to remove staff profile')
+      setStaffError(error.message || 'Unable to remove')
     } finally {
       setStaffActionLoading(false)
-    }
-  }
-
-  async function createAccount(form) {
-    setAccessActionLoading(true)
-    setAccessError('')
-    setAccessMessage('')
-
-    try {
-      const token = await withAccessToken()
-      const response = await fetch('/api/admin-users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'create_user',
-          email: form.identifier,
-          password: form.password,
-          isAdmin: form.isAdmin,
-          canViewTimetableOverview: !!form.canViewTimetableOverview,
-          canEditTimetable: !!form.canEditTimetable,
-          canViewSafeguarding: !!form.canViewSafeguarding,
-          allowedTabs: sanitizeAllowedTabs(form.allowedTabs),
-          ...(form.name?.trim() ? { fullName: form.name.trim() } : {}),
-        }),
-      })
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to create account')
-      }
-
-      if (form.name.trim()) {
-        const isEmail = form.identifier.includes('@')
-        const exists = isEmail
-          ? staffList.some(member => (member.email || '').toLowerCase() === form.identifier.toLowerCase())
-          : false
-
-        if (!exists) {
-          setStaffList(prev => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              name: form.name.trim(),
-              role: form.role?.trim() || '',
-              email: isEmail ? form.identifier.toLowerCase() : '',
-              phone: '',
-              emergencyContact: '',
-              emergencyPhone: '',
-              notes: '',
-            },
-          ])
-        }
-      }
-
-      const label = payload.user?.username || payload.user?.email || form.identifier
-      setAccessMessage(`Created account: ${label}`)
-      await loadAccessUsers()
-    } catch (error) {
-      setAccessError(error.message)
-    } finally {
-      setAccessActionLoading(false)
     }
   }
 
   async function savePermissions(userId, fullName = '') {
     const edit = accessEdits[userId]
     if (!edit) return
-
     setAccessActionLoading(true)
     setAccessError('')
     setAccessMessage('')
-
     try {
       const token = await withAccessToken()
       const response = await fetch('/api/admin-users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           action: 'update_permissions',
           userId,
           isAdmin: !!edit.isAdmin,
-          canViewTimetableOverview: !!edit.canViewTimetableOverview,
-          canEditTimetable: !!edit.canEditTimetable,
+          canViewTimetableOverview: false,
+          canEditTimetable: false,
           canViewSafeguarding: !!edit.canViewSafeguarding,
           allowedTabs: sanitizeAllowedTabs(edit.allowedTabs),
           ...(fullName ? { fullName } : {}),
         }),
       })
       const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to save permissions')
-      }
-
-      setAccessMessage('Permissions updated successfully')
+      if (!response.ok) throw new Error(payload.error || 'Unable to save permissions')
+      setAccessMessage('Permissions updated.')
       await loadAccessUsers()
     } catch (error) {
       setAccessError(error.message)
@@ -743,78 +1007,24 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function saveUserDetails(userId) {
-    const edit = accessEdits[userId]
-    if (!edit) return
-
-    setAccessActionLoading(true)
-    setAccessError('')
-    setAccessMessage('')
-
-    try {
-      const token = await withAccessToken()
-      const response = await fetch('/api/admin-users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'update_user',
-          userId,
-          email: edit.identifier,
-        }),
-      })
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to save user details')
-      }
-
-      setAccessMessage('User details updated successfully')
-      await loadAccessUsers()
-    } catch (error) {
-      setAccessError(error.message)
-    } finally {
-      setAccessActionLoading(false)
-    }
-  }
-
-  async function resetPassword(userId, requestId = '') {
+  async function resetPassword(userId) {
     const edit = accessEdits[userId]
     const newPassword = edit?.newPassword || ''
-    if (newPassword.length < 8) {
-      setAccessError('Password must be at least 8 characters')
-      return
-    }
-
+    if (newPassword.length < 8) { setAccessError('Password must be at least 8 characters'); return }
     setAccessActionLoading(true)
     setAccessError('')
     setAccessMessage('')
-
     try {
       const token = await withAccessToken()
       const response = await fetch('/api/admin-users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'reset_password',
-          userId,
-          newPassword,
-          requestId,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'reset_password', userId, newPassword }),
       })
       const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to reset password')
-      }
-
-      setEdit(userId, { newPassword: '' })
-      setAccessMessage('Password reset. User will be asked to set a new password at next login.')
+      if (!response.ok) throw new Error(payload.error || 'Unable to reset password')
+      setAccessEdit(userId, { newPassword: '' })
+      setAccessMessage('Password reset successfully.')
       await loadAccessUsers()
     } catch (error) {
       setAccessError(error.message)
@@ -823,41 +1033,26 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function setArchivedState(user, shouldArchive) {
+  async function toggleArchive(user, shouldArchive) {
     const internalEmail = (user.internalEmail || user.email || '').toLowerCase()
     if (internalEmail && internalEmail === currentUserEmail) {
-      setAccessError('You cannot change archive status for your own account while signed in')
+      setAccessError('You cannot change archive status on your own account')
       return
     }
-
-    const label = accountLabel(user)
-    const confirmed = window.confirm(`${shouldArchive ? 'Archive' : 'Restore'} login account for ${label}?`)
+    const confirmed = window.confirm(`${shouldArchive ? 'Archive' : 'Restore'} login account for ${accountLabel(user)}?`)
     if (!confirmed) return
-
     setAccessActionLoading(true)
     setAccessError('')
-    setAccessMessage('')
-
     try {
       const token = await withAccessToken()
       const response = await fetch('/api/admin-users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: shouldArchive ? 'archive_user' : 'restore_user',
-          userId: user.id,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: shouldArchive ? 'archive_user' : 'restore_user', userId: user.id }),
       })
-
       const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error || `Unable to ${shouldArchive ? 'archive' : 'restore'} account`)
-      }
-
-      setAccessMessage(`${shouldArchive ? 'Archived' : 'Restored'} account: ${label}`)
+      if (!response.ok) throw new Error(payload.error || 'Unable to update account')
+      setAccessMessage(`${shouldArchive ? 'Archived' : 'Restored'} account.`)
       await loadAccessUsers()
     } catch (error) {
       setAccessError(error.message)
@@ -866,41 +1061,26 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function permanentlyDeleteUser(user) {
+  async function deleteLoginAccount(user) {
     const internalEmail = (user.internalEmail || user.email || '').toLowerCase()
     if (internalEmail && internalEmail === currentUserEmail) {
-      setAccessError('You cannot permanently delete your own account while signed in')
+      setAccessError('You cannot delete your own account')
       return
     }
-
-    const label = accountLabel(user)
-    const check = window.prompt(`Type DELETE to permanently remove ${label}. This cannot be undone.`)
+    const check = window.prompt(`Type DELETE to permanently remove ${accountLabel(user)}.`)
     if (check !== 'DELETE') return
-
     setAccessActionLoading(true)
     setAccessError('')
-    setAccessMessage('')
-
     try {
       const token = await withAccessToken()
       const response = await fetch('/api/admin-users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action: 'delete_user',
-          userId: user.id,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'delete_user', userId: user.id }),
       })
-
       const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to permanently delete account')
-      }
-
-      setAccessMessage(`Permanently deleted account: ${label}`)
+      if (!response.ok) throw new Error(payload.error || 'Unable to delete account')
+      setAccessMessage('Login account permanently deleted.')
       await loadAccessUsers()
     } catch (error) {
       setAccessError(error.message)
@@ -909,90 +1089,11 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function assignLoginToStaff(user) {
-    const edit = accessEdits[user.id]
-    const selectedStaffId = edit?.linkedStaffId || ''
-    if (!selectedStaffId) {
-      setAccessError('Choose a staff profile first.')
-      return
-    }
-
-    const loginEmail = String(user.email || '').trim().toLowerCase()
-    if (!loginEmail) {
-      setAccessError('This login account has no email (username-only accounts cannot be linked by email).')
-      return
-    }
-
-    const selectedStaff = staffList.find(member => member.id === selectedStaffId)
-    if (!selectedStaff) {
-      setAccessError('Selected staff profile no longer exists.')
-      return
-    }
-
-    setAccessActionLoading(true)
-    setAccessError('')
-    setAccessMessage('')
-    try {
-      await setStaffList(prev => prev.map(member => {
-        if (member.id === selectedStaffId) {
-          return { ...member, email: loginEmail }
-        }
-        return member
-      }))
-      setAccessMessage(`Linked ${selectedStaff.name} to ${loginEmail}`)
-    } catch (error) {
-      setAccessError(error.message || 'Unable to link staff to login account')
-    } finally {
-      setAccessActionLoading(false)
-    }
+  function accountLabel(user) {
+    return user.username || user.email || user.internalEmail || ''
   }
 
-  async function assignOwnerProfile() {
-    if (!ownerEmail) {
-      setStaffError('Owner email is not configured.')
-      return
-    }
-
-    setStaffActionLoading(true)
-    setStaffError('')
-    setStaffMessage('')
-    try {
-      await setStaffList(prev => {
-        const existing = prev.find(member => (member.email || '').toLowerCase() === ownerEmail)
-        if (existing) {
-          return prev.map(member => member.id === existing.id
-            ? { ...member, name: 'Sam Brenner', role: 'Camp Coordinator', email: ownerEmail, isAssignedThisSeason: true }
-            : member
-          )
-        }
-
-        return [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            name: 'Sam Brenner',
-            role: 'Camp Coordinator',
-            email: ownerEmail,
-            phone: '',
-            emergencyContact: '',
-            emergencyPhone: '',
-            notes: '',
-            firstAidTrained: false,
-            safeguardingTrained: false,
-            firstAidExpiresOn: '',
-            safeguardingExpiresOn: '',
-            isAssignedThisSeason: true,
-          },
-        ]
-      })
-      setStaffMessage(`Owner profile assigned to Sam Brenner (${ownerEmail}).`)
-    } catch (error) {
-      setStaffError(error.message || 'Unable to assign owner profile')
-    } finally {
-      setStaffActionLoading(false)
-    }
-  }
-
+  // Camp period helpers
   async function saveCampPeriod(id) {
     const draft = campPeriodDrafts.find(d => d.id === id)
     if (!draft) return
@@ -1000,11 +1101,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     try {
       await setCampPeriods(prev => prev.map(p => p.id === id ? { ...p, ...draft } : p))
       setCampPeriodMessage('Period updated.')
-    } catch (error) {
-      setCampPeriodError(error.message)
-    } finally {
-      setCampPeriodSaving(false)
-    }
+    } catch (error) { setCampPeriodError(error.message) }
+    finally { setCampPeriodSaving(false) }
   }
 
   async function addCampPeriod() {
@@ -1014,11 +1112,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       await setCampPeriods(prev => [...prev, { ...newPeriodDraft, id: crypto.randomUUID() }])
       setNewPeriodDraft({ label: '', startDate: '', endDate: '' })
       setCampPeriodMessage('Period added.')
-    } catch (error) {
-      setCampPeriodError(error.message)
-    } finally {
-      setCampPeriodSaving(false)
-    }
+    } catch (error) { setCampPeriodError(error.message) }
+    finally { setCampPeriodSaving(false) }
   }
 
   async function deleteCampPeriod(id) {
@@ -1026,455 +1121,341 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     await setCampPeriods(prev => prev.filter(p => p.id !== id))
   }
 
-  const staffByEmail = useMemo(() => {
-    const map = new Map()
-    staffList.forEach(member => {
-      const email = (member.email || '').toLowerCase()
-      if (email) map.set(email, member)
+  // Filtered staff list
+  const filtered = useMemo(() => {
+    let list = [...staffList].sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(s =>
+        s.name?.toLowerCase().includes(q) ||
+        s.role?.toLowerCase().includes(q) ||
+        s.email?.toLowerCase().includes(q)
+      )
+    }
+    if (filterSeason === 'active') list = list.filter(s => s.isAssignedThisSeason !== false)
+    if (filterSeason === 'inactive') list = list.filter(s => s.isAssignedThisSeason === false)
+    return list
+  }, [staffList, search, filterSeason])
+
+  const activeCount = staffList.filter(s => s.isAssignedThisSeason !== false).length
+  const faCount = staffList.filter(s => s.firstAidTrained).length
+  const sgCount = staffList.filter(s => s.safeguardingTrained).length
+
+  // Unlinked login accounts (no matching staff profile)
+  const unlinkedLoginUsers = useMemo(() => {
+    return accessUsers.filter(user => {
+      const email = (user.email || '').toLowerCase()
+      const username = (user.username || '').toLowerCase()
+      const fullName = (user.fullName || '').toLowerCase()
+      return !staffList.some(s =>
+        (s.email && s.email.toLowerCase() === email) ||
+        normalizeUsername(s.name) === username ||
+        s.name?.toLowerCase() === fullName
+      )
     })
-    return map
-  }, [staffList])
+  }, [accessUsers, staffList])
 
   return (
     <div className="fade-in space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Staff</h2>
-          <p className="text-stone-500 text-sm">{staffList.length} staff members</p>
+          <p className="text-stone-500 text-sm">
+            {activeCount} active this season · {faCount} first aid · {sgCount} safeguarding
+          </p>
         </div>
-        <button onClick={() => { setShowForm(true); setSelected(null) }} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
-          <Plus size={15} strokeWidth={2.5} /> Add Staff
+        <button onClick={() => { setShowForm(true); setSelected(null); setEditingMember(null) }}
+          className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
+          <Plus size={15} strokeWidth={2.5} /> Add Staff Member
         </button>
       </div>
 
-      {showForm && (
-        <StaffForm onSave={addStaff} onCancel={() => setShowForm(false)} />
-      )}
-
+      {/* Messages */}
       {staffError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm flex items-start gap-2">
-          <AlertCircle size={16} className="mt-0.5" />
-          <span>{staffError}</span>
+          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" /><span>{staffError}</span>
         </div>
       )}
-
       {staffMessage && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-700 text-sm flex items-start gap-2">
-          <Check size={16} className="mt-0.5" />
-          <span>{staffMessage}</span>
+          <Check size={16} className="mt-0.5 flex-shrink-0" /><span>{staffMessage}</span>
+        </div>
+      )}
+      {accessError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" /><span>{accessError}</span>
+        </div>
+      )}
+      {accessMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-700 text-sm flex items-start gap-2">
+          <Check size={16} className="mt-0.5 flex-shrink-0" /><span>{accessMessage}</span>
         </div>
       )}
 
-      {selected && !editing && (
-        <StaffDetail
-          member={selected}
-          onEdit={() => setEditing(true)}
-          onClose={() => setSelected(null)}
+      {/* Add form */}
+      {showForm && (
+        <StaffProfileForm
+          isNew
+          onSave={addStaff}
+          onCancel={() => setShowForm(false)}
         />
       )}
 
-      {selected && editing && (
-        <StaffForm initial={selected} onSave={saveEdit} onCancel={() => setEditing(false)} />
+      {/* Edit form */}
+      {editingMember && (
+        <StaffProfileForm
+          initial={editingMember}
+          isNew={false}
+          onSave={saveEditStaff}
+          onCancel={() => setEditingMember(null)}
+        />
       )}
 
+      {/* Selected staff detail */}
+      {selected && !editingMember && (
+        <StaffDetailPanel
+          member={selected}
+          loginUser={getLinkedLoginUser(selected)}
+          onEdit={(member, saveOnly) => {
+            if (saveOnly) { saveEditStaff(member, true); return }
+            setEditingMember(member)
+          }}
+          onClose={() => setSelected(null)}
+          onDelete={deleteStaff}
+          onSavePermissions={savePermissions}
+          onResetPassword={resetPassword}
+          onToggleArchive={toggleArchive}
+          onDeleteAccount={deleteLoginAccount}
+          accessActionLoading={accessActionLoading}
+          canManageAccess={canManageAccess}
+          currentUserEmail={currentUserEmail}
+          accessEdits={accessEdits}
+          setAccessEdit={setAccessEdit}
+        />
+      )}
+
+      {/* Search + filter */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text" placeholder="Search staff..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="input flex-1"
+        />
+        <div className="flex gap-1">
+          {[['all', 'All'], ['active', 'Active'], ['inactive', 'Inactive']].map(([val, label]) => (
+            <button key={val} onClick={() => setFilterSeason(val)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                filterSeason === val ? 'bg-forest-900 text-white border-forest-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Staff list */}
       <div className="space-y-2">
-        {staffList.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="card text-center py-10">
             <User size={32} className="text-stone-300 mx-auto mb-3" />
-            <p className="text-stone-500">No staff added yet.</p>
+            <p className="text-stone-500">No staff found.</p>
           </div>
         ) : (
-          staffList.map(s => (
-            <div key={s.id}
-              className={`card flex items-center gap-4 hover:shadow-sm transition-shadow group cursor-pointer ${selected?.id === s.id ? 'ring-2 ring-forest-400' : ''}`}
-              onClick={() => { setSelected(s); setEditing(false); setShowForm(false) }}>
-              <div className="w-10 h-10 rounded-full bg-forest-900 flex items-center justify-center text-white font-display font-bold text-sm flex-shrink-0">
-                {s.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-display font-semibold text-forest-950 group-hover:text-forest-700">{s.name}</p>
-                <p className="text-xs text-stone-400 truncate">{s.role || 'Staff'}{s.phone ? ` · ${s.phone}` : ''}</p>
-                <p className="text-xs text-forest-700 mt-0.5">@{normalizeUsername(s.name) || 'no-username'}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  {s.firstAidTrained && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">FA</span>}
-                  {s.safeguardingTrained && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">SG</span>}
-                  {s.isAssignedThisSeason === false && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">No camp assigned</span>}
+          filtered.map(s => {
+            const loginUser = getLinkedLoginUser(s)
+            const hasLogin = Boolean(loginUser)
+            const isArchived = loginUser?.isArchived
+            const faExp = expiryStatus(s.firstAidExpiresOn)
+            const sgExp = expiryStatus(s.safeguardingExpiresOn)
+            const isActive = s.isAssignedThisSeason !== false
+
+            return (
+              <div key={s.id}
+                className={`card flex items-center gap-4 hover:shadow-sm transition-all group cursor-pointer ${selected?.id === s.id ? 'ring-2 ring-forest-400' : ''} ${!isActive ? 'opacity-60' : ''}`}
+                onClick={() => { setSelected(s); setEditingMember(null); setShowForm(false) }}>
+
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-display font-bold text-sm flex-shrink-0 ${
+                  isActive ? 'bg-forest-900' : 'bg-stone-400'
+                }`}>
+                  {initials(s.name)}
                 </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-display font-semibold text-forest-950 group-hover:text-forest-700">{s.name}</p>
+                    {hasLogin && !isArchived && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-forest-100 text-forest-800 border border-forest-200 flex items-center gap-0.5">
+                        <Key size={8} /> Login
+                      </span>
+                    )}
+                    {hasLogin && isArchived && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                        Login archived
+                      </span>
+                    )}
+                    {!hasLogin && (
+                      <span className="text-[10px] text-stone-400 italic">No login</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-stone-400 truncate mt-0.5">{s.role || 'Staff'}{s.email ? ` · ${s.email}` : ''}</p>
+                  <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                    {s.firstAidTrained && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
+                        faExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
+                        faExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                        'bg-emerald-100 text-emerald-800 border-emerald-200'
+                      }`}>
+                        <Heart size={8} /> FA
+                        {faExp === 'expired' && ' ⚠'}
+                        {faExp === 'soon' && ' !'}
+                      </span>
+                    )}
+                    {s.safeguardingTrained && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
+                        sgExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
+                        sgExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                        'bg-blue-100 text-blue-800 border-blue-200'
+                      }`}>
+                        <Shield size={8} /> SG
+                        {sgExp === 'expired' && ' ⚠'}
+                        {sgExp === 'soon' && ' !'}
+                      </span>
+                    )}
+                    {!isActive && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Not this season</span>
+                    )}
+                    {loginUser?.isAdmin && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-0.5">
+                        <Star size={8} /> Admin
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <ChevronRight size={18} className="text-stone-400 group-hover:text-forest-700 flex-shrink-0" />
               </div>
-              <button onClick={e => { e.stopPropagation(); deleteStaff(s.id) }}
-                className="p-1.5 text-stone-400 hover:text-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-                <Trash2 size={15} />
-              </button>
-              <ChevronRight size={18} className="text-stone-400 group-hover:text-forest-700" />
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
-      <section className="card border-2 border-forest-200 space-y-4">
-        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-3">
-          <div>
-            <h3 className="font-display font-bold text-forest-950 text-lg">Camp Period</h3>
-            <p className="text-sm text-stone-600">Used as the shared custom date ranges across tabs.</p>
-          </div>
-
-          {campPeriodDrafts.length === 0 ? (
-            <p className="text-sm text-stone-500">No camp period ranges defined yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {campPeriodDrafts.map((draft, index) => (
-                <div key={draft.id} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
-                  <div>
-                    <label className="label">Label</label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={draft.label || ''}
-                      onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, label: e.target.value } : item))}
-                      placeholder={`Range ${index + 1}`}
-                      disabled={!canManageCampPeriod}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Start Date</label>
-                    <input
-                      type="date"
-                      className="input"
-                      value={draft.startDate}
-                      onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, startDate: e.target.value } : item))}
-                      disabled={!canManageCampPeriod}
-                    />
-                  </div>
-                  <div>
-                    <label className="label">End Date</label>
-                    <input
-                      type="date"
-                      className="input"
-                      value={draft.endDate}
-                      onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, endDate: e.target.value } : item))}
-                      disabled={!canManageCampPeriod}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="btn-secondary text-sm"
-                      onClick={() => saveCampPeriod(draft.id)}
-                      disabled={!canManageCampPeriod || campPeriodSaving}
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary text-sm text-rose-700 border-rose-200 hover:bg-rose-50"
-                      onClick={() => deleteCampPeriod(draft.id)}
-                      disabled={!canManageCampPeriod || campPeriodSaving}
-                    >
-                      Delete
-                    </button>
-                  </div>
+      {/* Unlinked login accounts notice */}
+      {canManageAccess && unlinkedLoginUsers.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+          <p className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+            <AlertTriangle size={15} /> {unlinkedLoginUsers.length} login account{unlinkedLoginUsers.length > 1 ? 's' : ''} without a staff profile
+          </p>
+          <p className="text-xs text-amber-700">These accounts can log in but have no staff record. Add a staff profile with a matching email, or delete these accounts.</p>
+          <div className="space-y-1.5">
+            {unlinkedLoginUsers.map(user => (
+              <div key={user.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700 flex items-center justify-between gap-2">
+                <span className="font-mono">{user.email || user.username || user.id}</span>
+                <div className="flex gap-2">
+                  {user.isAdmin && <span className="text-amber-700 font-semibold">Admin</span>}
+                  {user.isArchived && <span className="text-stone-500">Archived</span>}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-          {canManageCampPeriod && (
-            <div className="rounded-xl border border-stone-200 bg-white p-4">
-              <p className="text-sm font-semibold mb-3">Add a new camp period</p>
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+      {/* Password reset requests */}
+      {canManageAccess && resetRequests.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+          <p className="text-sm font-semibold text-amber-900">Open Password Reset Requests</p>
+          <div className="space-y-2">
+            {resetRequests.map(req => (
+              <div key={req.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700">
+                <p><span className="font-semibold">Email:</span> {req.requester_email}</p>
+                {req.requester_identifier && <p><span className="font-semibold">Identifier:</span> {req.requester_identifier}</p>}
+                {req.reason && <p><span className="font-semibold">Reason:</span> {req.reason}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Camp Periods */}
+      <section className="card border-2 border-forest-200 space-y-4">
+        <div>
+          <h3 className="font-display font-bold text-forest-950 text-lg">Camp Periods</h3>
+          <p className="text-sm text-stone-500">Shared date ranges used across all tabs.</p>
+        </div>
+
+        {campPeriodDrafts.length === 0 ? (
+          <p className="text-sm text-stone-500">No camp periods defined yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {campPeriodDrafts.map((draft, index) => (
+              <div key={draft.id} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
                 <div>
                   <label className="label">Label</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={newPeriodDraft.label}
-                    onChange={e => setNewPeriodDraft(prev => ({ ...prev, label: e.target.value }))}
-                    placeholder="e.g. Week 1"
-                  />
+                  <input type="text" className="input" value={draft.label || ''}
+                    onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, label: e.target.value } : item))}
+                    placeholder={`Range ${index + 1}`} disabled={!canManageCampPeriod} />
                 </div>
                 <div>
                   <label className="label">Start Date</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={newPeriodDraft.startDate}
-                    onChange={e => setNewPeriodDraft(prev => ({ ...prev, startDate: e.target.value }))}
-                  />
+                  <input type="date" className="input" value={draft.startDate}
+                    onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, startDate: e.target.value } : item))}
+                    disabled={!canManageCampPeriod} />
                 </div>
                 <div>
                   <label className="label">End Date</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={newPeriodDraft.endDate}
-                    onChange={e => setNewPeriodDraft(prev => ({ ...prev, endDate: e.target.value }))}
-                  />
+                  <input type="date" className="input" value={draft.endDate}
+                    onChange={e => setCampPeriodDrafts(prev => prev.map(item => item.id === draft.id ? { ...item, endDate: e.target.value } : item))}
+                    disabled={!canManageCampPeriod} />
                 </div>
-                <button
-                  type="button"
-                  className="btn-primary text-sm"
-                  onClick={addCampPeriod}
-                  disabled={campPeriodSaving || !newPeriodDraft.startDate || !newPeriodDraft.endDate}
-                >
-                  {campPeriodSaving ? 'Saving...' : 'Add Range'}
-                </button>
+                <div className="flex gap-2">
+                  <button type="button" className="btn-secondary text-sm" onClick={() => saveCampPeriod(draft.id)} disabled={!canManageCampPeriod || campPeriodSaving}>Save</button>
+                  <button type="button" className="btn-secondary text-sm text-rose-700 border-rose-200" onClick={() => deleteCampPeriod(draft.id)} disabled={!canManageCampPeriod || campPeriodSaving}>Delete</button>
+                </div>
               </div>
-            </div>
-          )}
-
-          {!canManageCampPeriod && (
-            <p className="text-xs text-stone-500">Only owner/admin can change dates. Everyone can see and use the selected ranges.</p>
-          )}
-          {campPeriodError && <p className="text-xs text-red-700">{campPeriodError}</p>}
-          {campPeriodMessage && <p className="text-xs text-emerald-700">{campPeriodMessage}</p>}
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <h3 className="font-display font-bold text-forest-950 text-lg flex items-center gap-2">
-              <Shield size={18} /> User Access Management
-            </h3>
-            <p className="text-sm text-stone-500">Create login accounts, edit tab permissions, and reset passwords.</p>
-            {currentUserEmail && <p className="text-xs text-stone-400 mt-1">Signed in as: {currentUserEmail}</p>}
-          </div>
-          <button className="btn-secondary text-sm flex items-center gap-2" onClick={loadAccessUsers} disabled={accessLoading || accessActionLoading}>
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
-
-        {accessLoading && <p className="text-sm text-stone-500">Loading user accounts...</p>}
-
-        {accessError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm flex items-start gap-2">
-            <AlertCircle size={16} className="mt-0.5" />
-            <span>{accessError}</span>
+            ))}
           </div>
         )}
 
-        {accessMessage && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-700 text-sm flex items-start gap-2">
-            <Check size={16} className="mt-0.5" />
-            <span>{accessMessage}</span>
-          </div>
-        )}
-
-        {!accessLoading && !canManageAccess && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm">
-            This account does not have admin permission to manage users. Sign in with the owner/admin account.
-          </div>
-        )}
-
-        {!accessLoading && canManageAccess && (
-          <>
-            <div className="rounded-xl border border-stone-200 p-3 bg-stone-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <p className="text-sm text-stone-700">Quick setup: assign owner profile to Sam Brenner / Camp Coordinator.</p>
-              <button className="btn-secondary text-sm" onClick={assignOwnerProfile} disabled={staffActionLoading}>
-                Set Owner Profile
+        {canManageCampPeriod && (
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <p className="text-sm font-semibold mb-3">Add new period</p>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+              <div>
+                <label className="label">Label</label>
+                <input type="text" className="input" value={newPeriodDraft.label}
+                  onChange={e => setNewPeriodDraft(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Week 1" />
+              </div>
+              <div>
+                <label className="label">Start Date</label>
+                <input type="date" className="input" value={newPeriodDraft.startDate}
+                  onChange={e => setNewPeriodDraft(p => ({ ...p, startDate: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">End Date</label>
+                <input type="date" className="input" value={newPeriodDraft.endDate}
+                  onChange={e => setNewPeriodDraft(p => ({ ...p, endDate: e.target.value }))} />
+              </div>
+              <button type="button" className="btn-primary text-sm" onClick={addCampPeriod}
+                disabled={campPeriodSaving || !newPeriodDraft.startDate || !newPeriodDraft.endDate}>
+                {campPeriodSaving ? 'Saving...' : 'Add Range'}
               </button>
             </div>
-
-            <CreateAccountForm onSubmit={createAccount} loading={accessActionLoading} />
-
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <p className="text-sm font-semibold text-amber-900">Open Password Reset Requests</p>
-              {resetRequests.length === 0 ? (
-                <p className="text-xs text-amber-800">No open requests.</p>
-              ) : (
-                <div className="space-y-2">
-                  {resetRequests.map(request => (
-                    <div key={request.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700">
-                      <p><span className="font-semibold">Email:</span> {request.requester_email}</p>
-                      {request.requester_identifier && <p><span className="font-semibold">Identifier:</span> {request.requester_identifier}</p>}
-                      {request.reason && <p><span className="font-semibold">Reason:</span> {request.reason}</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="font-display font-semibold text-forest-950">Existing Login Accounts</h4>
-              {accessUsers.length === 0 && <p className="text-sm text-stone-500">No auth users found.</p>}
-
-              {accessUsers.map(user => {
-                const edit = accessEdits[user.id] || {
-                  identifier: user.username || user.email || '',
-                  isAdmin: false,
-                  allowedTabs: ['dashboard', 'signin'],
-                  newPassword: '',
-                  deleteConfirmed: false,
-                }
-                const linkedStaff =
-                staffByEmail.get((user.email || '').toLowerCase())
-                  || staffByEmail.get((user.internalEmail || '').toLowerCase())
-                  || staffByEmail.get((user.username || '').toLowerCase()) //
-                  || (user.username ? staffList.find(m => normalizeUsername(m.name) === user.username) : null)
-                  || (user.fullName ? staffList.find(m => m.name === user.fullName) : null)
-                const isCurrentUser = (user.internalEmail || user.email || '').toLowerCase() === currentUserEmail
-                const pendingRequest = resetRequests.find(request =>
-                  (request.requester_email || '').toLowerCase() === (user.email || '').toLowerCase()
-                )
-                const derivedUsername = linkedStaff?.name
-                  ? normalizeUsername(linkedStaff.name)
-                  : (user.username || normalizeUsername((user.email || '').split('@')[0] || ''))
-
-                const label = accountLabel(user)
-                const isUsernameAccount = !!user.username
-
-                return (
-                  <div key={user.id} className="rounded-xl border border-stone-200 p-4 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-forest-950">{label}</p>
-                        {isUsernameAccount && (
-                          <p className="text-xs text-amber-700 mt-0.5">Username-only account (no email)</p>
-                        )}
-                        <p className="text-xs text-stone-600 mt-1">
-                          Login as: <span className="font-semibold text-forest-900 font-mono">{derivedUsername || label}</span>
-                        </p>
-                        <p className="text-xs text-stone-500">User ID: {user.id}</p>
-                        {pendingRequest && <p className="text-xs text-amber-700 mt-1">Open reset request pending</p>}
-                        {user.isArchived && <p className="text-xs text-amber-700 mt-1">Archived (login disabled)</p>}
-                        {linkedStaff && <p className="text-xs text-forest-700 mt-1">Linked staff record: {linkedStaff.name}</p>}
-                      </div>
-                      <label className="inline-flex items-center gap-2 text-sm text-forest-900">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={!!edit.isAdmin}
-                          onChange={e => setEdit(user.id, { isAdmin: e.target.checked })}
-                        />
-                        Full admin
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-                      <div>
-                        <input
-                          className="input"
-                          value={edit.identifier || ''}
-                          onChange={e => setEdit(user.id, { identifier: e.target.value })}
-                          placeholder="Email or username (firstname.lastname)"
-                          disabled={isCurrentUser}
-                        />
-                        {!isCurrentUser && (
-                          <p className="text-xs text-stone-400 mt-1">Enter an email or a plain username like firstname.lastname</p>
-                        )}
-                      </div>
-                      <button
-                        className="btn-secondary text-sm"
-                        onClick={() => saveUserDetails(user.id)}
-                        disabled={accessActionLoading || isCurrentUser}
-                        title={isCurrentUser ? 'Sign in as another admin to edit this identifier' : 'Save account identifier'}
-                      >
-                        Save Account
-                      </button>
-                    </div>
-
-                    {!isUsernameAccount && (
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-                        <select
-                          className="input"
-                          value={edit.linkedStaffId || linkedStaff?.id || ''}
-                          onChange={e => setEdit(user.id, { linkedStaffId: e.target.value })}
-                        >
-                          <option value="">Select staff profile to link</option>
-                          {[...staffList]
-                            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
-                            .map(member => (
-                              <option key={member.id} value={member.id}>
-                                {member.name}{member.email ? ` (${member.email})` : ''}
-                              </option>
-                            ))}
-                        </select>
-                        <button
-                          className="btn-secondary text-sm"
-                          onClick={() => assignLoginToStaff(user)}
-                          disabled={accessActionLoading || staffActionLoading}
-                        >
-                          Link Staff Email
-                        </button>
-                      </div>
-                    )}
-
-                    <div>
-                      <p className="label mb-2">Allowed Tabs</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {TAB_OPTIONS.map(tab => (
-                          <label key={tab.id} className="inline-flex items-center gap-2 text-sm text-forest-800">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={edit.allowedTabs.includes(tab.id)}
-                              onChange={() => {
-                                const nextTabs = edit.allowedTabs.includes(tab.id)
-                                  ? edit.allowedTabs.filter(value => value !== tab.id)
-                                  : [...edit.allowedTabs, tab.id]
-                                setEdit(user.id, { allowedTabs: sanitizeAllowedTabs(nextTabs) })
-                              }}
-                              disabled={!!edit.isAdmin}
-                            />
-                            {tab.label}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        className="btn-secondary text-sm flex items-center justify-center gap-2"
-                        onClick={() => savePermissions(user.id, linkedStaff?.name || user.fullName || '')}
-                        disabled={accessActionLoading}
-                      >
-                        <Save size={14} /> Save Permissions
-                      </button>
-                      <input
-                        className="input sm:max-w-xs"
-                        placeholder="New password (min 8 chars)"
-                        value={edit.newPassword || ''}
-                        onChange={e => setEdit(user.id, { newPassword: e.target.value })}
-                      />
-                      <button
-                        className="btn-primary text-sm"
-                        onClick={() => resetPassword(user.id, pendingRequest?.id || '')}
-                        disabled={accessActionLoading}
-                      >
-                        Reset Password
-                      </button>
-                      <button
-                        className={`btn-secondary text-sm ${user.isArchived ? 'text-forest-700 border-forest-200' : 'text-amber-700 border-amber-200'}`}
-                        onClick={() => setArchivedState(user, !user.isArchived)}
-                        disabled={accessActionLoading || isCurrentUser}
-                        title={isCurrentUser ? 'You cannot change archive status on your currently signed-in account' : user.isArchived ? 'Restore login account' : 'Archive login account'}
-                      >
-                        {user.isArchived ? 'Restore Account' : 'Archive Account'}
-                      </button>
-                      <label className="inline-flex items-center gap-2 text-xs text-stone-600 px-2">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={!!edit.deleteConfirmed}
-                          onChange={e => setEdit(user.id, { deleteConfirmed: e.target.checked })}
-                          disabled={isCurrentUser}
-                        />
-                        I understand this permanently deletes the account.
-                      </label>
-                      <button
-                        className="btn-secondary text-sm text-red-700 border-red-200"
-                        onClick={() => permanentlyDeleteUser(user)}
-                        disabled={accessActionLoading || isCurrentUser || !edit.deleteConfirmed}
-                        title={isCurrentUser ? 'You cannot delete your currently signed-in account' : !edit.deleteConfirmed ? 'Tick the confirmation checkbox first' : 'Permanently delete login account'}
-                      >
-                        Permanent Delete
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
+          </div>
         )}
+
+        {!canManageCampPeriod && <p className="text-xs text-stone-500">Only owner/admin can change dates.</p>}
+        {campPeriodError && <p className="text-xs text-red-700">{campPeriodError}</p>}
+        {campPeriodMessage && <p className="text-xs text-emerald-700">{campPeriodMessage}</p>}
       </section>
+
+      {/* Refresh button for access users */}
+      <div className="flex items-center justify-between text-xs text-stone-400">
+        <span>{currentUserEmail ? `Signed in as: ${currentUserEmail}` : ''}</span>
+        <button className="flex items-center gap-1.5 text-stone-500 hover:text-stone-700" onClick={loadAccessUsers} disabled={accessLoading || accessActionLoading}>
+          <RefreshCw size={12} className={accessLoading ? 'animate-spin' : ''} /> Refresh accounts
+        </button>
+      </div>
     </div>
   )
 }
