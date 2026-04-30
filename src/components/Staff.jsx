@@ -406,8 +406,8 @@ function StaffDetailPanel({
         size: file.size,
       }
 
-      const existing = Array.isArray(member.staffDocuments) ? member.staffDocuments : []
-      onEdit({ ...member, staffDocuments: [...existing, doc] }, true) // true = save only
+      const existing = Array.isArray(member.staff_documents) ? member.staff_documents : []
+      onEdit({ ...member, staff_documents: [...existing, doc] }, true) // true = save only
     } catch (err) {
       alert(err.message || 'Upload failed')
     } finally {
@@ -417,11 +417,11 @@ function StaffDetailPanel({
 
   function removeDocument(docId) {
     if (!window.confirm('Remove this document?')) return
-    const existing = Array.isArray(member.staffDocuments) ? member.staffDocuments : []
-    onEdit({ ...member, staffDocuments: existing.filter(d => d.id !== docId) }, true)
+    const existing = Array.isArray(member.staff_documents) ? member.staff_documents : []
+    onEdit({ ...member, staff_documents: existing.filter(d => d.id !== docId) }, true)
   }
 
-  const staffDocuments = Array.isArray(member.staffDocuments) ? member.staffDocuments : []
+  const staffDocuments = Array.isArray(member.staff_documents) ? member.staff_documents : []
   const faExpiry = expiryStatus(member.firstAidExpiresOn)
   const sgExpiry = expiryStatus(member.safeguardingExpiresOn)
 
@@ -840,7 +840,22 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
           deleteConfirmed: false,
         }
       })
-      setAccessEdits(edits)
+      // Merge with any existing edits so optimistic updates (e.g. after savePermissions)
+      // are not overwritten by a background reload returning stale server values
+      setAccessEdits(prev => {
+        const merged = { ...edits }
+        Object.keys(prev).forEach(id => {
+          if (merged[id]) {
+            merged[id] = {
+              ...merged[id],
+              // Preserve in-progress edits: only overwrite if the user hasn't changed them
+              newPassword: prev[id].newPassword || '',
+              deleteConfirmed: false,
+            }
+          }
+        })
+        return merged
+      })
     } catch (error) {
       setCanManageAccess(false)
       setAccessUsers([])
@@ -999,7 +1014,25 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || 'Unable to save permissions')
       setAccessMessage('Permissions updated.')
-      await loadAccessUsers()
+      // Optimistically update local state so canViewSafeguarding and allowedTabs
+      // (incl. star-of-day) reflect the saved values immediately, rather than
+      // being overwritten if the background reload returns stale data
+      setAccessUsers(prev => prev.map(u => u.id !== userId ? u : {
+        ...u,
+        isAdmin: !!edit.isAdmin,
+        canViewSafeguarding: !!edit.canViewSafeguarding,
+        allowedTabs: sanitizeAllowedTabs(edit.allowedTabs),
+      }))
+      setAccessEdits(prev => ({
+        ...prev,
+        [userId]: {
+          ...prev[userId],
+          isAdmin: !!edit.isAdmin,
+          canViewSafeguarding: !!edit.canViewSafeguarding,
+          allowedTabs: sanitizeAllowedTabs(edit.allowedTabs),
+        },
+      }))
+      loadAccessUsers().catch(() => {})
     } catch (error) {
       setAccessError(error.message)
     } finally {
