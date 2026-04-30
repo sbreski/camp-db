@@ -301,7 +301,13 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
               </label>
               <label className="flex items-start gap-3 cursor-pointer group">
                 <input type="checkbox" className="h-4 w-4 mt-0.5" checked={form.canViewSafeguarding}
-                  onChange={e => set('canViewSafeguarding', e.target.checked)}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    set('canViewSafeguarding', checked)
+                    if (checked && !form.allowedTabs.includes('incidents')) {
+                      set('allowedTabs', sanitizeAllowedTabs([...form.allowedTabs, 'incidents']))
+                    }
+                  }}
                   disabled={form.isAdmin} />
                 <div>
                   <span className={`text-sm font-semibold flex items-center gap-1.5 ${form.isAdmin ? 'text-stone-400' : 'text-forest-900'}`}>
@@ -621,7 +627,13 @@ function StaffDetailPanel({
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input type="checkbox" className="h-4 w-4 mt-0.5"
                       checked={!!edit.canViewSafeguarding}
-                      onChange={e => setEdit({ canViewSafeguarding: e.target.checked })}
+                      onChange={e => {
+                        const checked = e.target.checked
+                        const updatedTabs = checked && !edit.allowedTabs.includes('incidents')
+                          ? sanitizeAllowedTabs([...edit.allowedTabs, 'incidents'])
+                          : edit.allowedTabs
+                        setEdit({ canViewSafeguarding: checked, allowedTabs: updatedTabs })
+                      }}
                       disabled={!!edit.isAdmin} />
                     <div>
                       <span className="text-sm font-semibold text-forest-900 flex items-center gap-1.5">
@@ -841,14 +853,18 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         }
       })
       // Merge with any existing edits so optimistic updates (e.g. after savePermissions)
-      // are not overwritten by a background reload returning stale server values
+      // are not overwritten by a background reload returning stale server values.
+      // Preserve allowedTabs, isAdmin, and canViewSafeguarding so saved permissions
+      // (including star-of-day tab) are not reverted by a background reload.
       setAccessEdits(prev => {
         const merged = { ...edits }
         Object.keys(prev).forEach(id => {
           if (merged[id]) {
             merged[id] = {
               ...merged[id],
-              // Preserve in-progress edits: only overwrite if the user hasn't changed them
+              isAdmin: prev[id].isAdmin ?? merged[id].isAdmin,
+              canViewSafeguarding: prev[id].canViewSafeguarding ?? merged[id].canViewSafeguarding,
+              allowedTabs: prev[id].allowedTabs ?? merged[id].allowedTabs,
               newPassword: prev[id].newPassword || '',
               deleteConfirmed: false,
             }
