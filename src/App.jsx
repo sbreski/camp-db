@@ -1048,6 +1048,31 @@ export default function App() {
     }
   }, [])
 
+  // Live-refresh permissions when an admin updates this user's row in user_tab_permissions.
+  // This means tab access and safeguarding permission changes take effect immediately
+  // without requiring the affected user to log out and back in.
+  useEffect(() => {
+    if (!currentUser?.id) return
+
+    const channel = supabase
+      .channel(`permissions-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_tab_permissions',
+          filter: `user_id=eq.${currentUser.id}`,
+        },
+        () => {
+          loadPermissionsForUser(currentUser)
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [currentUser?.id])
+
   useEffect(() => {
     if (!authLoading) {
       if (authWatchdogRef.current) clearTimeout(authWatchdogRef.current)

@@ -5,6 +5,7 @@ const TAB_IDS = [
   'signin',
   'shared-info',
   'attendance',
+  'star-of-day',
   'participants',
   'parents',
   'dressing-rooms',
@@ -160,7 +161,7 @@ export async function handler(event) {
     if (event.httpMethod === 'GET') {
       const [authUsers, permissionsRows, resetRequestsRows] = await Promise.all([
         listUsers(admin),
-        admin.from('user_tab_permissions').select('user_id, is_admin, allowed_tabs, can_view_timetable_overview, can_edit_timetable'),
+        admin.from('user_tab_permissions').select('user_id, is_admin, allowed_tabs, can_view_timetable_overview, can_edit_timetable, can_view_safeguarding'),
         admin
           .from('password_reset_requests')
           .select('id, requester_user_id, requester_email, requester_identifier, reason, status, requested_at')
@@ -240,6 +241,7 @@ export async function handler(event) {
       const isAdminInput = !!body.isAdmin
       const canViewTimetableOverviewInput = !!body.canViewTimetableOverview
       const canEditTimetableInput = !!body.canEditTimetable
+      const canViewSafeguardingInput = !!body.canViewSafeguarding
       const allowedTabs = sanitizeAllowedTabs(body.allowedTabs)
       const fullName = String(body.fullName || '').trim()
 
@@ -274,6 +276,7 @@ export async function handler(event) {
           is_admin: isAdminInput,
           can_view_timetable_overview: canViewTimetableOverviewInput,
           can_edit_timetable: canEditTimetableInput,
+          can_view_safeguarding: canViewSafeguardingInput,
           allowed_tabs: allowedTabs,
         },
         { onConflict: 'user_id' }
@@ -293,6 +296,7 @@ export async function handler(event) {
           isAdmin: isAdminInput,
           canViewTimetableOverview: canViewTimetableOverviewInput,
           canEditTimetable: canEditTimetableInput,
+          canViewSafeguarding: canViewSafeguardingInput,
           allowedTabs,
         },
       })
@@ -305,6 +309,8 @@ export async function handler(event) {
       const canEditTimetableInput = !!body.canEditTimetable
       const allowedTabs = sanitizeAllowedTabs(body.allowedTabs)
       const fullName = String(body.fullName || '').trim()
+
+      const canViewSafeguardingInput = !!body.canViewSafeguarding
 
       if (!userId) return json(400, { error: 'userId is required' })
 
@@ -323,6 +329,7 @@ export async function handler(event) {
           is_admin: isAdminInput,
           can_view_timetable_overview: canViewTimetableOverviewInput,
           can_edit_timetable: canEditTimetableInput,
+          can_view_safeguarding: canViewSafeguardingInput,
           allowed_tabs: allowedTabs,
         },
         { onConflict: 'user_id' }
