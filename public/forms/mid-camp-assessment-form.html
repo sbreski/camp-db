@@ -14,7 +14,7 @@
     --note: #666;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Georgia, serif; background: #f5f5f0; color: #222; font-size: 14px; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f5f5f0; color: #222; font-size: 14px; }
 
   .header-banner {
     background: var(--blue);
@@ -50,7 +50,7 @@
   .field input[type="date"],
   .field textarea {
     width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 5px;
-    font-family: Georgia, serif; font-size: 13px; color: #222; background: #fafafa; transition: border-color 0.2s;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.5; overflow: visible; color: #222; background: #fafafa; transition: border-color 0.2s;
   }
   .field input:focus, .field textarea:focus { outline: none; border-color: var(--blue); background: #fff; }
   .field textarea { resize: vertical; min-height: 70px; }
@@ -65,7 +65,7 @@
   }
   .consideration-q { font-weight: 700; font-size: 13px; color: var(--label); margin-bottom: 6px; }
   .consideration-note { font-size: 11px; color: var(--note); font-style: italic; margin-bottom: 10px; line-height: 1.5; }
-  .consideration textarea { width: 100%; padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 5px; font-family: Georgia, serif; font-size: 12px; color: #222; background: #fff; resize: vertical; min-height: 55px; }
+  .consideration textarea { width: 100%; padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 5px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; color: #222; background: #fff; resize: vertical; min-height: 55px; }
   .consideration textarea:focus { outline: none; border-color: var(--blue); }
   .notes-label { font-size: 11px; font-weight: 700; color: #555; margin-bottom: 4px; }
 
@@ -83,7 +83,7 @@
   .saved-note { text-align: center; font-size: 12px; color: var(--blue); padding: 6px; font-style: italic; min-height: 22px; }
 
   .action-bar { display: flex; gap: 12px; justify-content: center; padding: 20px 24px; background: #fff; border-top: 2px solid #e0e0e0; position: sticky; bottom: 0; }
-  .btn { padding: 10px 28px; border-radius: 6px; border: none; font-family: Georgia, serif; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn { padding: 10px 28px; border-radius: 6px; border: none; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; }
   .btn-primary { background: var(--blue); color: #fff; }
   .btn-send { background: var(--darkblue); color: #fff; }
   .btn-secondary { background: #f0f0f0; color: #333; }
@@ -472,137 +472,135 @@
   async function generateFormPdf(rootSelector, filePrefix, nameFieldId) {
     if (!window.html2canvas || !window.jspdf) throw new Error('PDF libraries failed to load.')
     const formRoot = document.querySelector(rootSelector)
-    if (!formRoot) throw new Error('Could not find the form content to export.')
+    if (!formRoot) throw new Error('Could not find form content to export.')
 
     const { jsPDF } = window.jspdf
-    const pageW_mm = 210, pageH_mm = 297
-    const marginX_mm = 10, marginTop_mm = 10, marginBot_mm = 10
-    const usableW_mm = pageW_mm - marginX_mm * 2
-    const usableH_mm = pageH_mm - marginTop_mm - marginBot_mm
-    const SCALE = 2          // render at 2× for sharpness
-    const MM_PER_PX = 25.4 / 96  // 96 dpi baseline
+    const PAGE_W_MM = 210, PAGE_H_MM = 297
+    const MARGIN_MM = 10
+    const USABLE_W_MM = PAGE_W_MM - MARGIN_MM * 2
+    const USABLE_H_MM = PAGE_H_MM - MARGIN_MM * 2
+    const SCALE = 2
 
-    // Collect the header + each section as discrete capture targets.
-    // We capture the whole page once, then slice by element bounding boxes —
-    // this avoids multi-capture artifacts while still letting us page-break correctly.
-    const fullCanvas = await window.html2canvas(formRoot, {
+    // Common html2canvas options for consistency
+    const hcOpts = (el) => ({
       scale: SCALE,
       useCORS: true,
       backgroundColor: '#ffffff',
       scrollY: -window.scrollY,
       onclone: (doc) => {
-        // Hide non-print elements
-        doc.querySelectorAll('.action-bar, #saved_note').forEach(el => el.style.display = 'none')
-        // Make all inputs flow their text fully
-        doc.querySelectorAll('input, textarea, select').forEach(el => {
-          el.style.overflow = 'visible'
-          el.style.whiteSpace = 'normal'
-          el.style.wordBreak = 'break-word'
-          el.style.overflowWrap = 'break-word'
-          el.style.height = 'auto'
+        doc.querySelectorAll('.action-bar, #saved_note').forEach(e => e.style.display = 'none')
+        doc.querySelectorAll('input, textarea, select').forEach(e => {
+          e.style.overflow = 'visible'
+          e.style.height = 'auto'
+          e.style.minHeight = e.tagName === 'TEXTAREA' ? '30px' : ''
+          e.style.paddingBottom = '4px'
+          e.style.lineHeight = '1.6'
+          e.style.wordBreak = 'break-word'
+          e.style.overflowWrap = 'break-word'
+          e.style.whiteSpace = 'normal'
+          e.style.boxSizing = 'border-box'
         })
       },
     })
 
-    // Map each child element to its slice in the full canvas.
-    const rootRect = formRoot.getBoundingClientRect()
-    const children = Array.from(formRoot.children).filter(el => {
+    // Gather visible top-level children as capture targets
+    const targets = Array.from(formRoot.children).filter(el => {
+      if (el.id === 'saved_note') return false
       const s = window.getComputedStyle(el)
       return s.display !== 'none' && s.visibility !== 'hidden'
     })
 
-    // Build list of {y_px, h_px} for each child relative to the canvas origin
-    const scaledMmPerPx = MM_PER_PX / SCALE  // mm per *scaled* pixel
-    // The canvas width maps to usableW_mm... actually we need the true px→mm ratio
-    // Canvas is SCALE * CSS-px wide; CSS-px maps to MM_PER_PX mm
-    const canvasPxToMm = MM_PER_PX / 1  // 1 CSS-px = MM_PER_PX mm; canvas pixels = CSS * SCALE
-    // So canvas px → mm = (canvas_px / SCALE) * MM_PER_PX
-    function cPxToMm(px) { return (px / SCALE) * MM_PER_PX }
+    // Render each target to its own canvas so we get the true rendered height
+    const chunks = []
+    for (const el of targets) {
+      const canvas = await window.html2canvas(el, hcOpts(el))
+      // mm height: canvas is SCALE * CSS-px tall; CSS-px at 96dpi → mm
+      const h_mm = (canvas.height / SCALE) * (25.4 / 96)
+      // Scale width to fit page
+      const w_mm = (canvas.width / SCALE) * (25.4 / 96)
+      const drawScale = USABLE_W_MM / w_mm
+      const drawH_mm = h_mm * drawScale
 
-    const totalW_mm = cPxToMm(fullCanvas.width)
-    const drawScale = usableW_mm / totalW_mm  // stretch/shrink to fit page width
-
-    // Gather chunks: each child element becomes a chunk.
-    // We also split any chunk taller than usableH into sub-chunks by scanning for
-    // its own child sections.
-    function getChunks(el) {
-      const rect = el.getBoundingClientRect()
-      const y_cPx = (rect.top - rootRect.top) * SCALE
-      const h_cPx = rect.height * SCALE
-      const h_mm = cPxToMm(h_cPx) * drawScale
-
-      if (h_mm <= usableH_mm) {
-        return [{ y_cPx, h_cPx, h_mm }]
+      if (drawH_mm <= USABLE_H_MM) {
+        // Fits on one page — keep as single chunk
+        chunks.push({ canvas, drawH_mm })
+      } else {
+        // Taller than one page — try to split on its own children
+        const subs = Array.from(el.children).filter(c => {
+          const s = window.getComputedStyle(c)
+          return s.display !== 'none'
+        })
+        if (subs.length > 1) {
+          for (const sub of subs) {
+            const sc = await window.html2canvas(sub, hcOpts(sub))
+            const sh_mm = (sc.height / SCALE) * (25.4 / 96)
+            const sw_mm = (sc.width / SCALE) * (25.4 / 96)
+            const sScale = USABLE_W_MM / sw_mm
+            chunks.push({ canvas: sc, drawH_mm: sh_mm * sScale })
+          }
+        } else {
+          chunks.push({ canvas, drawH_mm })
+        }
       }
-      // Too tall — recurse into children
-      const subs = Array.from(el.children).filter(c => {
-        const s = window.getComputedStyle(c)
-        return s.display !== 'none'
-      })
-      if (subs.length === 0) {
-        // No children to split on — just take it whole and let it overflow (rare)
-        return [{ y_cPx, h_cPx, h_mm }]
-      }
-      return subs.flatMap(getChunks)
     }
 
-    const chunks = children.flatMap(getChunks)
-
-    // Bin-pack chunks onto pages
+    // Bin-pack onto A4 pages
     const pdf = new jsPDF('p', 'mm', 'a4')
-    let pageY_mm = marginTop_mm
-    let pageNum = 0
+    let curY = MARGIN_MM
+    let firstPage = true
 
-    for (const chunk of chunks) {
-      // If this chunk alone is taller than a page, force it onto its own page(s) via slicing
-      const fitsOnPage = chunk.h_mm <= usableH_mm
-
-      if (fitsOnPage) {
-        // Does it fit in remaining space on this page?
-        if (pageNum > 0 && pageY_mm + chunk.h_mm > pageH_mm - marginBot_mm) {
-          pdf.addPage()
-          pageY_mm = marginTop_mm
-          pageNum++
-        }
-      } else {
-        // Oversized chunk — start on new page if we're not already at top
-        if (pageY_mm > marginTop_mm + 2) {
-          pdf.addPage()
-          pageY_mm = marginTop_mm
-          pageNum++
-        }
+    for (const { canvas, drawH_mm } of chunks) {
+      if (!firstPage && curY + drawH_mm > PAGE_H_MM - MARGIN_MM) {
+        pdf.addPage()
+        curY = MARGIN_MM
       }
+      firstPage = false
 
-      // Slice this chunk from the full canvas and draw it
-      let remainH_cPx = chunk.h_cPx
-      let offsetY_cPx = chunk.y_cPx
+      // If even a single chunk is taller than a page, slice it
+      let remainCanvas = canvas
+      let remainH_mm = drawH_mm
 
-      while (remainH_cPx > 0) {
-        const availH_mm = pageH_mm - marginBot_mm - pageY_mm
-        const availH_cPx = (availH_mm / drawScale) / (MM_PER_PX) * SCALE
+      while (remainH_mm > 0) {
+        const availH_mm = PAGE_H_MM - MARGIN_MM - curY
+        if (remainH_mm <= availH_mm + 0.5) {
+          // Fits — draw it
+          pdf.addImage(remainCanvas.toDataURL('image/jpeg', 0.92), 'JPEG',
+            MARGIN_MM, curY, USABLE_W_MM, remainH_mm)
+          curY += remainH_mm
+          remainH_mm = 0
+        } else {
+          // Slice at availH
+          const ratio = availH_mm / remainH_mm
+          const takeH_px = Math.floor(remainCanvas.height * ratio)
 
-        const takeH_cPx = Math.min(remainH_cPx, Math.ceil(availH_cPx))
-        const takeH_mm = cPxToMm(takeH_cPx) * drawScale
+          const topSlice = document.createElement('canvas')
+          topSlice.width = remainCanvas.width
+          topSlice.height = takeH_px
+          const ctx1 = topSlice.getContext('2d')
+          ctx1.fillStyle = '#fff'
+          ctx1.fillRect(0, 0, topSlice.width, topSlice.height)
+          ctx1.drawImage(remainCanvas, 0, 0, remainCanvas.width, takeH_px,
+                                       0, 0, remainCanvas.width, takeH_px)
 
-        // Render this slice
-        const sliceCanvas = document.createElement('canvas')
-        sliceCanvas.width = fullCanvas.width
-        sliceCanvas.height = Math.max(1, takeH_cPx)
-        const ctx = sliceCanvas.getContext('2d')
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
-        ctx.drawImage(fullCanvas, 0, offsetY_cPx, fullCanvas.width, takeH_cPx, 0, 0, fullCanvas.width, takeH_cPx)
+          pdf.addImage(topSlice.toDataURL('image/jpeg', 0.92), 'JPEG',
+            MARGIN_MM, curY, USABLE_W_MM, availH_mm)
 
-        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.9), 'JPEG', marginX_mm, pageY_mm, usableW_mm, takeH_mm)
+          // Bottom slice becomes the new remainCanvas
+          const botH_px = remainCanvas.height - takeH_px
+          const botSlice = document.createElement('canvas')
+          botSlice.width = remainCanvas.width
+          botSlice.height = botH_px
+          const ctx2 = botSlice.getContext('2d')
+          ctx2.fillStyle = '#fff'
+          ctx2.fillRect(0, 0, botSlice.width, botH_px)
+          ctx2.drawImage(remainCanvas, 0, takeH_px, remainCanvas.width, botH_px,
+                                       0, 0, remainCanvas.width, botH_px)
 
-        pageY_mm += takeH_mm
-        offsetY_cPx += takeH_cPx
-        remainH_cPx -= takeH_cPx
+          remainCanvas = botSlice
+          remainH_mm -= availH_mm
 
-        if (remainH_cPx > 0) {
           pdf.addPage()
-          pageY_mm = marginTop_mm
-          pageNum++
+          curY = MARGIN_MM
         }
       }
     }
@@ -612,6 +610,7 @@
     const cleanName = nameVal.trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'participant'
     return { pdf, fileName: `${filePrefix}-${cleanName}-${now}.pdf` }
   }
+
 
 
   async function sendPdfToCampDb() {
