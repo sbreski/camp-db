@@ -870,49 +870,27 @@ export default function App() {
 
     const lastActivity = getStoredLastActivity() || Date.now()
     const elapsed = Date.now() - lastActivity
-    const remaining = INACTIVITY_TIMEOUT_MS - elapsed
-
-    if (remaining <= 0) {
-      setWarningCountdown(SESSION_WARNING_SECONDS)
-      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
-      setShowSessionWarning(true)
-      return
-    }
+    const remaining = Math.max(0, INACTIVITY_TIMEOUT_MS - elapsed)
 
     inactivityTimeoutRef.current = setTimeout(() => {
-      setWarningCountdown(SESSION_WARNING_SECONDS)
       sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
+      setWarningCountdown(SESSION_WARNING_SECONDS)
     }, remaining)
   }
 
+  // Debounce activity updates to reduce localStorage writes
   function touchSessionActivity() {
-    setStoredLastActivity()
     if (!showSessionWarning) {
+      setStoredLastActivity()
       startInactivityTimer()
     }
   }
 
-  async function syncSessionTimeoutState() {
+  // Only handles showing warning when inactivity threshold is exceeded
+  function checkInactivityThreshold() {
     if (!authed || !isAdminUser) return
-
-    if (showSessionWarning) {
-      const deadline = sessionWarningDeadlineRef.current
-      if (!deadline) {
-        sessionWarningDeadlineRef.current = Date.now() + (warningCountdown * 1000)
-        return
-      }
-
-      const remainingMs = deadline - Date.now()
-      if (remainingMs <= 0) {
-        await logout()
-        return
-      }
-
-      const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000))
-      setWarningCountdown(remainingSeconds)
-      return
-    }
+    if (showSessionWarning) return // Already warning
 
     const lastActivity = getStoredLastActivity()
     if (!lastActivity) {
@@ -922,13 +900,10 @@ export default function App() {
     }
 
     if ((Date.now() - lastActivity) >= INACTIVITY_TIMEOUT_MS) {
-      setWarningCountdown(SESSION_WARNING_SECONDS)
       sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
-      return
+      setWarningCountdown(SESSION_WARNING_SECONDS)
     }
-
-    startInactivityTimer()
   }
 
   function sanitizeAllowedTabs(tabIds) {
@@ -1306,11 +1281,11 @@ export default function App() {
 
     function handleVisibilityOrFocus() {
       if (document.visibilityState === 'visible') {
-        syncSessionTimeoutState()
+        checkInactivityThreshold()
       }
     }
 
-    syncSessionTimeoutState()
+    checkInactivityThreshold()
 
     window.addEventListener('mousemove', handleActivity)
     window.addEventListener('keydown', handleActivity)
