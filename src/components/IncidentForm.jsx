@@ -26,7 +26,7 @@ export default function IncidentForm({
   const [form, setForm] = useState(() => ({
     type: 'Incident/Accident',
     staffMember: defaultStaff,
-    followUpTiming: 'none',  // 'none' | 'today' | 'tomorrow'
+    followUpTiming: 'today',  // 'none' | 'today' | 'tomorrow'
     pdfName: null,
     pdfData: null,
     ...(initial || {}),
@@ -86,7 +86,7 @@ export default function IncidentForm({
     const nextStaff = initial?.staffMember || defaultStaff
     setForm({
       ...(initial || {}),
-      followUpTiming: initial?.followUpTiming || (initial?.followUpRequired ? 'tomorrow' : 'none'),
+      followUpTiming: initial?.followUpTiming || (initial?.followUpRequired ? 'tomorrow' : 'today'),
       pdfName: initial?.pdfName || null,
       pdfData: initial?.pdfData || null,
       id: initial?.id,
@@ -435,7 +435,7 @@ export default function IncidentForm({
               <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
                 {isReceivingPdf
                   ? 'Receiving PDF from form...'
-                  : 'Complete the form, then use its "Send PDF back to Camp DB" button to attach it automatically.'}
+                  : 'Complete the form, then use its "Save Form" button to attach it automatically.'}
               </div>
               <iframe
                 title={selectedTemplate.label}

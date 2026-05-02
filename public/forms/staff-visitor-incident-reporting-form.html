@@ -560,7 +560,7 @@
       backgroundColor: '#ffffff',
       scrollY: -window.scrollY,
       onclone: (doc) => {
-        doc.querySelectorAll('.action-bar, #saved_note').forEach(e => e.style.display = 'none')
+        doc.querySelectorAll('.action-bar, #saved_note, .intro').forEach(e => e.style.display = 'none')
         doc.querySelectorAll('input, textarea, select').forEach(e => {
           e.style.overflow = 'visible'
           e.style.height = 'auto'
@@ -692,7 +692,7 @@
         alert('Open this form inside Camp DB to send PDF directly to the log.')
         return
       }
-      const { pdf, fileName } = await generateFormPdf('.page', 'staff-visitor-incident', 'f-name')
+      const { pdf, fileName } = await generateFormPdf('body', 'staff-visitor-incident', 'f-name')
       window.parent.postMessage(
         { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
         window.location.origin,
