@@ -64,6 +64,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   const [activeMainTab, setActiveMainTab] = useState('reports')
   const [staffVisitorForms, setStaffVisitorForms] = useState([])
   const [loadingStaffVisitorForms, setLoadingStaffVisitorForms] = useState(false)
+  const [editingStaffVisitorId, setEditingStaffVisitorId] = useState(null)
+  const [editingStaffVisitorName, setEditingStaffVisitorName] = useState('')
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const actorInitialsNormalized = normalizeInitials(actorInitials)
@@ -600,6 +602,36 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       console.error('Error loading staff/visitor forms:', error)
     } finally {
       setLoadingStaffVisitorForms(false)
+    }
+  }
+
+  async function deleteStaffVisitorForm(doc) {
+    if (!window.confirm(`Delete "${doc.filename}"? This cannot be undone.`)) return
+    try {
+      await supabase.storage.from('documents').remove([doc.filepath])
+      await supabase.from('documents').delete().eq('id', doc.id)
+      setStaffVisitorForms(prev => prev.filter(f => f.id !== doc.id))
+    } catch (error) {
+      alert('Error deleting form: ' + error.message)
+    }
+  }
+
+  async function saveStaffVisitorFormName(doc) {
+    const newName = editingStaffVisitorName.trim()
+    if (!newName || newName === doc.filename) {
+      setEditingStaffVisitorId(null)
+      return
+    }
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ filename: newName })
+        .eq('id', doc.id)
+      if (error) throw error
+      setStaffVisitorForms(prev => prev.map(f => f.id === doc.id ? { ...f, filename: newName } : f))
+      setEditingStaffVisitorId(null)
+    } catch (error) {
+      alert('Error updating form name: ' + error.message)
     }
   }
 
@@ -1317,24 +1349,72 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             ) : (
               <div className="space-y-2">
                 {staffVisitorForms.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between gap-3 py-2 border-b border-stone-100 last:border-0">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div key={doc.id} className="flex items-start justify-between gap-3 py-2 border-b border-stone-100 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <FileText size={14} className="text-stone-400 flex-shrink-0" />
-                      <span className="text-sm text-stone-800 truncate">{doc.filename}</span>
+                      {editingStaffVisitorId === doc.id ? (
+                        <input
+                          className="input text-sm py-0.5 px-2"
+                          value={editingStaffVisitorName}
+                          onChange={e => setEditingStaffVisitorName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') saveStaffVisitorFormName(doc)
+                            if (e.key === 'Escape') setEditingStaffVisitorId(null)
+                          }}
+                          autoFocus
+                        />
+                      ) : (
+                        <span className="text-sm text-stone-800 truncate">{doc.filename}</span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                       <span className="text-xs text-stone-500">
                         {new Date(doc.created_at).toLocaleDateString('en-GB', {
                           day: 'numeric', month: 'short', year: 'numeric',
                         })}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => downloadStaffVisitorForm(doc.filepath, doc.filename)}
-                        className="text-xs text-forest-700 underline hover:text-forest-900"
-                      >
-                        Download
-                      </button>
+                      {editingStaffVisitorId === doc.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => saveStaffVisitorFormName(doc)}
+                            className="text-xs text-emerald-700 underline hover:text-emerald-900"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingStaffVisitorId(null)}
+                            className="text-xs text-stone-500 underline hover:text-stone-700"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => downloadStaffVisitorForm(doc.filepath, doc.filename)}
+                            className="text-xs text-forest-700 underline hover:text-forest-900"
+                          >
+                            Download
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingStaffVisitorId(doc.id); setEditingStaffVisitorName(doc.filename) }}
+                            className="text-xs text-stone-500 underline hover:text-stone-700"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteStaffVisitorForm(doc)}
+                            className="text-xs text-red-600 underline hover:text-red-800"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
