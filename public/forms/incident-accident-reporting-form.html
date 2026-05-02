@@ -217,7 +217,7 @@
     <div class="field"><label>Room/Area in building</label><input type="text" id="f-location-detail" placeholder="e.g. Dance Space, Level 3"/></div>
     <div class="two-col">
       <div class="field"><label>Activity at time of incident</label><input type="text" id="f-activity" placeholder="e.g. dance warm-up, lunch break..."/></div>
-      <div class="field"><label>Staff present (initials only)</label><div class="hint">Use initials only, e.g. SB, JD</div><input type="text" id="f-staff" placeholder="e.g. SB, JD"/></div>
+      <div class="field"><label>Staff present (initials only)</label><input type="text" id="f-staff" placeholder="e.g. SB, JD"/></div>
     </div>
   </div>
 
@@ -292,15 +292,6 @@
     <div class="field">
       <div class="hint">Describe the sequence of events in factual language.</div>
       <textarea id="f-whathappened" style="min-height:70px;" placeholder="Describe what happened..."></textarea>
-    </div>
-    <div class="two-col">
-      <div class="field"><label>Witnesses (other than staff)</label>
-        <div class="radio-group" style="margin-bottom:5px;">
-          <label><input type="radio" name="witnesses" value="Yes"/> Yes</label>
-          <label><input type="radio" name="witnesses" value="No"/> No</label>
-        </div>
-      </div>
-      <div class="field"><label>Witness names/details (if yes)</label><input type="text" id="f-witnesses" placeholder="Names/details..."/></div>
     </div>
   </div>
 
@@ -463,7 +454,6 @@
       const reportedByField = document.getElementById('f-reportedby')
       const staffPresentField = document.getElementById('f-staff')
       if (reportedByField) reportedByField.value = staffMember
-      if (staffPresentField) staffPresentField.value = staffMember
     }
     const note = document.getElementById('saved_note')
     note.textContent = ''
@@ -709,7 +699,8 @@
       reportedByField.value = staffMember
     }
     if (staffPresentField && staffMember && !staffPresentField.value) {
-      staffPresentField.value = staffMember
+      const initials = staffMember.trim().split(/\s+/).map(w => w[0].toUpperCase()).join('')
+      staffPresentField.value = initials
     }
 
     if (participantName) {
