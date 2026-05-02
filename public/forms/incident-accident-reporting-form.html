@@ -90,10 +90,6 @@
   .checklist-item input[type="checkbox"] { accent-color: #c0392b; width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
   .checklist-item label { cursor: pointer; margin: 0; font-weight: 400; font-size: 12px; }
 
-  /* RIDDOR */
-  .riddor-box { background: #fdf8e6; border: 1.5px solid #e6a817; border-radius: 6px; padding: 12px 14px; }
-  .riddor-title { font-weight: 700; font-size: 12px; color: #b5500a; margin-bottom: 8px; }
-
   /* Signature lines */
   .sig-line { border-bottom: 1.5px solid #aaa; height: 30px; background: #fafafa; border-radius: 4px 4px 0 0; }
   .sig-note { font-size: 10px; color: #aaa; font-style: italic; margin-top: 2px; }
@@ -190,7 +186,7 @@
         <label><input type="radio" name="reporttype" value="Accident" onchange="toggleSectionD(this)"/> Accident</label>
         <label><input type="radio" name="reporttype" value="Incident (no injury)" onchange="toggleSectionD(this)"/> Incident (no injury)</label>
         <label><input type="radio" name="reporttype" value="Near miss" onchange="toggleSectionD(this)"/> Near miss</label>
-        <label><input type="radio" name="reporttype" value="Allergic reaction" onchange="toggleSectionD(this)"/> Allergic reaction</label>
+        <label><input type="radio" name="reporttype" value="Medical/Allergic reaction" onchange="toggleSectionD(this)"/> Medical/Allergic reaction</label>
       </div>
     </div>
   </div>
@@ -200,17 +196,11 @@
     <div class="section-title">B — Individual involved</div>
     <div class="two-col">
       <div class="field"><label>Full name</label><input type="text" id="f-name" placeholder="Full name"/></div>
-      <div class="field"><label>Role</label>
-        <div class="radio-group">
-          <label><input type="radio" name="role" value="Child"/> Child</label>
-          <label><input type="radio" name="role" value="Staff"/> Staff</label>
-          <label><input type="radio" name="role" value="Volunteer"/> Volunteer</label>
-          <label><input type="radio" name="role" value="Visitor"/> Visitor</label>
         </div>
       </div>
     </div>
     <div class="two-col">
-      <div class="field"><label>Age (if child)</label><input type="text" id="f-age" placeholder="e.g. 8"/></div>
+      <div class="field"><label>Age</label><input type="text" id="f-age" placeholder="e.g. 8"/></div>
     </div>
   </div>
 
@@ -227,10 +217,10 @@
         </div>
       </div>
     </div>
-    <div class="field"><label>Room / Area in building</label><input type="text" id="f-location-detail" placeholder="e.g. Dance Space, Level 3"/></div>
+    <div class="field"><label>Room/Area in building</label><input type="text" id="f-location-detail" placeholder="e.g. Dance Space, Level 3"/></div>
     <div class="two-col">
       <div class="field"><label>Activity at time of incident</label><input type="text" id="f-activity" placeholder="e.g. dance warm-up, lunch break..."/></div>
-      <div class="field"><label>Staff present</label><input type="text" id="f-staff" placeholder="Names of staff / volunteers present"/></div>
+      <div class="field"><label>Staff present</label><input type="text" id="f-staff" placeholder="Names of staff/volunteers present"/></div>
     </div>
   </div>
 
@@ -270,20 +260,20 @@
         <div class="field">
           <label>Injury type(s)</label>
           <div class="check-group">
-            <label><input type="checkbox"/> Cut / laceration</label>
-            <label><input type="checkbox"/> Bruise / swelling</label>
-            <label><input type="checkbox"/> Graze / abrasion</label>
-            <label><input type="checkbox"/> Sprain / strain</label>
-            <label><input type="checkbox"/> Fracture / suspected fracture</label>
+            <label><input type="checkbox"/> Cut/laceration</label>
+            <label><input type="checkbox"/> Bruise/swelling</label>
+            <label><input type="checkbox"/> Graze/abrasion</label>
+            <label><input type="checkbox"/> Sprain/strain</label>
+            <label><input type="checkbox"/> Fracture/suspected fracture</label>
             <label><input type="checkbox"/> Bump to head</label>
-            <label><input type="checkbox"/> Burn / scald</label>
+            <label><input type="checkbox"/> Burn/scald</label>
             <label><input type="checkbox"/> Allergic reaction</label>
             <label><input type="checkbox"/> Loss of consciousness</label>
             <label><input type="checkbox"/> Other</label>
           </div>
         </div>
         <div class="field"><label>If other</label><input type="text" id="f-injuryother" placeholder="Describe..."/></div>
-        <div class="field"><label>Side affected</label>
+        <div class="field"><label>Side affected (Child's Perspective)</label>
           <div class="radio-group">
             <label><input type="radio" name="side" value="Left"/> Left</label>
             <label><input type="radio" name="side" value="Right"/> Right</label>
@@ -310,7 +300,7 @@
           <label><input type="radio" name="witnesses" value="No"/> No</label>
         </div>
       </div>
-      <div class="field"><label>Witness names (if yes)</label><input type="text" id="f-witnesses" placeholder="Names..."/></div>
+      <div class="field"><label>Witness names/details (if yes)</label><input type="text" id="f-witnesses" placeholder="Names/details..."/></div>
     </div>
   </div>
 
@@ -336,41 +326,9 @@
     </div>
   </div>
 
-  <!-- G: RIDDOR -->
+  <!-- G: SIGN OFF -->
   <div class="section">
-    <div class="section-title">G — RIDDOR</div>
-    <div class="riddor-box">
-      <div class="riddor-title">⚠ Reporting of Injuries, Diseases and Dangerous Occurrences Regulations 2013</div>
-      <div style="font-size:11px;color:#666;margin-bottom:10px;line-height:1.5;">Applies to: over-7-day incapacitation, specified injuries (fractures, amputations, loss of sight, loss of consciousness, requiring resuscitation), dangerous occurrences and occupational diseases.</div>
-      <div class="field"><label>Reportable under RIDDOR?</label>
-        <div class="radio-group">
-          <label><input type="radio" name="riddorR" value="Yes" onchange="toggleRiddorDetails()"/> Yes</label>
-          <label><input type="radio" name="riddorR" value="No" onchange="toggleRiddorDetails()"/> No</label>
-          <label><input type="radio" name="riddorR" value="Unsure" onchange="toggleRiddorDetails()"/> Unsure</label>
-        </div>
-      </div>
-      <div id="riddorDetails">
-        <div class="two-col">
-          <div class="field"><label>Reported to RIDDOR?</label>
-            <div class="radio-group">
-              <label><input type="radio" name="riddorRep" value="Yes"/> Yes</label>
-              <label><input type="radio" name="riddorRep" value="No"/> No</label>
-              <label><input type="radio" name="riddorRep" value="N/A"/> N/A</label>
-            </div>
-          </div>
-          <div class="field"><label>RIDDOR reference number</label><input type="text" id="f-riddorref" placeholder="If reported..."/></div>
-        </div>
-        <div class="two-col">
-          <div class="field"><label>Date reported</label><input type="date" id="f-riddordate"/></div>
-          <div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- H: SIGN OFF -->
-  <div class="section">
-    <div class="section-title">H — Sign off</div>
+    <div class="section-title">G — Sign off</div>
     <div style="font-size:11px;color:#777;font-style:italic;margin-bottom:14px;">Print and obtain parent/carer handwritten signature before filing. Keep original on child's file.</div>
     <div style="margin-bottom:14px;">
       <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:8px;">Reported by</div>
@@ -381,7 +339,7 @@
       </div>
     </div>
     <div style="margin-bottom:14px;padding-top:12px;border-top:1px solid #eee;">
-      <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:4px;">Parent / carer acknowledgement</div>
+      <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:4px;">Parent/carer acknowledgement</div>
       <div style="font-size:11px;color:#aaa;font-style:italic;margin-bottom:8px;">To be completed by hand after printing.</div>
       <div class="signoff-row">
         <div class="field" style="margin:0;"><label>Name</label><div class="sig-line"></div><div class="sig-note">Print name</div></div>
