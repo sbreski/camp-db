@@ -1600,7 +1600,7 @@ export default function App() {
           onBack={() => navigate('participants')}
         />
       )
-      case 'medical': return <Medical participants={participants} setParticipants={setParticipants} actorInitials={actorInitials} onView={(id) => navigate('participant', id)} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} />
+      case 'medical': return <Medical participants={participants} setParticipants={setParticipants} actorInitials={actorInitials} onView={(id) => navigate('participant', id)} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} canManageShares={isOwnerUser || isAdminUser} />
       case 'behaviour': return <BehaviourLogs participants={participants} incidents={incidents} behaviourLogs={behaviourLogs} setBehaviourLogs={setBehaviourLogs} actorInitials={actorInitials} />
       case 'timetable': return (
         <Timetable
