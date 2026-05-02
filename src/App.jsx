@@ -213,6 +213,7 @@ function toSnake(obj) {
   const result = {}
   for (const [k, v] of Object.entries(obj)) {
     if (k === 'pdfPayload') continue
+    if (k === 'followUpTiming') continue   // UI-only — derived into followUpRequired/followUpDueDate before save
     result[map[k] || k] = v
   }
   // Only process age if it exists in the input object (for participants table)
@@ -508,6 +509,7 @@ export default function App() {
         || isMissingColumnError(error, 'resolved_by')
         || isMissingColumnError(error, 'incident_notes')
         || isMissingColumnError(error, 'incident_documents')
+        || isMissingColumnError(error, 'follow_up_timing')
       )) {
         const {
           created_by_initials,
@@ -518,6 +520,7 @@ export default function App() {
           resolved_by,
           incident_notes,
           incident_documents,
+          follow_up_timing,
           ...fallbackRest
         } = rest
         const fallback = await supabase.from('incidents').insert({ id: inc.id, ...fallbackRest })
@@ -540,6 +543,7 @@ export default function App() {
         || isMissingColumnError(error, 'resolved_by')
         || isMissingColumnError(error, 'incident_notes')
         || isMissingColumnError(error, 'incident_documents')
+        || isMissingColumnError(error, 'follow_up_timing')
       )) {
         // Backward-compatible fallback before the updated_at migration is applied.
         const {
@@ -549,6 +553,7 @@ export default function App() {
           resolved_by,
           incident_notes,
           incident_documents,
+          follow_up_timing,
           ...fallbackRest
         } = rest
         const fallback = await supabase.from('incidents').update(fallbackRest).eq('id', inc.id)

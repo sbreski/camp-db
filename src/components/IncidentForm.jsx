@@ -280,9 +280,20 @@ export default function IncidentForm({
     const isEditing = Boolean(initial?.id)
     const incidentId = form.id || crypto.randomUUID()
     const nextForm = { ...form, id: incidentId }
+
+    // Derive DB fields from the UI-only followUpTiming selector, then strip it.
+    const timing = nextForm.followUpTiming || 'none'
+    const followUpRequired = timing !== 'none'
+    const today = new Date().toISOString().slice(0, 10)
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+    const followUpDueDate = timing === 'today' ? today : timing === 'tomorrow' ? tomorrow : (nextForm.followUpDueDate || null)
+
     const incidentRecord = {
       ...nextForm,
-      // Client-only field used by safeguarding function upload path.
+      followUpRequired,
+      followUpDueDate,
+      // Strip client-only fields that have no DB column.
+      followUpTiming: undefined,
       pdfPayload: undefined,
     }
 
