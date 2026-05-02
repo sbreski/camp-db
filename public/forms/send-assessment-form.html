@@ -481,6 +481,7 @@
 </div><!-- /form-body -->
 
 <div class="action-bar">
+  <button type="button" class="btn btn-secondary" id="btn-fullscreen" onclick="toggleFullscreen()">&#10562; Full screen</button>
   <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear form</button>
   <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Save form</button>
 </div>
@@ -681,6 +682,18 @@
     note.textContent = '✓ Progress saved — your data will be here when you reopen this file on this computer.';
     setTimeout(() => note.textContent = '', 4000);
   }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+  document.addEventListener('fullscreenchange', () => {
+    const btn = document.getElementById('btn-fullscreen');
+    if (btn) btn.textContent = document.fullscreenElement ? '⤢ Exit full screen' : '⤢ Full screen';
+  });
 
   function clearForm() {
     if (!confirm('Are you sure you want to clear all fields? This cannot be undone.')) return;

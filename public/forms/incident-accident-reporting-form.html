@@ -197,13 +197,13 @@
     <div class="two-col">
       <div class="field"><label>Full name</label><input type="text" id="f-name" placeholder="Full name"/></div>
       <div class="field"><label>Age</label><input type="text" id="f-age" placeholder="e.g. 8"/></div>
-        </div>
-      </div>
     </div>
+  </div>
 
   <!-- C: DATE / TIME / LOCATION -->
   <div class="section">
     <div class="section-title">C — Date, time &amp; location</div>
+    <div style="font-size:12px;color:#555;margin-bottom:12px;"><strong>artsdepot</strong> — 5 Nether St, London N12 0GA</div>
     <div class="three-col">
       <div class="field"><label>Date</label><input type="date" id="f-date"/></div>
       <div class="field"><label>Time</label><input type="time" id="f-time"/></div>
@@ -217,7 +217,7 @@
     <div class="field"><label>Room/Area in building</label><input type="text" id="f-location-detail" placeholder="e.g. Dance Space, Level 3"/></div>
     <div class="two-col">
       <div class="field"><label>Activity at time of incident</label><input type="text" id="f-activity" placeholder="e.g. dance warm-up, lunch break..."/></div>
-      <div class="field"><label>Staff present</label><input type="text" id="f-staff" placeholder="Names of staff/volunteers present"/></div>
+      <div class="field"><label>Staff present (initials only)</label><div class="hint">Use initials only, e.g. SB, JD</div><input type="text" id="f-staff" placeholder="e.g. SB, JD"/></div>
     </div>
   </div>
 
@@ -262,12 +262,15 @@
             <label><input type="checkbox"/> Graze/abrasion</label>
             <label><input type="checkbox"/> Sprain/strain</label>
             <label><input type="checkbox"/> Fracture/suspected fracture</label>
-            <label><input type="checkbox"/> Bump to head</label>
+            <label><input type="checkbox" id="cb-bumphead" onchange="toggleBumpHeadNotice(this)"/> Bump to head</label>
             <label><input type="checkbox"/> Burn/scald</label>
             <label><input type="checkbox"/> Allergic reaction</label>
             <label><input type="checkbox"/> Loss of consciousness</label>
             <label><input type="checkbox"/> Other</label>
           </div>
+        </div>
+        <div id="bumpHeadNotice" style="display:none;background:#fff8e1;border-left:4px solid #f39c12;padding:10px 14px;border-radius:0 5px 5px 0;margin-bottom:10px;font-size:12px;color:#7d5a00;">
+          <strong>⚠ Bump to Head selected</strong> — please also complete a <strong>Notification of Head Bump</strong> form and give a copy to the parent/carer at collection.
         </div>
         <div class="field"><label>If other</label><input type="text" id="f-injuryother" placeholder="Describe..."/></div>
         <div class="field"><label>Side affected (Child's Perspective)</label>
@@ -347,10 +350,22 @@
 
   </div>
 
+  <!-- H: COORDINATOR / DIRECTOR REVIEW -->
+  <div class="section">
+    <div class="section-title">H — Coordinator / Director Review</div>
+    <div style="font-size:11px;color:#777;font-style:italic;margin-bottom:14px;">To be completed by hand after printing by the Camp Coordinator or Director.</div>
+    <div class="signoff-row">
+      <div class="field" style="margin:0;"><label>Print name</label><div class="sig-line"></div><div class="sig-note">Print name</div></div>
+      <div class="field" style="margin:0;"><label>Date</label><div class="sig-line"></div><div class="sig-note">Date</div></div>
+      <div class="field" style="margin:0;"><label>Signature</label><div class="sig-line"></div><div class="sig-note">Sign</div></div>
+    </div>
+  </div>
+
   <div class="saved-note" id="saved_note"></div>
 </div>
 
 <div class="action-bar">
+  <button type="button" class="btn btn-secondary" id="btn-fullscreen" onclick="toggleFullscreen()">&#10562; Full screen</button>
   <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear form</button>
   <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Save form</button>
 </div>
@@ -617,6 +632,22 @@
       alert('Failed to send PDF to Camp DB: ' + error.message)
     }
   }
+
+  function toggleBumpHeadNotice(cb) {
+    document.getElementById('bumpHeadNotice').style.display = cb.checked ? 'block' : 'none';
+  }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+  document.addEventListener('fullscreenchange', () => {
+    const btn = document.getElementById('btn-fullscreen');
+    if (btn) btn.textContent = document.fullscreenElement ? '⤢ Exit full screen' : '⤢ Full screen';
+  });
 
   // ── Body diagram ──
   const markedParts = new Set();
