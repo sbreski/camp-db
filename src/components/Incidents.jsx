@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2, Mail, Edit2, MessageSquare, Paperclip, Check, X } from 'lucide-react'
 import IncidentForm from './IncidentForm'
 import { supabase } from '../supabase'
@@ -59,6 +59,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   const [noteDraftByIncident, setNoteDraftByIncident] = useState({})
   const [editingNote, setEditingNote] = useState(null)
   const [uploadingExtraIncidentId, setUploadingExtraIncidentId] = useState('')
+  const [isReceivingStaffVisitorPdf, setIsReceivingStaffVisitorPdf] = useState(false)
+  const [staffVisitorUploadNotice, setStaffVisitorUploadNotice] = useState('')
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const actorInitialsNormalized = normalizeInitials(actorInitials)
@@ -581,6 +583,90 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }))
   }
 
+  async function uploadGeneratedFormPdf(file, fileDisplayName) {
+    const fileName = `${Date.now()}-${fileDisplayName}`
+    const filePath = `other/${fileName}`
+    const category = 'Staff & Visitor Incident Forms'
+
+    const { data } = await supabase.auth.getSession()
+    if (!data.session) {
+      throw new Error('You must be logged in to upload generated forms')
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file)
+
+    if (uploadError) throw uploadError
+
+    let { error: dbError } = await supabase.from('documents').insert({
+      section: 'other',
+      filename: fileDisplayName,
+      filepath: filePath,
+      category,
+      uploaded_by_initials: actorInitials,
+      created_at: new Date().toISOString(),
+    })
+
+    if (dbError && String(dbError.message || '').toLowerCase().includes('uploaded_by_initials') && String(dbError.message || '').toLowerCase().includes('does not exist')) {
+      const fallback = await supabase.from('documents').insert({
+        section: 'other',
+        filename: fileDisplayName,
+        filepath: filePath,
+        category,
+        created_at: new Date().toISOString(),
+      })
+      dbError = fallback.error
+    }
+
+    if (dbError) throw dbError
+  }
+
+  useEffect(() => {
+    async function handleStaffVisitorFormPdfMessage(event) {
+      if (event.origin !== window.location.origin) return
+      if (!event.data || typeof event.data !== 'object') return
+      if (event.data.type !== 'campdb-document-form-pdf') return
+
+      const payload = event.data.payload || {}
+      const rawBase64 = payload.base64Pdf || ''
+      const fileName = payload.fileName || `staff-visitor-incident-${Date.now()}.pdf`
+
+      if (!rawBase64) {
+        alert('The form did not return a PDF payload.')
+        return
+      }
+
+      setIsReceivingStaffVisitorPdf(true)
+      try {
+        const cleanBase64 = rawBase64.includes(',') ? rawBase64.split(',')[1] : rawBase64
+        const binary = atob(cleanBase64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i)
+        }
+
+        const blob = new Blob([bytes], { type: payload.mimeType || 'application/pdf' })
+        const file = new File([blob], fileName, { type: 'application/pdf' })
+
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Generated PDF is over 5MB. Please reduce size and try again.')
+          return
+        }
+
+        await uploadGeneratedFormPdf(file, fileName)
+        setStaffVisitorUploadNotice(`Upload complete: ${fileName}`)
+      } catch (error) {
+        alert('Failed to receive PDF from staff/visitor form: ' + error.message)
+      } finally {
+        setIsReceivingStaffVisitorPdf(false)
+      }
+    }
+
+    window.addEventListener('message', handleStaffVisitorFormPdfMessage)
+    return () => window.removeEventListener('message', handleStaffVisitorFormPdfMessage)
+  }, [])
+
   const filtered = incidents
     .filter(inc => {
       const p = participants.find(x => x.id === inc.participantId)
@@ -681,6 +767,29 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
           )}
         </div>
       )}
+
+      {/* Staff & Visitor Incident Form */}
+      <div className="card space-y-3">
+        <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
+        <p className="text-xs text-stone-500">
+          Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
+        </p>
+        <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
+          <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
+            {isReceivingStaffVisitorPdf
+              ? 'Receiving PDF from staff/visitor form...'
+              : 'When submitted, PDFs are saved to Other Docs under Staff & Visitor Incident Forms.'}
+          </div>
+          <iframe
+            title="Staff and Visitor Incident Form"
+            src="/forms/staff-visitor-incident-reporting-form.html"
+            className="w-full h-[560px] border-0"
+          />
+        </div>
+        {staffVisitorUploadNotice && (
+          <p className="text-xs text-green-700">{staffVisitorUploadNotice}</p>
+        )}
+      </div>
 
       {/* Search */}
       <div className="relative">

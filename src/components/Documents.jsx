@@ -15,8 +15,6 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   const [categories, setCategories] = useState([])
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [isReceivingDocumentFormPdf, setIsReceivingDocumentFormPdf] = useState(false)
-  const [uploadNotice, setUploadNotice] = useState('')
   const [safeguardingReports, setSafeguardingReports] = useState([])
   const [loadingSafeguarding, setLoadingSafeguarding] = useState(false)
   const [safeguardingActionId, setSafeguardingActionId] = useState('')
@@ -52,45 +50,6 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     } finally {
       setLoading(false)
     }
-  }
-
-  async function uploadGeneratedFormPdf(file, fileDisplayName) {
-    const fileName = `${Date.now()}-${fileDisplayName}`
-    const filePath = `other/${fileName}`
-    const category = 'Staff & Visitor Incident Forms'
-
-    const { data } = await supabase.auth.getSession()
-    if (!data.session) {
-      throw new Error('You must be logged in to upload generated forms')
-    }
-
-    const { error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(filePath, file)
-
-    if (uploadError) throw uploadError
-
-    let { error: dbError } = await supabase.from('documents').insert({
-      section: 'other',
-      filename: fileDisplayName,
-      filepath: filePath,
-      category,
-      uploaded_by_initials: actorInitials,
-      created_at: new Date().toISOString(),
-    })
-
-    if (dbError && String(dbError.message || '').toLowerCase().includes('uploaded_by_initials') && String(dbError.message || '').toLowerCase().includes('does not exist')) {
-      const fallback = await supabase.from('documents').insert({
-        section: 'other',
-        filename: fileDisplayName,
-        filepath: filePath,
-        category,
-        created_at: new Date().toISOString(),
-      })
-      dbError = fallback.error
-    }
-
-    if (dbError) throw dbError
   }
 
   async function fetchSafeguarding(action, body = {}) {
@@ -301,7 +260,6 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
 
       setSelectedFile(null)
       setNewCategory('')
-      setUploadNotice(`Upload complete: ${selectedFile.name}`)
       loadDocuments()
       alert('Document uploaded successfully!')
     } catch (error) {
@@ -422,57 +380,6 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     }
   }
 
-  useEffect(() => {
-    async function handleDocumentFormPdfMessage(event) {
-      if (event.origin !== window.location.origin) return
-      if (!event.data || typeof event.data !== 'object') return
-      if (event.data.type !== 'campdb-document-form-pdf') return
-
-      if (section !== 'other') {
-        alert('Open Other Docs first, then submit the form again.')
-        return
-      }
-
-      const payload = event.data.payload || {}
-      const rawBase64 = payload.base64Pdf || ''
-      const fileName = payload.fileName || `staff-visitor-incident-${Date.now()}.pdf`
-
-      if (!rawBase64) {
-        alert('The form did not return a PDF payload.')
-        return
-      }
-
-      setIsReceivingDocumentFormPdf(true)
-      try {
-        const cleanBase64 = rawBase64.includes(',') ? rawBase64.split(',')[1] : rawBase64
-        const binary = atob(cleanBase64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i += 1) {
-          bytes[i] = binary.charCodeAt(i)
-        }
-
-        const blob = new Blob([bytes], { type: payload.mimeType || 'application/pdf' })
-        const file = new File([blob], fileName, { type: 'application/pdf' })
-
-        if (file.size > 5 * 1024 * 1024) {
-          alert('Generated PDF is over 5MB. Please reduce size and try again.')
-          return
-        }
-
-        await uploadGeneratedFormPdf(file, fileName)
-        await loadDocuments()
-        setUploadNotice(`Upload complete: ${fileName}`)
-      } catch (error) {
-        alert('Failed to receive PDF from staff/visitor form: ' + error.message)
-      } finally {
-        setIsReceivingDocumentFormPdf(false)
-      }
-    }
-
-    window.addEventListener('message', handleDocumentFormPdfMessage)
-    return () => window.removeEventListener('message', handleDocumentFormPdfMessage)
-  }, [section])
-
   const groupedByCategory = documents.reduce((acc, doc) => {
     const cat = doc.category || 'Uncategorized'
     if (!acc[cat]) acc[cat] = []
@@ -525,31 +432,6 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
           Other Docs
         </button>
       </div>
-
-      {/* Upload section */}
-      {section === 'other' && (
-        <div className="card space-y-3">
-          <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
-          <p className="text-xs text-stone-500">
-            Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
-          </p>
-          <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
-            <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
-              {isReceivingDocumentFormPdf
-                ? 'Receiving PDF from staff/visitor form...'
-                : 'When submitted, PDFs are saved to Other Docs under Staff & Visitor Incident Forms.'}
-            </div>
-            <iframe
-              title="Staff and Visitor Incident Form"
-              src="/forms/staff-visitor-incident-reporting-form.html"
-              className="w-full h-[560px] border-0"
-            />
-          </div>
-          {uploadNotice && (
-            <p className="text-xs text-green-700">{uploadNotice}</p>
-          )}
-        </div>
-      )}
 
       {section === 'other' && canViewSafeguarding && (
         <div className="card space-y-3">
