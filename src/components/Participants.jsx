@@ -14,8 +14,8 @@ function photoConsentMode(value) {
 
 function genderOf(p) {
   const pr = String(p.pronouns || '').trim().toLowerCase()
-  if (pr === 'he/him') return 'm'
-  if (pr === 'she/her') return 'f'
+  if (pr === 'he/him' || pr === 'he/they') return 'm'
+  if (pr === 'she/her' || pr === 'she/they') return 'f'
   return 'nb'
 }
 
