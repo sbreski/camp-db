@@ -663,7 +663,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     async function handleStaffVisitorFormPdfMessage(event) {
       if (event.origin !== window.location.origin) return
       if (!event.data || typeof event.data !== 'object') return
-      if (event.data.type !== 'campdb-document-form-pdf') return
+      if (event.data.type !== 'campdb-form-pdf') return
 
       const payload = event.data.payload || {}
       const rawBase64 = payload.base64Pdf || ''
