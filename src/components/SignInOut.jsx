@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar, CameraOff, Camera, FileText } from 'lucide-react'
+import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar, CameraOff, Camera, FileText, Edit2, Trash2, Check } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { getPendingFollowUpsForParticipant } from '../utils/workflow'
@@ -220,6 +220,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [noteEditor, setNoteEditor] = useState(null)
   const [noteInput, setNoteInput] = useState('')
   const [keepOnRecord, setKeepOnRecord] = useState(false)
+  const [editingHistoryEntry, setEditingHistoryEntry] = useState(null)
   const [selectedDate, setSelectedDate] = useState(todayKey())
   const [editingTime, setEditingTime] = useState(null) // { participantId, type: 'signIn' | 'signOut', currentTime }
   const [timeInput, setTimeInput] = useState('')
@@ -233,6 +234,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     return seasonFlag !== false
   })
   const selectedRecords = attendance.filter(a => a.date === selectedDate)
+  const liveNoteEditorParticipant = noteEditor
+    ? participants.find(item => item.id === noteEditor.id) || noteEditor
+    : null
 
   function getPendingFollowUps(participantId) {
     return getPendingFollowUpsForParticipant(incidents, participantId, selectedDate)
@@ -344,6 +348,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     setNoteEditor(null)
     setNoteInput('')
     setKeepOnRecord(false)
+    setEditingHistoryEntry(null)
   }
 
   function saveNoteEditor() {
@@ -382,6 +387,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         if (p.id !== noteEditor.id) return p
         const existingHistory = Array.isArray(p.note_history) ? p.note_history : []
         const newEntry = {
+          id: crypto.randomUUID(),
           note: nextNote,
           date: selectedDate,
           addedBy: actorInitials,
@@ -406,6 +412,93 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   function clearNoteEditor() {
     setNoteInput('')
     setKeepOnRecord(false)
+  }
+
+  function beginEditHistoryEntry(entry, historyIndex) {
+    const participant = participants.find(item => item.id === noteEditor?.id)
+    const activeFollowUp = String(participant?.register_note || participant?.registerNote || '').trim()
+    setEditingHistoryEntry({
+      historyIndex,
+      originalNote: String(entry.note || ''),
+      note: String(entry.note || ''),
+      keepOnRecord: activeFollowUp === String(entry.note || '').trim(),
+    })
+  }
+
+  function cancelEditHistoryEntry() {
+    setEditingHistoryEntry(null)
+  }
+
+  function saveHistoryEntryEdit() {
+    if (!noteEditor || !editingHistoryEntry || typeof setParticipants !== 'function') return
+    const nextNote = String(editingHistoryEntry.note || '').trim()
+    if (!nextNote) return
+    const participantId = noteEditor.id
+
+    setParticipants(prev => prev.map(p => {
+      if (p.id !== participantId) return p
+      const existingHistory = Array.isArray(p.note_history) ? p.note_history : []
+      const previousEntry = existingHistory[editingHistoryEntry.historyIndex]
+      const previousNote = String(previousEntry?.note || editingHistoryEntry.originalNote || '').trim()
+      return {
+        ...p,
+        note_history: existingHistory.map((entry, index) => (
+          index === editingHistoryEntry.historyIndex
+            ? {
+                ...entry,
+                note: nextNote,
+                updatedAt: new Date().toISOString(),
+                updatedBy: actorInitials,
+              }
+            : entry
+        )),
+        register_note: editingHistoryEntry.keepOnRecord
+          ? nextNote
+          : String(p.register_note || '').trim() === previousNote
+            ? null
+            : p.register_note,
+      }
+    }))
+
+    setAttendance(prev => prev.map(record => (
+      record.participantId === participantId
+      && record.date === liveNoteEditorParticipant?.note_history?.[editingHistoryEntry.historyIndex]?.date
+      && String(record.exceptionNotes || record.exception_notes || '').trim() === String(editingHistoryEntry.originalNote || '').trim()
+        ? { ...record, exceptionNotes: nextNote }
+        : record
+    )))
+
+    setEditingHistoryEntry(null)
+  }
+
+  function deleteHistoryEntry(historyIndex) {
+    if (!noteEditor || typeof setParticipants !== 'function') return
+    if (!window.confirm('Delete this saved note from history?')) return
+    const participantId = noteEditor.id
+    const removedEntry = liveNoteEditorParticipant?.note_history?.[historyIndex]
+    const removedNote = String(removedEntry?.note || '').trim()
+
+    setParticipants(prev => prev.map(p => {
+      if (p.id !== participantId) return p
+      const existingHistory = Array.isArray(p.note_history) ? p.note_history : []
+      return {
+        ...p,
+        note_history: existingHistory.filter((_, index) => index !== historyIndex),
+        register_note: String(p.register_note || '').trim() === removedNote ? null : p.register_note,
+      }
+    }))
+
+    setAttendance(prev => prev.map(record => (
+      record.participantId === participantId
+      && record.date === removedEntry?.date
+      && String(record.exceptionNotes || record.exception_notes || '').trim() === removedNote
+        ? { ...record, exceptionNotes: null }
+        : record
+    )))
+
+    if (editingHistoryEntry?.historyIndex === historyIndex) {
+      setEditingHistoryEntry(null)
+    }
   }
 
   function clearRegisterFollowUp(participantId) {
@@ -659,19 +752,62 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                 </div>
               </label>
               {/* Note history */}
-              {Array.isArray(noteEditor.note_history) && noteEditor.note_history.length > 0 && (
+              {Array.isArray(liveNoteEditorParticipant?.note_history) && liveNoteEditorParticipant.note_history.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Note History</p>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {[...noteEditor.note_history].reverse().map((entry, i) => (
-                      <div key={i} className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
-                        <p className="text-xs text-stone-700 whitespace-pre-wrap">{formatMultilineHistoryText(entry.note)}</p>
-                        <p className="text-[10px] text-stone-400 mt-1">
-                          {new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB')}
-                          {entry.addedBy ? ` · ${entry.addedBy}` : ''}
-                        </p>
-                      </div>
-                    ))}
+                    {[...liveNoteEditorParticipant.note_history].reverse().map((entry, i) => {
+                      const historyIndex = liveNoteEditorParticipant.note_history.length - 1 - i
+                      const isEditingEntry = editingHistoryEntry?.historyIndex === historyIndex
+                      return (
+                        <div key={entry.id || `${entry.savedAt || entry.date || 'note'}-${historyIndex}`} className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
+                          {isEditingEntry ? (
+                            <div className="space-y-2">
+                              <textarea
+                                className="input min-h-[88px]"
+                                value={editingHistoryEntry.note}
+                                onChange={e => setEditingHistoryEntry(prev => ({ ...prev, note: e.target.value }))}
+                              />
+                              <label className="flex items-start gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={editingHistoryEntry.keepOnRecord}
+                                  onChange={e => setEditingHistoryEntry(prev => ({ ...prev, keepOnRecord: e.target.checked }))}
+                                  className="mt-0.5 h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
+                                />
+                                <span className="text-xs text-stone-600">Pin for follow up</span>
+                              </label>
+                              <div className="flex items-center justify-end gap-2">
+                                <button type="button" onClick={saveHistoryEntryEdit} className="text-xs font-semibold text-forest-800 hover:text-forest-950 inline-flex items-center gap-1">
+                                  <Check size={13} /> Save
+                                </button>
+                                <button type="button" onClick={cancelEditHistoryEntry} className="text-xs font-semibold text-stone-500 hover:text-stone-800 inline-flex items-center gap-1">
+                                  <X size={13} /> Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs text-stone-700 whitespace-pre-wrap flex-1">{formatMultilineHistoryText(entry.note)}</p>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button type="button" onClick={() => beginEditHistoryEntry(entry, historyIndex)} className="text-stone-400 hover:text-forest-700" title="Edit saved note">
+                                    <Edit2 size={13} />
+                                  </button>
+                                  <button type="button" onClick={() => deleteHistoryEntry(historyIndex)} className="text-stone-400 hover:text-red-600" title="Delete saved note">
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-stone-400 mt-1">
+                                {new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB')}
+                                {entry.addedBy ? ` · ${entry.addedBy}` : ''}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

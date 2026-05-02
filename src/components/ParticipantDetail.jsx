@@ -85,6 +85,7 @@ export default function ParticipantDetail({
   const [downloadingIncidentId, setDownloadingIncidentId] = useState('')
   const [participantNoteDraft, setParticipantNoteDraft] = useState('')
   const [editingParticipantNote, setEditingParticipantNote] = useState(null)
+  const [editingRegisterHistoryEntry, setEditingRegisterHistoryEntry] = useState(null)
   const [uploadingParticipantDocument, setUploadingParticipantDocument] = useState(false)
   const [expandedIncidentId, setExpandedIncidentId] = useState('')
   const [noteDraftByIncident, setNoteDraftByIncident] = useState({})
@@ -660,6 +661,100 @@ export default function ParticipantDetail({
     setParticipants(prev => prev.map(item => (
       item.id === participant.id ? updater(item) : item
     )))
+  }
+
+  function beginEditRegisterHistoryEntry(entry, historyIndex) {
+    const activeFollowUp = String(participant?.register_note || participant?.registerNote || '').trim()
+    setEditingRegisterHistoryEntry({
+      historyIndex,
+      originalNote: String(entry.note || ''),
+      note: String(entry.note || ''),
+      keepOnRegister: activeFollowUp === String(entry.note || '').trim(),
+    })
+  }
+
+  function cancelEditRegisterHistoryEntry() {
+    setEditingRegisterHistoryEntry(null)
+  }
+
+  function saveEditedRegisterHistoryEntry() {
+    if (!editingRegisterHistoryEntry) return
+    const nextNote = String(editingRegisterHistoryEntry.note || '').trim()
+    if (!nextNote) return
+    const previousEntry = registerNoteHistory[editingRegisterHistoryEntry.historyIndex]
+    const previousNote = String(previousEntry?.note || editingRegisterHistoryEntry.originalNote || '').trim()
+
+    updateParticipantRecord(current => {
+      const existingHistory = Array.isArray(current.note_history)
+        ? current.note_history
+        : Array.isArray(current.noteHistory)
+          ? current.noteHistory
+          : []
+      return {
+        ...current,
+        note_history: existingHistory.map((entry, index) => (
+          index === editingRegisterHistoryEntry.historyIndex
+            ? {
+                ...entry,
+                note: nextNote,
+                updatedAt: new Date().toISOString(),
+                updatedBy: actorInitials,
+              }
+            : entry
+        )),
+        register_note: editingRegisterHistoryEntry.keepOnRegister
+          ? nextNote
+          : String(current.register_note || current.registerNote || '').trim() === previousNote
+            ? null
+            : (current.register_note || current.registerNote || null),
+      }
+    })
+
+    if (typeof setAttendance === 'function') {
+      setAttendance(prev => prev.map(record => (
+        record.participantId === participant.id
+        && record.date === previousEntry?.date
+        && String(record.exceptionNotes || record.exception_notes || '').trim() === previousNote
+          ? { ...record, exceptionNotes: nextNote }
+          : record
+      )))
+    }
+
+    setEditingRegisterHistoryEntry(null)
+  }
+
+  function deleteRegisterHistoryEntry(historyIndex) {
+    if (!window.confirm('Delete this saved register note?')) return
+    const removedEntry = registerNoteHistory[historyIndex]
+    const removedNote = String(removedEntry?.note || '').trim()
+
+    updateParticipantRecord(current => {
+      const existingHistory = Array.isArray(current.note_history)
+        ? current.note_history
+        : Array.isArray(current.noteHistory)
+          ? current.noteHistory
+          : []
+      const activeFollowUp = String(current.register_note || current.registerNote || '').trim()
+      return {
+        ...current,
+        note_history: existingHistory.filter((_, index) => index !== historyIndex),
+        register_note: activeFollowUp === removedNote ? null : (current.register_note || current.registerNote || null),
+      }
+    })
+
+    if (typeof setAttendance === 'function') {
+      setAttendance(prev => prev.map(record => (
+        record.participantId === participant.id
+        && record.date === removedEntry?.date
+        && String(record.exceptionNotes || record.exception_notes || '').trim() === removedNote
+          ? { ...record, exceptionNotes: null }
+          : record
+      )))
+    }
+
+    if (editingRegisterHistoryEntry?.historyIndex === historyIndex) {
+      setEditingRegisterHistoryEntry(null)
+    }
   }
 
   function addParticipantNote() {
@@ -1254,15 +1349,58 @@ export default function ParticipantDetail({
                   {registerNoteHistory.length > 0 && (
                     <div className="space-y-1.5">
                       <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Session Note History</p>
-                      {[...registerNoteHistory].reverse().map((entry, i) => (
-                        <div key={i} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
-                          <p className="text-sm text-stone-800 whitespace-pre-wrap">{entry.note}</p>
-                          <p className="text-[11px] text-stone-400 mt-1">
-                            {entry.date ? new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
-                            {entry.addedBy ? ` · ${entry.addedBy}` : ''}
-                          </p>
-                        </div>
-                      ))}
+                      {[...registerNoteHistory].reverse().map((entry, i) => {
+                        const historyIndex = registerNoteHistory.length - 1 - i
+                        const isEditingEntry = editingRegisterHistoryEntry?.historyIndex === historyIndex
+                        return (
+                          <div key={entry.id || `${entry.savedAt || entry.date || 'note'}-${historyIndex}`} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2">
+                            {isEditingEntry ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  className="input min-h-[88px]"
+                                  value={editingRegisterHistoryEntry.note}
+                                  onChange={e => setEditingRegisterHistoryEntry(prev => ({ ...prev, note: e.target.value }))}
+                                />
+                                <label className="flex items-start gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingRegisterHistoryEntry.keepOnRegister}
+                                    onChange={e => setEditingRegisterHistoryEntry(prev => ({ ...prev, keepOnRegister: e.target.checked }))}
+                                    className="mt-0.5 h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
+                                  />
+                                  <span className="text-xs text-stone-600">Pin for follow up</span>
+                                </label>
+                                <div className="flex items-center justify-end gap-2">
+                                  <button type="button" onClick={saveEditedRegisterHistoryEntry} className="text-xs font-semibold text-forest-800 hover:text-forest-950 inline-flex items-center gap-1">
+                                    <Check size={13} /> Save
+                                  </button>
+                                  <button type="button" onClick={cancelEditRegisterHistoryEntry} className="text-xs font-semibold text-stone-500 hover:text-stone-800 inline-flex items-center gap-1">
+                                    <X size={13} /> Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-sm text-stone-800 whitespace-pre-wrap flex-1">{entry.note}</p>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button type="button" onClick={() => beginEditRegisterHistoryEntry(entry, historyIndex)} className="text-stone-400 hover:text-forest-700" title="Edit saved note">
+                                      <Edit2 size={14} />
+                                    </button>
+                                    <button type="button" onClick={() => deleteRegisterHistoryEntry(historyIndex)} className="text-stone-400 hover:text-red-600" title="Delete saved note">
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className="text-[11px] text-stone-400 mt-1">
+                                  {entry.date ? new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                                  {entry.addedBy ? ` · ${entry.addedBy}` : ''}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
