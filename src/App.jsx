@@ -48,6 +48,7 @@ const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
 const SESSION_WARNING_SECONDS = 60
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
+const LAST_ACTIVITY_STORAGE_KEY = 'camp_db_last_activity_at'
 const tableCache = new Map()
 const ROUTE_PREFETCHERS = {
   dashboard: loadDashboard,
@@ -326,6 +327,7 @@ export default function App() {
   const permissionsWatchdogRef = useRef(null)
   const inactivityTimeoutRef = useRef(null)
   const warningIntervalRef = useRef(null)
+  const sessionWarningDeadlineRef = useRef(null)
   const prefetchedRoutesRef = useRef(new Set())
   const routeState = getRouteState(location.pathname)
   const page = routeState.page
@@ -832,15 +834,101 @@ export default function App() {
       clearInterval(warningIntervalRef.current)
       warningIntervalRef.current = null
     }
+    sessionWarningDeadlineRef.current = null
+  }
+
+  function getStoredLastActivity() {
+    try {
+      const raw = localStorage.getItem(LAST_ACTIVITY_STORAGE_KEY)
+      if (!raw) return null
+      const parsed = Number(raw)
+      return Number.isFinite(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+
+  function setStoredLastActivity(value = Date.now()) {
+    try {
+      localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, String(value))
+    } catch {
+      // Ignore storage failures and continue with in-memory timers.
+    }
+  }
+
+  function clearStoredLastActivity() {
+    try {
+      localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY)
+    } catch {
+      // Ignore storage failures.
+    }
   }
 
   function startInactivityTimer() {
     if (!authed || !isAdminUser) return
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current)
+
+    const lastActivity = getStoredLastActivity() || Date.now()
+    const elapsed = Date.now() - lastActivity
+    const remaining = INACTIVITY_TIMEOUT_MS - elapsed
+
+    if (remaining <= 0) {
+      setWarningCountdown(SESSION_WARNING_SECONDS)
+      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
+      setShowSessionWarning(true)
+      return
+    }
+
     inactivityTimeoutRef.current = setTimeout(() => {
       setWarningCountdown(SESSION_WARNING_SECONDS)
+      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
-    }, INACTIVITY_TIMEOUT_MS)
+    }, remaining)
+  }
+
+  function touchSessionActivity() {
+    setStoredLastActivity()
+    if (!showSessionWarning) {
+      startInactivityTimer()
+    }
+  }
+
+  async function syncSessionTimeoutState() {
+    if (!authed || !isAdminUser) return
+
+    if (showSessionWarning) {
+      const deadline = sessionWarningDeadlineRef.current
+      if (!deadline) {
+        sessionWarningDeadlineRef.current = Date.now() + (warningCountdown * 1000)
+        return
+      }
+
+      const remainingMs = deadline - Date.now()
+      if (remainingMs <= 0) {
+        await logout()
+        return
+      }
+
+      const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000))
+      setWarningCountdown(remainingSeconds)
+      return
+    }
+
+    const lastActivity = getStoredLastActivity()
+    if (!lastActivity) {
+      setStoredLastActivity()
+      startInactivityTimer()
+      return
+    }
+
+    if ((Date.now() - lastActivity) >= INACTIVITY_TIMEOUT_MS) {
+      setWarningCountdown(SESSION_WARNING_SECONDS)
+      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
+      setShowSessionWarning(true)
+      return
+    }
+
+    startInactivityTimer()
   }
 
   function sanitizeAllowedTabs(tabIds) {
@@ -1126,6 +1214,7 @@ export default function App() {
 
   async function logout() {
     clearSessionTimers()
+    clearStoredLastActivity()
     await supabase.auth.signOut()
     routerNavigate(pathForPage('dashboard'), { replace: true })
     setCurrentUser(null)
@@ -1140,7 +1229,8 @@ export default function App() {
   function staySignedIn() {
     setShowSessionWarning(false)
     setWarningCountdown(SESSION_WARNING_SECONDS)
-    startInactivityTimer()
+    sessionWarningDeadlineRef.current = null
+    touchSessionActivity()
   }
 
   const currentUserEmail = (currentUser?.email || '').toLowerCase()
@@ -1204,22 +1294,32 @@ export default function App() {
   useEffect(() => {
     if (!authed) {
       clearSessionTimers()
+      clearStoredLastActivity()
       setShowSessionWarning(false)
       return
     }
 
     function handleActivity() {
       if (showSessionWarning) return
-      startInactivityTimer()
+      touchSessionActivity()
     }
 
-    startInactivityTimer()
+    function handleVisibilityOrFocus() {
+      if (document.visibilityState === 'visible') {
+        syncSessionTimeoutState()
+      }
+    }
+
+    syncSessionTimeoutState()
 
     window.addEventListener('mousemove', handleActivity)
     window.addEventListener('keydown', handleActivity)
     window.addEventListener('click', handleActivity)
     window.addEventListener('scroll', handleActivity)
     window.addEventListener('touchstart', handleActivity)
+    window.addEventListener('focus', handleVisibilityOrFocus)
+    window.addEventListener('pageshow', handleVisibilityOrFocus)
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus)
 
     return () => {
       window.removeEventListener('mousemove', handleActivity)
@@ -1227,6 +1327,9 @@ export default function App() {
       window.removeEventListener('click', handleActivity)
       window.removeEventListener('scroll', handleActivity)
       window.removeEventListener('touchstart', handleActivity)
+      window.removeEventListener('focus', handleVisibilityOrFocus)
+      window.removeEventListener('pageshow', handleVisibilityOrFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus)
     }
   }, [authed, showSessionWarning, isAdminUser])
 
@@ -1236,22 +1339,29 @@ export default function App() {
         clearInterval(warningIntervalRef.current)
         warningIntervalRef.current = null
       }
+      sessionWarningDeadlineRef.current = null
       return
+    }
+
+    if (!sessionWarningDeadlineRef.current) {
+      sessionWarningDeadlineRef.current = Date.now() + (warningCountdown * 1000)
     }
 
     if (warningIntervalRef.current) clearInterval(warningIntervalRef.current)
     warningIntervalRef.current = setInterval(() => {
-      setWarningCountdown(prev => {
-        if (prev <= 1) {
-          if (warningIntervalRef.current) {
-            clearInterval(warningIntervalRef.current)
-            warningIntervalRef.current = null
-          }
-          logout()
-          return 0
+      const deadline = sessionWarningDeadlineRef.current
+      const remainingMs = (deadline || 0) - Date.now()
+
+      if (remainingMs <= 0) {
+        if (warningIntervalRef.current) {
+          clearInterval(warningIntervalRef.current)
+          warningIntervalRef.current = null
         }
-        return prev - 1
-      })
+        logout()
+        return
+      }
+
+      setWarningCountdown(Math.max(1, Math.ceil(remainingMs / 1000)))
     }, 1000)
 
     return () => {
