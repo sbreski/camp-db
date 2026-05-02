@@ -13,6 +13,14 @@ function fmt(ts) {
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+function formatMultilineHistoryText(value) {
+  return String(value || '').replace(/\r\n/g, '\n')
+}
+
+function formatRegisterInlineText(value) {
+  return formatMultilineHistoryText(value).replace(/\n+/g, ' | ').trim()
+}
+
 function parseApprovedAdults(str) {
   if (!str) return []
   return str.split(',').map(s => s.trim()).filter(Boolean)
@@ -326,9 +334,10 @@ export default function SignInOut({ participants, setParticipants, attendance, s
 
   function openNoteEditor(participant) {
     const existing = getRecord(participant.id)
+    const existingNote = existing?.exceptionNotes || existing?.exception_notes || ''
     setNoteEditor(participant)
-    setNoteInput(existing?.exceptionNotes || existing?.exception_notes || '')
-    setKeepOnRecord(Boolean(participant.register_note))
+    setNoteInput(existingNote)
+    setKeepOnRecord(Boolean(participant.register_note) && participant.register_note === existingNote)
   }
 
   function cancelNoteEditor() {
@@ -367,7 +376,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       ])
     }
 
-    // Persist note history and optional "keep on record" to participant
+    // Persist note history and optional register follow-up to participant
     if (nextNote && typeof setParticipants === 'function') {
       setParticipants(prev => prev.map(p => {
         if (p.id !== noteEditor.id) return p
@@ -381,14 +390,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         return {
           ...p,
           note_history: [...existingHistory, newEntry],
-          register_note: keepOnRecord ? nextNote : (p.register_note || null),
+          register_note: keepOnRecord ? nextNote : null,
         }
       }))
     } else if (!nextNote && typeof setParticipants === 'function') {
-      // If note cleared and keepOnRecord was on for this note, also clear register_note
       setParticipants(prev => prev.map(p => {
         if (p.id !== noteEditor.id) return p
-        return { ...p, register_note: keepOnRecord ? null : p.register_note }
+        return { ...p, register_note: null }
       }))
     }
 
@@ -400,8 +408,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     setKeepOnRecord(false)
   }
 
-  function removeregister_note(participantId) {
-    if (!window.confirm('Remove the pinned note from this child\'s register? It will remain in their note history.')) return
+  function clearRegisterFollowUp(participantId) {
+    if (!window.confirm('Mark this note follow-up as done? It will remain in note history.')) return
     if (typeof setParticipants === 'function') {
       setParticipants(prev => prev.map(p =>
         p.id === participantId ? { ...p, register_note: null } : p
@@ -410,18 +418,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   }
 
   function hasParticipantNoteFollowUp(participantId) {
-    const record = getRecord(participantId)
-    return Boolean(String(record?.exceptionNotes || record?.exception_notes || '').trim())
+    const participant = participants.find(item => item.id === participantId)
+    return Boolean(String(participant?.register_note || participant?.registerNote || '').trim())
   }
 
   function clearParticipantNoteFollowUp(participantId) {
-    const existing = getRecord(participantId)
-    if (!existing) return
-    setAttendance(prev => prev.map(r => (
-      r.id === existing.id
-        ? { ...r, exceptionNotes: null }
-        : r
-    )))
+    clearRegisterFollowUp(participantId)
   }
 
   function startEditTime(participantId, type, currentTime) {
@@ -643,7 +645,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   placeholder="Add handover notes, follow-up reminders, or important context for this participant."
                 />
               </div>
-              {/* Keep on Record checkbox */}
+              {/* Register follow-up checkbox */}
               <label className="flex items-start gap-3 cursor-pointer group">
                 <input
                   type="checkbox"
@@ -652,25 +654,10 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   className="mt-0.5 h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
                 />
                 <div>
-                  <span className="text-sm font-medium text-stone-800 group-hover:text-forest-900">Keep on record</span>
-                  <p className="text-xs text-stone-500 mt-0.5">This note will appear on this child's register row every session until manually removed.</p>
+                  <span className="text-sm font-medium text-stone-800 group-hover:text-forest-900">Pin for follow up</span>
+                  <p className="text-xs text-stone-500 mt-0.5">Show this note as a follow-up on the Sign In / Out register until it is marked done.</p>
                 </div>
               </label>
-              {/* Show existing pinned note if different from current input */}
-              {noteEditor.register_note && noteEditor.register_note !== noteInput && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex items-start gap-2">
-                  <span className="text-xs font-bold text-amber-700 mt-0.5 shrink-0">📌 Pinned</span>
-                  <p className="text-xs text-amber-900 flex-1">{noteEditor.register_note}</p>
-                  <button
-                    type="button"
-                    onClick={() => removeregister_note(noteEditor.id)}
-                    className="text-amber-500 hover:text-amber-700 shrink-0"
-                    title="Remove pinned note"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
               {/* Note history */}
               {Array.isArray(noteEditor.note_history) && noteEditor.note_history.length > 0 && (
                 <div>
@@ -678,7 +665,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
                     {[...noteEditor.note_history].reverse().map((entry, i) => (
                       <div key={i} className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
-                        <p className="text-xs text-stone-700">{entry.note}</p>
+                        <p className="text-xs text-stone-700 whitespace-pre-wrap">{formatMultilineHistoryText(entry.note)}</p>
                         <p className="text-[10px] text-stone-400 mt-1">
                           {new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB')}
                           {entry.addedBy ? ` · ${entry.addedBy}` : ''}
@@ -908,7 +895,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const signOutBy = rec?.signOutBy || rec?.sign_out_by || null
               const reasonLabel = attendanceReasonLabel(rec?.exceptionReason || rec?.exception_reason)
               const reasonNotes = rec?.exceptionNotes || rec?.exception_notes || ''
-              const noteFollowUp = String(rec?.exceptionNotes || rec?.exception_notes || '').trim()
+              const noteFollowUp = String(p.register_note || p.registerNote || '').trim()
               const absenceReasonLocked = Boolean(rec?.signIn || rec?.signOut)
 
               return (
@@ -980,21 +967,6 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                         Absence Reason: <span className="font-medium">{reasonLabel}</span>{reasonNotes ? ` - ${reasonNotes}` : ''}
                       </p>
                     )}
-                    {/* Pinned register note */}
-                    {p.register_note && (
-                      <div className="mt-1.5 flex items-start gap-1.5">
-                        <span className="text-amber-500 shrink-0 mt-0.5" title="Pinned note — kept on record">📌</span>
-                        <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 flex-1">{p.register_note}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeregister_note(p.id)}
-                          className="shrink-0 text-stone-300 hover:text-red-500 transition-colors mt-0.5"
-                          title="Remove pinned note"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    )}
                     {pendingFollowUps.length > 0 && (
                       <div className="mt-2 space-y-1.5">
                         {pendingFollowUps.map(incident => {
@@ -1060,7 +1032,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       <div className="mt-2">
                         <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-900">
                           <span>
-                            Follow Up Note: {noteFollowUp}
+                            Follow Up Note: {formatRegisterInlineText(noteFollowUp)}
                           </span>
                           <button
                             type="button"
