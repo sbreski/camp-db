@@ -669,9 +669,6 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
             <Upload size={16} />
             {uploading ? 'Uploading...' : 'Upload Document'}
           </button>
-          {uploadNotice && (
-            <p className="text-xs text-green-700">{uploadNotice}</p>
-          )}
         </div>
       </div>
 

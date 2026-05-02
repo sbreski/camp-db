@@ -61,6 +61,9 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   const [uploadingExtraIncidentId, setUploadingExtraIncidentId] = useState('')
   const [isReceivingStaffVisitorPdf, setIsReceivingStaffVisitorPdf] = useState(false)
   const [staffVisitorUploadNotice, setStaffVisitorUploadNotice] = useState('')
+  const [activeMainTab, setActiveMainTab] = useState('reports')
+  const [staffVisitorForms, setStaffVisitorForms] = useState([])
+  const [loadingStaffVisitorForms, setLoadingStaffVisitorForms] = useState(false)
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const actorInitialsNormalized = normalizeInitials(actorInitials)
@@ -583,9 +586,43 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }))
   }
 
+  async function loadStaffVisitorForms() {
+    setLoadingStaffVisitorForms(true)
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('section', 'staff-visitor')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setStaffVisitorForms(data || [])
+    } catch (error) {
+      console.error('Error loading staff/visitor forms:', error)
+    } finally {
+      setLoadingStaffVisitorForms(false)
+    }
+  }
+
+  async function downloadStaffVisitorForm(filepath, filename) {
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .download(filepath)
+      if (error) throw error
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (error) {
+      alert('Error downloading form: ' + error.message)
+    }
+  }
+
   async function uploadGeneratedFormPdf(file, fileDisplayName) {
     const fileName = `${Date.now()}-${fileDisplayName}`
-    const filePath = `other/${fileName}`
+    const filePath = `staff-visitor/${fileName}`
     const category = 'Staff & Visitor Incident Forms'
 
     const { data } = await supabase.auth.getSession()
@@ -600,7 +637,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     if (uploadError) throw uploadError
 
     let { error: dbError } = await supabase.from('documents').insert({
-      section: 'other',
+      section: 'staff-visitor',
       filename: fileDisplayName,
       filepath: filePath,
       category,
@@ -610,7 +647,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
     if (dbError && String(dbError.message || '').toLowerCase().includes('uploaded_by_initials') && String(dbError.message || '').toLowerCase().includes('does not exist')) {
       const fallback = await supabase.from('documents').insert({
-        section: 'other',
+        section: 'staff-visitor',
         filename: fileDisplayName,
         filepath: filePath,
         category,
@@ -655,6 +692,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         }
 
         await uploadGeneratedFormPdf(file, fileName)
+        await loadStaffVisitorForms()
         setStaffVisitorUploadNotice(`Upload complete: ${fileName}`)
       } catch (error) {
         alert('Failed to receive PDF from staff/visitor form: ' + error.message)
@@ -666,6 +704,12 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     window.addEventListener('message', handleStaffVisitorFormPdfMessage)
     return () => window.removeEventListener('message', handleStaffVisitorFormPdfMessage)
   }, [])
+
+  useEffect(() => {
+    if (activeMainTab === 'staff-visitor') {
+      loadStaffVisitorForms()
+    }
+  }, [activeMainTab])
 
   const filtered = incidents
     .filter(inc => {
@@ -703,19 +747,49 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             </p>
           )}
         </div>
-        <button onClick={() => {
-          setShowForm(s => {
-            const next = !s
-            if (!next) {
-              setSelectedParticipant('')
-              setEditingIncidentId(null)
-            }
-            return next
-          })
-        }} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
-          <Plus size={15} strokeWidth={2.5} /> Log Incident
+        {activeMainTab === 'reports' && (
+          <button onClick={() => {
+            setShowForm(s => {
+              const next = !s
+              if (!next) {
+                setSelectedParticipant('')
+                setEditingIncidentId(null)
+              }
+              return next
+            })
+          }} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
+            <Plus size={15} strokeWidth={2.5} /> Log Incident
+          </button>
+        )}
+      </div>
+
+      {/* Main tabs */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('reports')}
+          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
+            activeMainTab === 'reports'
+              ? 'bg-amber-500 text-white'
+              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          }`}
+        >
+          Reports
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('staff-visitor')}
+          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
+            activeMainTab === 'staff-visitor'
+              ? 'bg-amber-500 text-white'
+              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+          }`}
+        >
+          Staff/Visitor Form
         </button>
       </div>
+
+      {activeMainTab === 'reports' && <>
 
       {saveNotice && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 flex flex-wrap items-center gap-2">
@@ -767,29 +841,6 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
           )}
         </div>
       )}
-
-      {/* Staff & Visitor Incident Form */}
-      <div className="card space-y-3">
-        <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
-        <p className="text-xs text-stone-500">
-          Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
-        </p>
-        <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
-          <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
-            {isReceivingStaffVisitorPdf
-              ? 'Receiving PDF from staff/visitor form...'
-              : 'When submitted, PDFs are saved to Other Docs under Staff & Visitor Incident Forms.'}
-          </div>
-          <iframe
-            title="Staff and Visitor Incident Form"
-            src="/forms/staff-visitor-incident-reporting-form.html"
-            className="w-full h-[560px] border-0"
-          />
-        </div>
-        {staffVisitorUploadNotice && (
-          <p className="text-xs text-green-700">{staffVisitorUploadNotice}</p>
-        )}
-      </div>
 
       {/* Search */}
       <div className="relative">
@@ -1228,6 +1279,68 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
               </div>
             </section>
           ))}
+        </div>
+      )}
+
+      </>}
+
+      {activeMainTab === 'staff-visitor' && (
+        <div className="space-y-5">
+          <div className="card space-y-3">
+            <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
+            <p className="text-xs text-stone-500">
+              Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
+            </p>
+            <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
+              <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
+                {isReceivingStaffVisitorPdf
+                  ? 'Receiving PDF from staff/visitor form...'
+                  : 'When submitted, PDFs are saved here in the Reporting tab.'}
+              </div>
+              <iframe
+                title="Staff and Visitor Incident Form"
+                src="/forms/staff-visitor-incident-reporting-form.html"
+                className="w-full h-[560px] border-0"
+              />
+            </div>
+            {staffVisitorUploadNotice && (
+              <p className="text-xs text-green-700">{staffVisitorUploadNotice}</p>
+            )}
+          </div>
+
+          <div className="card space-y-3">
+            <h3 className="font-display font-semibold text-forest-950">Submitted Forms</h3>
+            {loadingStaffVisitorForms ? (
+              <p className="text-xs text-stone-500">Loading...</p>
+            ) : staffVisitorForms.length === 0 ? (
+              <p className="text-xs text-stone-500">No forms submitted yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {staffVisitorForms.map(doc => (
+                  <div key={doc.id} className="flex items-center justify-between gap-3 py-2 border-b border-stone-100 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText size={14} className="text-stone-400 flex-shrink-0" />
+                      <span className="text-sm text-stone-800 truncate">{doc.filename}</span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-xs text-stone-500">
+                        {new Date(doc.created_at).toLocaleDateString('en-GB', {
+                          day: 'numeric', month: 'short', year: 'numeric',
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => downloadStaffVisitorForm(doc.filepath, doc.filename)}
+                        className="text-xs text-forest-700 underline hover:text-forest-900"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
