@@ -827,22 +827,44 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                     {p?.parentEmail && (
-                      <button onClick={(e) => {
+                      <button onClick={async (e) => {
                         e.stopPropagation()
-                        const subject = `Incident Report - ${p.name}`
-                        let body = `Dear ${p.parentName || 'Parent/Guardian'},\n\n`
-                        body += `Please find details of the incident involving ${p.name}.\n\n`
-                        if (inc.pdfName) {
-                          body += `Attachment: ${inc.pdfName}\n\n`
+
+                        // Step 1: download the PDF if one is attached, so the user can attach it manually to the email
+                        if (inc.pdfData && inc.pdfName) {
+                          try {
+                            const response = await fetch(inc.pdfData)
+                            if (response.ok) {
+                              const blob = await response.blob()
+                              const url = URL.createObjectURL(blob)
+                              const anchor = document.createElement('a')
+                              anchor.href = url
+                              anchor.download = inc.pdfName
+                              document.body.appendChild(anchor)
+                              anchor.click()
+                              anchor.remove()
+                              setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                            }
+                          } catch (_) {
+                            // Non-fatal — continue to open email anyway
+                          }
                         }
-                        body += `Incident Type: ${inc.type}\nDate: ${new Date(inc.createdAt).toLocaleDateString('en-GB')}\nReported by: ${inc.staffMember || 'Staff'}\n\n`
-                        body += `This email is being sent following our discussion about this incident.`
-                        
-                        const mailtoLink = `mailto:?bcc=${encodeURIComponent(p.parentEmail)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+
+                        // Step 2: open mailto with pre-filled subject and body
+                        const subject = `Incident Report — ${p.name}`
+                        let body = `Dear ${p.parentName || 'Parent/Guardian'},\n\n`
+                        body += `Please find attached a copy of the incident report relating to ${p.name}.\n\n`
+                        body += `Incident type: ${inc.type}\nDate: ${new Date(inc.createdAt).toLocaleDateString('en-GB')}\nReported by: ${inc.staffMember || 'Staff'}\n\n`
+                        if (inc.pdfName) {
+                          body += `The report (${inc.pdfName}) has been downloaded to your device — please attach it to this email before sending.\n\n`
+                        }
+                        body += `Please do not hesitate to get in touch if you have any questions.\n\nKind regards,\nImpact Kidz Summer Camp`
+
+                        const mailtoLink = `mailto:${encodeURIComponent(p.parentEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
                         window.open(mailtoLink, '_blank')
                       }}
                         className="p-1.5 text-stone-400 hover:text-blue-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                        title="Email parent">
+                        title={inc.pdfData ? 'Download PDF & email parent (attach the downloaded file before sending)' : 'Email parent'}>
                         <Mail size={15} />
                       </button>
                     )}

@@ -104,6 +104,40 @@
     .section { box-shadow: none; border: 1px solid #ccc; }
     .form-body { padding: 0; max-width: 100%; }
     .field input, .field textarea, .consideration textarea { background: #fff !important; border: 1px solid #999 !important; }
+  
+    /* Compact print overrides — keep to 1–2 A4 sides */
+    @page { margin: 7mm 9mm; }
+    body { font-size: 9pt !important; }
+    .header-banner { padding: 4px 8px !important; font-size: 7pt !important; }
+    .title-block { padding: 6px 10px 5px !important; }
+    .title-block .org { font-size: 11pt !important; }
+    .title-block .doc-title { font-size: 10pt !important; }
+    .title-block .subtitle { display: none !important; }
+    .form-body, .page { padding: 0 !important; max-width: 100% !important; }
+    .section { margin-bottom: 5px !important; box-shadow: none !important; overflow: visible !important; }
+    .section-header, .section-title { font-size: 7.5pt !important; padding: 4px 9px !important; }
+    .section-body { padding: 6px 9px !important; }
+    .section-note { display: none !important; }
+    .field { margin-bottom: 4px !important; }
+    .field label { font-size: 7.5pt !important; margin-bottom: 1px !important; }
+    .field-note, .field .field-note, .hint, .field .hint { display: none !important; }
+    input[type="text"], input[type="date"], input[type="time"], textarea {
+      font-size: 8pt !important; padding: 2px 4px !important;
+      border: 1px solid #aaa !important; background: #fff !important;
+      word-break: break-word !important; overflow-wrap: break-word !important;
+      white-space: normal !important; overflow: visible !important;
+    }
+    textarea { min-height: 24px !important; }
+    .check-group label, .radio-group label, .check-group input[type="radio"] + span,
+    .category-tag { font-size: 6.5pt !important; padding: 2px 4px !important; }
+    .consideration { padding: 6px !important; margin-bottom: 6px !important; }
+    .consideration-q { font-size: 7.5pt !important; }
+    .consideration-note { display: none !important; }
+    .conclusion-option { padding: 4px 8px !important; font-size: 7.5pt !important; }
+    .sig-line { height: 15px !important; }
+    .sig-note { font-size: 6pt !important; }
+    .action-bar, #saved_note { display: none !important; }
+    .section { page-break-inside: avoid; }
   }
 </style>
 </head>
@@ -435,117 +469,76 @@
   const STORAGE_KEY = 'ik_general_assessment';
   const params = new URLSearchParams(window.location.search)
 
+  async function generateFormPdf() {
+    if (!window.html2canvas || !window.jspdf) throw new Error('PDF libraries failed to load.')
+    const formRoot = document.querySelector('.form-body')
+    if (!formRoot) throw new Error('Could not find form content.')
+
+    const canvas = await window.html2canvas(formRoot, {
+      scale: 1.5,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      scrollY: -window.scrollY,
+      onclone: (doc) => {
+        doc.querySelectorAll('.action-bar, #saved_note').forEach(el => el.style.display = 'none')
+        doc.querySelectorAll('input, textarea').forEach(el => {
+          el.style.overflow = 'visible'
+          el.style.whiteSpace = 'normal'
+          el.style.wordBreak = 'break-word'
+          el.style.overflowWrap = 'break-word'
+        })
+      },
+    })
+
+    const { jsPDF } = window.jspdf
+    const pageW = 210, pageH = 297, margin = 9
+    const usableW = pageW - margin * 2
+    const usableH = pageH - margin * 2
+    const pxPerMm = canvas.width / usableW
+    const contentH_mm = canvas.height / pxPerMm
+    const pdf = new jsPDF('p', 'mm', 'a4')
+
+    let yMm = 0, page = 0
+    while (yMm < contentH_mm) {
+      if (page > 0) pdf.addPage()
+      const sliceH_mm = Math.min(usableH, contentH_mm - yMm)
+      const sliceH_px = Math.ceil(sliceH_mm * pxPerMm)
+      const srcY_px = Math.round(yMm * pxPerMm)
+
+      const slice = document.createElement('canvas')
+      slice.width = canvas.width
+      slice.height = sliceH_px
+      const ctx = slice.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, slice.width, slice.height)
+      ctx.drawImage(canvas, 0, srcY_px, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, usableW, sliceH_mm)
+      yMm += usableH
+      page++
+    }
+
+    const now = new Date().toISOString().slice(0, 10)
+    const name = (document.getElementById('child_name')?.value || 'participant').trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'participant'
+    return { pdf, fileName: `mid-camp-assessment-${name}-${now}.pdf` }
+  }
+
   async function sendPdfToCampDb() {
     try {
       saveForm()
-
       if (!window.parent || window.parent === window) {
-        alert('Open this form inside Camp DB to send PDF directly to incident log.')
+        alert('Open this form inside Camp DB to send PDF directly to the log.')
         return
       }
-
-      if (!window.html2canvas || !window.jspdf) {
-        alert('PDF libraries failed to load. Please check internet access and try again.')
-        return
-      }
-
-      const formRoot = document.querySelector('.form-body')
-      if (!formRoot) {
-        alert('Could not find the form content to export.')
-        return
-      }
-
-      const captureScale = Math.min(2, window.devicePixelRatio || 2)
-      const canvas = await window.html2canvas(formRoot, {
-        scale: captureScale,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        scrollY: -window.scrollY,
-        onclone: (doc) => {
-          const cloneRoot = doc.querySelector('.form-body')
-          if (cloneRoot) {
-            cloneRoot.style.paddingBottom = '16px'
-            cloneRoot.style.boxSizing = 'border-box'
-          }
-          doc.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(function(el) {
-            el.style.paddingBottom = '6px'
-            el.style.overflow = 'visible'
-          })
-        },
-      })
-
-      const { jsPDF } = window.jspdf
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pageWidth = 210
-      const pageHeight = 297
-      const margin = 8
-      const usableWidth = pageWidth - margin * 2
-      const usableHeight = pageHeight - margin * 2
-
-      let jpegQuality = 0.88
-      let imgData = canvas.toDataURL('image/jpeg', jpegQuality)
-      const maxDataUrlLength = 4_800_000
-      while (imgData.length > maxDataUrlLength && jpegQuality > 0.5) {
-        jpegQuality -= 0.08
-        imgData = canvas.toDataURL('image/jpeg', jpegQuality)
-      }
-      const maxCanvasPixels = 7_000_000
-      let exportCanvas = canvas
-      const currentPixels = canvas.width * canvas.height
-      if (currentPixels > maxCanvasPixels) {
-        const ratio = Math.sqrt(maxCanvasPixels / currentPixels)
-        const resized = document.createElement('canvas')
-        resized.width = Math.max(1200, Math.floor(canvas.width * ratio))
-        resized.height = Math.max(1200, Math.floor(canvas.height * ratio))
-        const ctx = resized.getContext('2d')
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, resized.width, resized.height)
-        ctx.drawImage(canvas, 0, 0, resized.width, resized.height)
-        exportCanvas = resized
-      }
-
-      jpegQuality = 0.84
-      imgData = exportCanvas.toDataURL('image/jpeg', jpegQuality)
-      while (imgData.length > maxDataUrlLength && jpegQuality > 0.4) {
-        jpegQuality -= 0.08
-        imgData = exportCanvas.toDataURL('image/jpeg', jpegQuality)
-      }
-
-      const maxPdfHeight = usableHeight * 2
-      const baseImgHeight = (exportCanvas.height * usableWidth) / exportCanvas.width
-      const drawScale = baseImgHeight > maxPdfHeight ? (maxPdfHeight / baseImgHeight) : 1
-      const drawWidth = usableWidth * drawScale
-      const drawHeight = baseImgHeight * drawScale
-      const drawX = margin + ((usableWidth - drawWidth) / 2)
-
-      pdf.addImage(imgData, 'JPEG', drawX, margin, drawWidth, drawHeight)
-
-      if (drawHeight > usableHeight) {
-        pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', drawX, margin - usableHeight, drawWidth, drawHeight)
-      }
-
-      const now = new Date().toISOString().slice(0, 10)
-      const titleName = (document.getElementById('child_name')?.value || 'participant').trim().replace(/\s+/g, '-').toLowerCase()
-      const fileName = `mid-camp-assessment-${titleName || 'participant'}-${now}.pdf`
-
+      const { pdf, fileName } = await generateFormPdf()
       window.parent.postMessage(
-        {
-          type: 'campdb-form-pdf',
-          payload: {
-            base64Pdf: pdf.output('dataurlstring'),
-            fileName,
-            mimeType: 'application/pdf',
-          },
-        },
+        { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
         window.location.origin,
       )
-
       const note = document.getElementById('saved_note')
       note.textContent = 'PDF sent back to Camp DB. Return to reporting and click Save report.'
       setTimeout(() => { if (note.textContent.includes('PDF sent')) note.textContent = '' }, 5000)
     } catch (error) {
-      alert('Failed to send PDF to Camp DB: ' + error.message)
+      alert('Failed to send PDF: ' + error.message)
     }
   }
 

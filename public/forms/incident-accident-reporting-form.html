@@ -131,36 +131,39 @@
 
   /* ── Print styles ── */
   @media print {
-    @page { size: A4; margin: 8mm 10mm; }
+    @page { size: A4; margin: 7mm 9mm; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { background: #fff; font-size: 10pt; }
-    .header-banner { padding: 7px 12px; font-size: 8pt; }
-    .title-block { padding: 10px 12px 8px; border-bottom-width: 2px; }
-    .title-block .org { font-size: 13pt; }
-    .title-block .doc-title { font-size: 11pt; margin-top: 4px; }
-    .title-block .subtitle { font-size: 7pt; margin-top: 4px; }
+    body { background: #fff; font-size: 9pt; }
+    .header-banner { padding: 5px 10px; font-size: 7pt; letter-spacing: 1px; }
+    .title-block { padding: 7px 10px 5px; border-bottom-width: 2px; }
+    .title-block .org { font-size: 11pt; }
+    .title-block .doc-title { font-size: 10pt; margin-top: 2px; }
+    .title-block .subtitle { display: none; }
     .page { padding: 0; max-width: 100%; }
-    .intro { padding: 6px 10px; font-size: 8pt; margin-bottom: 8px; }
-    .section { padding: 8px 12px; margin-bottom: 8px; box-shadow: none; border: 1px solid #ccc; border-radius: 4px; }
-    .section-title { font-size: 8pt; padding-bottom: 4px; margin-bottom: 8px; }
-    .field { margin-bottom: 6px; }
-    .field label { font-size: 8pt; margin-bottom: 2px; }
-    .field .hint { font-size: 7pt; margin-bottom: 2px; }
-    input[type="text"], input[type="date"], input[type="time"], textarea { font-size: 9pt; padding: 4px 6px; border: 1px solid #aaa !important; background: #fff !important; }
-    textarea { min-height: 36px; }
-    .radio-group label, .check-group label { font-size: 8pt; padding: 3px 7px; border: 1px solid #ccc; }
-    .checklist-item { padding: 4px 7px; font-size: 8pt; border: 1px solid #ccc; }
-    .riddor-box { padding: 8px 10px; background: #fffdf0 !important; border: 1px solid #ccc !important; }
-    .riddor-title { font-size: 8pt; }
-    .body-svg { width: 120px; height: 210px; }
-    .action-bar, #toast { display: none !important; }
-    /* sectionD visibility is controlled by JS inline style — do not override here */
-    .sig-line { height: 22px; background: #fff !important; }
-    .sig-note { font-size: 7pt; }
-    .signoff-row { gap: 8px; }
-    .two-col, .three-col { gap: 8px; }
-    .body-diagram-wrapper { gap: 12px; }
-    .section:nth-child(n) { page-break-inside: avoid; }
+    .intro { display: none; }
+    .section { padding: 5px 9px; margin-bottom: 5px; box-shadow: none; border: 1px solid #ccc; border-radius: 3px; overflow: visible; }
+    .section-title { font-size: 7.5pt; padding: 4px 9px; margin: -5px -9px 6px; }
+    .field { margin-bottom: 4px; }
+    .field label { font-size: 7.5pt; margin-bottom: 1px; }
+    .field .hint { font-size: 6.5pt; margin-bottom: 1px; }
+    input[type="text"], input[type="date"], input[type="time"], textarea {
+      font-size: 8pt; padding: 2px 4px; border: 1px solid #aaa !important; background: #fff !important;
+      word-break: break-word; overflow-wrap: break-word; white-space: normal; overflow: visible;
+    }
+    textarea { min-height: 26px; }
+    .radio-group label, .check-group label { font-size: 6.5pt; padding: 2px 4px; border: 1px solid #ccc; }
+    .checklist { grid-template-columns: 1fr 1fr 1fr; }
+    .checklist-item { padding: 2px 5px; font-size: 6.5pt; border: 1px solid #ccc; }
+    .riddor-box { padding: 5px 7px; background: #fffdf0 !important; border: 1px solid #ccc !important; }
+    .riddor-title { font-size: 7pt; }
+    .body-svg { width: 80px; height: 140px; }
+    .body-diagram-wrapper { gap: 8px; }
+    .action-bar, #toast, #saved_note { display: none !important; }
+    .sig-line { height: 16px; background: #fff !important; }
+    .sig-note { font-size: 6pt; }
+    .signoff-row { gap: 5px; }
+    .two-col, .three-col, .four-col { gap: 5px; }
+    .section { page-break-inside: avoid; }
   }
 </style>
 </head>
@@ -385,15 +388,7 @@
         <div class="field" style="margin:0;"><label>Signature</label><div class="sig-line"></div><div class="sig-note">Sign</div></div>
       </div>
     </div>
-    <div style="padding-top:12px;border-top:1px solid #eee;">
-      <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:8px;">Camp Coordinator review</div>
-      <div class="signoff-row">
-        <div class="field" style="margin:0;"><label>Name</label><input type="text" value="Sam Brenner"/></div>
-        <div class="field" style="margin:0;"><label>Date reviewed</label><input type="date"/></div>
-        <div class="field" style="margin:0;"><label>Signature</label><div class="sig-line"></div><div class="sig-note">Sign on printed copy</div></div>
-      </div>
-      <div class="field" style="margin-top:10px;"><label>Further notes / actions</label><textarea id="f-furthernotes" style="min-height:44px;" placeholder="e.g. safeguarding referral, RIDDOR report, policy review..."></textarea></div>
-    </div>
+
   </div>
 
   <div class="saved-note" id="saved_note"></div>
@@ -503,112 +498,74 @@
     note.textContent = ''
   }
 
+  async function generateFormPdf() {
+    if (!window.html2canvas || !window.jspdf) throw new Error('PDF libraries failed to load.')
+    const formRoot = document.querySelector('.page')
+    if (!formRoot) throw new Error('Could not find the form content to export.')
+
+    const canvas = await window.html2canvas(formRoot, {
+      scale: 1.5,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      scrollY: -window.scrollY,
+      onclone: (doc) => {
+        doc.querySelectorAll('.action-bar, #saved_note').forEach(el => el.style.display = 'none')
+        doc.querySelectorAll('input, textarea').forEach(el => {
+          el.style.overflow = 'visible'
+          el.style.whiteSpace = 'normal'
+          el.style.wordBreak = 'break-word'
+          el.style.overflowWrap = 'break-word'
+        })
+      },
+    })
+
+    const { jsPDF } = window.jspdf
+    const pageW = 210, pageH = 297, margin = 9
+    const usableW = pageW - margin * 2
+    const usableH = pageH - margin * 2
+
+    // Scale so canvas width fits the usable page width
+    const pxPerMm = canvas.width / usableW
+    const contentH_mm = canvas.height / pxPerMm
+    const pdf = new jsPDF('p', 'mm', 'a4')
+
+    let yMm = 0, page = 0
+    while (yMm < contentH_mm) {
+      if (page > 0) pdf.addPage()
+      const sliceH_mm = Math.min(usableH, contentH_mm - yMm)
+      const sliceH_px = Math.ceil(sliceH_mm * pxPerMm)
+      const srcY_px = Math.round(yMm * pxPerMm)
+
+      const slice = document.createElement('canvas')
+      slice.width = canvas.width
+      slice.height = sliceH_px
+      const ctx = slice.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, slice.width, slice.height)
+      ctx.drawImage(canvas, 0, srcY_px, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
+
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.88), 'JPEG', margin, margin, usableW, sliceH_mm)
+      yMm += usableH
+      page++
+    }
+
+    const now = new Date().toISOString().slice(0, 10)
+    const name = (document.getElementById('f-name')?.value || 'participant').trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'participant'
+    return { pdf, fileName: `incident-accident-${name}-${now}.pdf` }
+  }
+
   async function sendPdfToCampDb() {
     try {
       saveForm()
-
       if (!window.parent || window.parent === window) {
         alert('Open this form inside Camp DB to send PDF directly to incident log.')
         return
       }
-
-      if (!window.html2canvas || !window.jspdf) {
-        alert('PDF libraries failed to load. Please check internet access and try again.')
-        return
-      }
-
-      const formRoot = document.querySelector('.page')
-      if (!formRoot) {
-        alert('Could not find the form content to export.')
-        return
-      }
-
-      const captureScale = Math.min(2, window.devicePixelRatio || 2)
-      const canvas = await window.html2canvas(formRoot, {
-        scale: captureScale,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        scrollY: -window.scrollY,
-        onclone: (doc) => {
-          const cloneRoot = doc.querySelector('.page')
-          if (cloneRoot) {
-            cloneRoot.style.paddingBottom = '16px'
-            cloneRoot.style.boxSizing = 'border-box'
-          }
-          doc.querySelectorAll('input[type="text"], input[type="date"], input[type="time"], textarea').forEach(function(el) {
-            el.style.paddingBottom = '6px'
-            el.style.overflow = 'visible'
-          })
-        },
-      })
-
-      const { jsPDF } = window.jspdf
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pageWidth = 210
-      const pageHeight = 297
-      const margin = 8
-      const usableWidth = pageWidth - margin * 2
-      const usableHeight = pageHeight - margin * 2
-
-      let jpegQuality = 0.88
-      let imgData = canvas.toDataURL('image/jpeg', jpegQuality)
-      const maxDataUrlLength = 4_800_000
-      while (imgData.length > maxDataUrlLength && jpegQuality > 0.5) {
-        jpegQuality -= 0.08
-        imgData = canvas.toDataURL('image/jpeg', jpegQuality)
-      }
-      const maxCanvasPixels = 7_000_000
-      let exportCanvas = canvas
-      const currentPixels = canvas.width * canvas.height
-      if (currentPixels > maxCanvasPixels) {
-        const ratio = Math.sqrt(maxCanvasPixels / currentPixels)
-        const resized = document.createElement('canvas')
-        resized.width = Math.max(1200, Math.floor(canvas.width * ratio))
-        resized.height = Math.max(1200, Math.floor(canvas.height * ratio))
-        const ctx = resized.getContext('2d')
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, resized.width, resized.height)
-        ctx.drawImage(canvas, 0, 0, resized.width, resized.height)
-        exportCanvas = resized
-      }
-
-      jpegQuality = 0.84
-      imgData = exportCanvas.toDataURL('image/jpeg', jpegQuality)
-      while (imgData.length > maxDataUrlLength && jpegQuality > 0.4) {
-        jpegQuality -= 0.08
-        imgData = exportCanvas.toDataURL('image/jpeg', jpegQuality)
-      }
-
-      const maxPdfHeight = usableHeight * 2
-      const baseImgHeight = (exportCanvas.height * usableWidth) / exportCanvas.width
-      const drawScale = baseImgHeight > maxPdfHeight ? (maxPdfHeight / baseImgHeight) : 1
-      const drawWidth = usableWidth * drawScale
-      const drawHeight = baseImgHeight * drawScale
-      const drawX = margin + ((usableWidth - drawWidth) / 2)
-
-      pdf.addImage(imgData, 'JPEG', drawX, margin, drawWidth, drawHeight)
-
-      if (drawHeight > usableHeight) {
-        pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', drawX, margin - usableHeight, drawWidth, drawHeight)
-      }
-
-      const now = new Date().toISOString().slice(0, 10)
-      const titleName = (document.getElementById('f-name')?.value || 'participant').trim().replace(/\s+/g, '-').toLowerCase()
-      const fileName = `incident-accident-${titleName || 'participant'}-${now}.pdf`
-
+      const { pdf, fileName } = await generateFormPdf()
       window.parent.postMessage(
-        {
-          type: 'campdb-form-pdf',
-          payload: {
-            base64Pdf: pdf.output('dataurlstring'),
-            fileName,
-            mimeType: 'application/pdf',
-          },
-        },
+        { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
         window.location.origin,
       )
-
       const note = document.getElementById('saved_note')
       note.textContent = 'PDF sent back to Camp DB. Return to reporting and click Save report.'
       setTimeout(() => { if (note.textContent.includes('PDF sent')) note.textContent = '' }, 5000)
