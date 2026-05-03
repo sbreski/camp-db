@@ -20,12 +20,40 @@ function formatParentLabel(name) {
   return clean ? `${clean} (Parent)` : ''
 }
 
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase()
+}
 
-export default function Parents({ participants, onUpdateParticipant }) {
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '')
+}
+
+function getDefaultLinkedParticipantIds(participant, allParticipants) {
+  const nameKey = normalizeText(participant.parentName)
+  const emailKey = normalizeText(participant.parentEmail)
+  const phoneKey = normalizePhone(participant.parentPhone)
+
+  const matches = allParticipants
+    .filter(p => {
+      if (participant.id === p.id) return true
+      const sameName = nameKey && normalizeText(p.parentName) === nameKey
+      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
+      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
+      return sameName || sameEmail || samePhone
+    })
+    .map(p => p.id)
+
+  return matches.length > 0 ? matches : [participant.id]
+}
+
+
+export default function Parents({ participants, onUpdateParticipants }) {
   const [search, setSearch] = useState('')
   const [selectedParents, setSelectedParents] = useState(new Set())
   const [editingId, setEditingId] = useState(null)
+  const [editingContact, setEditingContact] = useState({ parentName: '', parentEmail: '', parentPhone: '' })
   const [editingAdults, setEditingAdults] = useState([])
+  const [editingLinkedParticipantIds, setEditingLinkedParticipantIds] = useState([])
   const [newAdult, setNewAdult] = useState('')
   const [sortBy, setSortBy] = useState('parent') // 'parent' or 'child'
 
@@ -45,13 +73,21 @@ export default function Parents({ participants, onUpdateParticipant }) {
       adults.unshift(formatParentLabel(participant.parentName))
     }
     setEditingId(participant.id)
+    setEditingContact({
+      parentName: participant.parentName || '',
+      parentEmail: participant.parentEmail || '',
+      parentPhone: participant.parentPhone || '',
+    })
     setEditingAdults(adults)
+    setEditingLinkedParticipantIds(getDefaultLinkedParticipantIds(participant, participants))
     setNewAdult('')
   }
 
   function cancelEdit() {
     setEditingId(null)
+    setEditingContact({ parentName: '', parentEmail: '', parentPhone: '' })
     setEditingAdults([])
+    setEditingLinkedParticipantIds([])
     setNewAdult('')
   }
 
@@ -68,12 +104,35 @@ export default function Parents({ participants, onUpdateParticipant }) {
     setEditingAdults(prev => prev.filter((_, i) => i !== index))
   }
 
-  function saveAdults(participant) {
-    const normalized = [...editingAdults]
-    if (participant.parentName && !hasSameAdult(normalized, participant.parentName)) {
-      normalized.unshift(formatParentLabel(participant.parentName))
+  function updateAdult(index, value) {
+    setEditingAdults(prev => prev.map((adult, i) => (i === index ? value : adult)))
+  }
+
+  function toggleLinkedParticipant(participantId) {
+    setEditingLinkedParticipantIds(prev => (
+      prev.includes(participantId)
+        ? prev.filter(id => id !== participantId)
+        : [...prev, participantId]
+    ))
+  }
+
+  function saveEdits(participant) {
+    const normalizedAdults = editingAdults
+      .map(adult => adult.trim())
+      .filter(Boolean)
+
+    const parentName = editingContact.parentName.trim()
+    if (parentName && !hasSameAdult(normalizedAdults, parentName)) {
+      normalizedAdults.unshift(formatParentLabel(parentName))
     }
-    onUpdateParticipant(participant.id, normalized.join(', '))
+
+    const targetIds = editingLinkedParticipantIds.length > 0 ? editingLinkedParticipantIds : [participant.id]
+    onUpdateParticipants(targetIds, {
+      parentName,
+      parentEmail: editingContact.parentEmail.trim(),
+      parentPhone: editingContact.parentPhone.trim(),
+      approvedAdults: normalizedAdults.join(', '),
+    })
     cancelEdit()
   }
 
@@ -191,6 +250,11 @@ export default function Parents({ participants, onUpdateParticipant }) {
                 {filtered.map(p => {
                   const adults = parseApprovedAdults(p.approvedAdults)
                   const isSelected = selectedParents.has(p.id)
+                  const linkedParticipants = editingId === p.id
+                    ? participants
+                      .filter(candidate => editingLinkedParticipantIds.includes(candidate.id))
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                    : []
                   return (
                     <Fragment key={p.id}>
                       <tr className={`border-b border-stone-100 hover:bg-stone-50 transition-colors ${isSelected ? 'bg-forest-50' : ''}`}>
@@ -258,15 +322,24 @@ export default function Parents({ participants, onUpdateParticipant }) {
                     </tr>
                     {editingId === p.id && (
                       <tr className="bg-stone-50">
-                        <td colSpan="7" className="px-4 py-3">
+                        <td colSpan="8" className="px-4 py-3">
                           <div className="rounded-2xl border border-stone-200 bg-white p-4 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                            <div className="flex flex-col gap-1 border-b border-stone-100 pb-3">
+                              <p className="text-sm font-semibold text-forest-950">
+                                Editing parent details for: {p.name}
+                              </p>
+                              <p className="text-xs text-stone-500">
+                                Changes will apply to {editingLinkedParticipantIds.length || 1} linked participant(s).
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               <div>
                                 <label className="label">Parent/Guardian Name</label>
                                 <input
                                   className="input"
-                                  value={p.parentName || ''}
-                                  onChange={e => onUpdateParticipant(p.id, { parentName: e.target.value })}
+                                  value={editingContact.parentName}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parentName: e.target.value }))}
                                   placeholder="Parent name"
                                 />
                               </div>
@@ -275,8 +348,8 @@ export default function Parents({ participants, onUpdateParticipant }) {
                                 <input
                                   className="input"
                                   type="email"
-                                  value={p.parentEmail || ''}
-                                  onChange={e => onUpdateParticipant(p.id, { parentEmail: e.target.value })}
+                                  value={editingContact.parentEmail}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parentEmail: e.target.value }))}
                                   placeholder="parent@email.com"
                                 />
                               </div>
@@ -285,12 +358,41 @@ export default function Parents({ participants, onUpdateParticipant }) {
                                 <input
                                   className="input"
                                   type="tel"
-                                  value={p.parentPhone || ''}
-                                  onChange={e => onUpdateParticipant(p.id, { parentPhone: e.target.value })}
+                                  value={editingContact.parentPhone}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parentPhone: e.target.value }))}
                                   placeholder="+44 7700 000000"
                                 />
                               </div>
                             </div>
+
+                            <div className="space-y-2">
+                              <label className="label">Linked Participant(s)</label>
+                              <div className="max-h-40 overflow-y-auto rounded-xl border border-stone-200 p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {participants
+                                  .slice()
+                                  .sort((a, b) => a.name.localeCompare(b.name))
+                                  .map(participant => {
+                                    const checked = editingLinkedParticipantIds.includes(participant.id)
+                                    return (
+                                      <label key={participant.id} className="inline-flex items-center gap-2 text-sm text-stone-700">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => toggleLinkedParticipant(participant.id)}
+                                          className="rounded border-stone-300 text-forest-600 focus:ring-forest-500"
+                                        />
+                                        <span>{participant.name}</span>
+                                      </label>
+                                    )
+                                  })}
+                              </div>
+                              {linkedParticipants.length > 0 && (
+                                <p className="text-xs text-stone-500">
+                                  Selected: {linkedParticipants.map(lp => lp.name).join(', ')}
+                                </p>
+                              )}
+                            </div>
+
                             <div className="flex gap-2 flex-col sm:flex-row items-stretch">
                               <input
                                 className="input flex-1"
@@ -301,18 +403,27 @@ export default function Parents({ participants, onUpdateParticipant }) {
                               />
                               <button type="button" onClick={addAdult} className="btn-secondary w-full sm:w-auto">Add</button>
                             </div>
-                            <div className="flex flex-wrap gap-2 mt-3">
+                            <div className="space-y-2 mt-1">
+                              <label className="label">Approved Adults (Numbered)</label>
                               {editingAdults.length === 0 ? (
                                 <span className="text-sm text-stone-500">No approved adults yet.</span>
                               ) : editingAdults.map((adult, i) => (
-                                <span key={`${adult}-${i}`} className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-sm text-stone-700">
-                                  {adult}
-                                  <button type="button" onClick={() => removeAdult(i)} className="text-stone-500 hover:text-red-600">×</button>
-                                </span>
+                                <div key={`${adult}-${i}`} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2">
+                                  <span className="w-6 h-6 rounded-full bg-stone-200 flex items-center justify-center text-xs font-bold text-stone-700">
+                                    {i + 1}
+                                  </span>
+                                  <input
+                                    className="input h-9 py-1.5"
+                                    value={adult}
+                                    onChange={e => updateAdult(i, e.target.value)}
+                                    placeholder="Adult name (relationship)"
+                                  />
+                                  <button type="button" onClick={() => removeAdult(i)} className="btn-secondary text-xs px-2 py-1">Remove</button>
+                                </div>
                               ))}
                             </div>
                             <div className="mt-4 flex gap-2 flex-wrap">
-                              <button type="button" onClick={() => saveAdults(p)} className="btn-primary">Save</button>
+                              <button type="button" onClick={() => saveEdits(p)} className="btn-primary">Save Changes</button>
                               <button type="button" onClick={cancelEdit} className="btn-secondary">Cancel</button>
                             </div>
                           </div>

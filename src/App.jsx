@@ -1598,8 +1598,9 @@ export default function App() {
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'participants': return <Participants participants={participants} setParticipants={setParticipants} onView={(id) => navigate('participant', id)} />
-      case 'parents': return <Parents participants={participants} onUpdateParticipant={(id, approvedAdults) => {
-        setParticipants(prev => prev.map(p => p.id === id ? { ...p, approvedAdults } : p))
+      case 'parents': return <Parents participants={participants} onUpdateParticipants={(ids, updates) => {
+        const targetIds = Array.isArray(ids) ? ids : [ids]
+        setParticipants(prev => prev.map(p => (targetIds.includes(p.id) ? { ...p, ...updates } : p)))
       }} />
       case 'dressing-rooms': return <DressingRooms participants={participants} />
       case 'documents': return <Documents canViewSafeguarding={canViewSafeguarding} isOwnerUser={isOwnerUser} actorInitials={actorInitials} />
