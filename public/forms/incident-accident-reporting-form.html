@@ -471,8 +471,50 @@
     const USABLE_H_MM = PAGE_H_MM - MARGIN_MM * 2
     const SCALE = 2
 
-    // Common html2canvas options for consistency
-    const hcOpts = (el) => ({
+    // Inject a temporary stylesheet to expand inputs in the live DOM so that
+    // getBoundingClientRect() measurements match the canvas render output.
+    const tempStyle = document.createElement('style')
+    tempStyle.textContent = [
+      'input, textarea, select {',
+      '  overflow: visible !important; height: auto !important;',
+      '  padding-bottom: 4px !important; line-height: 1.6 !important;',
+      '  word-break: break-word !important; overflow-wrap: break-word !important;',
+      '  white-space: normal !important; box-sizing: border-box !important;',
+      '}',
+      'textarea { min-height: 30px !important; }',
+      '.action-bar, #saved_note, .intro { display: none !important; }',
+    ].join('\n')
+    document.head.appendChild(tempStyle)
+
+    // Force reflow so measurements reflect the expanded-input layout.
+    formRoot.getBoundingClientRect()
+
+    // Collect "atom" bounding rects — elements that must not be split across pages.
+    // Page breaks are allowed between atoms (e.g. between fields in a section)
+    // but never within one. Grid containers are treated as single atoms so their
+    // cells are always kept on the same row.
+    const ATOM_SEL = [
+      '.field', '.section-title', '.header-banner', '.title-block',
+      '.body-diagram-wrapper', '.checklist', '.signoff-row',
+      '.two-col', '.three-col', '.four-col',
+    ].join(', ')
+
+    const atoms = Array.from(formRoot.querySelectorAll(ATOM_SEL)).filter(el => {
+      const s = window.getComputedStyle(el)
+      if (s.display === 'none' || s.visibility === 'hidden') return false
+      // Keep only the outermost atom — skip elements nested inside another atom
+      // (e.g. .field inside .two-col; .two-col is the atom that matters).
+      return !el.parentElement || !el.parentElement.closest(ATOM_SEL)
+    }).map(el => {
+      const r = el.getBoundingClientRect()
+      return {
+        top_px: (r.top + window.scrollY) * SCALE,
+        bottom_px: (r.bottom + window.scrollY) * SCALE,
+      }
+    })
+
+    // Render the entire form root to one tall canvas.
+    const canvas = await window.html2canvas(formRoot, {
       scale: SCALE,
       useCORS: true,
       backgroundColor: '#ffffff',
@@ -493,106 +535,58 @@
       },
     })
 
-    // Gather visible top-level children as capture targets
-    const targets = Array.from(formRoot.children).filter(el => {
-      if (el.id === 'saved_note') return false
-      const s = window.getComputedStyle(el)
-      return s.display !== 'none' && s.visibility !== 'hidden'
-    })
+    // Remove the temporary measurement style.
+    document.head.removeChild(tempStyle)
 
-    // Render each target to its own canvas so we get the true rendered height
-    const chunks = []
-    for (const el of targets) {
-      const canvas = await window.html2canvas(el, hcOpts(el))
-      // mm height: canvas is SCALE * CSS-px tall; CSS-px at 96dpi → mm
-      const h_mm = (canvas.height / SCALE) * (25.4 / 96)
-      // Scale width to fit page
-      const w_mm = (canvas.width / SCALE) * (25.4 / 96)
-      const drawScale = USABLE_W_MM / w_mm
-      const drawH_mm = h_mm * drawScale
+    // Derive the canvas-px → page-mm scale (accounts for width fitting).
+    const cssW_mm = (canvas.width / SCALE) * (25.4 / 96)
+    const pxToMm = ((25.4 / 96) / SCALE) * (USABLE_W_MM / cssW_mm)
+    const USABLE_H_px = USABLE_H_MM / pxToMm
 
-      if (drawH_mm <= USABLE_H_MM) {
-        // Fits on one page — keep as single chunk
-        chunks.push({ canvas, drawH_mm })
-      } else {
-        // Taller than one page — try to split on its own children
-        const subs = Array.from(el.children).filter(c => {
-          const s = window.getComputedStyle(c)
-          return s.display !== 'none'
-        })
-        if (subs.length > 1) {
-          for (const sub of subs) {
-            const sc = await window.html2canvas(sub, hcOpts(sub))
-            const sh_mm = (sc.height / SCALE) * (25.4 / 96)
-            const sw_mm = (sc.width / SCALE) * (25.4 / 96)
-            const sScale = USABLE_W_MM / sw_mm
-            chunks.push({ canvas: sc, drawH_mm: sh_mm * sScale })
-          }
-        } else {
-          chunks.push({ canvas, drawH_mm })
-        }
-      }
-    }
-
-    // Bin-pack onto A4 pages
+    // Slice the canvas into A4 pages, cutting only at safe points between atoms.
     const pdf = new jsPDF('p', 'mm', 'a4')
-    let curY = MARGIN_MM
-    let firstPage = true
+    const totalH_px = canvas.height
+    let pageStartPx = 0
+    let isFirst = true
 
-    for (const { canvas, drawH_mm } of chunks) {
-      if (!firstPage && curY + drawH_mm > PAGE_H_MM - MARGIN_MM) {
-        pdf.addPage()
-        curY = MARGIN_MM
-      }
-      firstPage = false
+    while (pageStartPx < totalH_px - 1) {
+      if (!isFirst) pdf.addPage()
+      isFirst = false
 
-      // If even a single chunk is taller than a page, slice it
-      let remainCanvas = canvas
-      let remainH_mm = drawH_mm
+      const idealCutPx = pageStartPx + USABLE_H_px
+      let cutPx
 
-      while (remainH_mm > 0) {
-        const availH_mm = PAGE_H_MM - MARGIN_MM - curY
-        if (remainH_mm <= availH_mm + 0.5) {
-          // Fits — draw it
-          pdf.addImage(remainCanvas.toDataURL('image/jpeg', 0.92), 'JPEG',
-            MARGIN_MM, curY, USABLE_W_MM, remainH_mm)
-          curY += remainH_mm
-          remainH_mm = 0
+      if (idealCutPx >= totalH_px) {
+        cutPx = totalH_px
+      } else {
+        // Prefer: bottom of the last atom that fits fully on this page.
+        const fullyFitting = atoms.filter(a => a.top_px >= pageStartPx && a.bottom_px <= idealCutPx)
+        if (fullyFitting.length > 0) {
+          cutPx = fullyFitting[fullyFitting.length - 1].bottom_px
         } else {
-          // Slice at availH
-          const ratio = availH_mm / remainH_mm
-          const takeH_px = Math.floor(remainCanvas.height * ratio)
-
-          const topSlice = document.createElement('canvas')
-          topSlice.width = remainCanvas.width
-          topSlice.height = takeH_px
-          const ctx1 = topSlice.getContext('2d')
-          ctx1.fillStyle = '#fff'
-          ctx1.fillRect(0, 0, topSlice.width, topSlice.height)
-          ctx1.drawImage(remainCanvas, 0, 0, remainCanvas.width, takeH_px,
-                                       0, 0, remainCanvas.width, takeH_px)
-
-          pdf.addImage(topSlice.toDataURL('image/jpeg', 0.92), 'JPEG',
-            MARGIN_MM, curY, USABLE_W_MM, availH_mm)
-
-          // Bottom slice becomes the new remainCanvas
-          const botH_px = remainCanvas.height - takeH_px
-          const botSlice = document.createElement('canvas')
-          botSlice.width = remainCanvas.width
-          botSlice.height = botH_px
-          const ctx2 = botSlice.getContext('2d')
-          ctx2.fillStyle = '#fff'
-          ctx2.fillRect(0, 0, botSlice.width, botH_px)
-          ctx2.drawImage(remainCanvas, 0, takeH_px, remainCanvas.width, botH_px,
-                                       0, 0, remainCanvas.width, botH_px)
-
-          remainCanvas = botSlice
-          remainH_mm -= availH_mm
-
-          pdf.addPage()
-          curY = MARGIN_MM
+          // No atom fully fits — cut just before the first atom that would
+          // otherwise be split, or fall back to the ideal position.
+          const nextAtom = atoms.find(a => a.top_px > pageStartPx + 1)
+          cutPx = (nextAtom && nextAtom.top_px < idealCutPx) ? nextAtom.top_px : idealCutPx
         }
       }
+
+      // Safety: always advance to prevent infinite loops.
+      if (cutPx <= pageStartPx) cutPx = Math.min(pageStartPx + USABLE_H_px, totalH_px)
+
+      const sliceH_px = Math.round(cutPx - pageStartPx)
+      const sliceCanvas = document.createElement('canvas')
+      sliceCanvas.width = canvas.width
+      sliceCanvas.height = sliceH_px
+      const ctx = sliceCanvas.getContext('2d')
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(0, 0, canvas.width, sliceH_px)
+      ctx.drawImage(canvas, 0, pageStartPx, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
+
+      const sliceH_mm = sliceH_px * pxToMm
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_MM, MARGIN_MM, USABLE_W_MM, sliceH_mm)
+
+      pageStartPx = Math.round(cutPx)
     }
 
     const now = new Date().toISOString().slice(0, 10)
