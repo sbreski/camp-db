@@ -993,6 +993,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
 
   const [search, setSearch] = useState('')
   const [filterSeason, setFilterSeason] = useState('all') // all | active | inactive
+  const [firstAidOnly, setFirstAidOnly] = useState(false)
   const [trainingById, setTrainingById] = useState({})
   const [liveTrainingCounts, setLiveTrainingCounts] = useState({ firstAid: null, safeguarding: null })
 
@@ -1385,14 +1386,13 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
     if (filterSeason === 'active') list = list.filter(s => !isInactiveForFilter(s))
     if (filterSeason === 'inactive') list = list.filter(s => isInactiveForFilter(s))
+    if (firstAidOnly) list = list.filter(s => (trainingById[s.id] || getTrainingMeta(s)).firstAidTrained)
     return list
-  }, [staffList, search, filterSeason, loginUserByEmail])
+  }, [staffList, search, filterSeason, firstAidOnly, loginUserByEmail, trainingById])
 
   const activeCount = staffList.filter(s => !isInactiveForFilter(s)).length
   const faCountFallback = staffList.filter(s => (trainingById[s.id] || getTrainingMeta(s)).firstAidTrained).length
-  const sgCountFallback = staffList.filter(s => (trainingById[s.id] || getTrainingMeta(s)).safeguardingTrained).length
   const faCount = liveTrainingCounts.firstAid ?? faCountFallback
-  const sgCount = liveTrainingCounts.safeguarding ?? sgCountFallback
 
   // Detect missing training columns: if the DB column doesn't exist, select('*') simply
   // won't return it, so the key is entirely absent from every staffList member.
@@ -1479,7 +1479,29 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Staff</h2>
           <p className="text-stone-500 text-sm">
-            {activeCount} active this season · {faCount} first aid · {sgCount} safeguarding
+            {activeCount} active this season ·
+            {' '}
+            <button
+              type="button"
+              onClick={() => setFirstAidOnly(prev => !prev)}
+              className={`underline underline-offset-2 font-medium transition-colors ${
+                firstAidOnly ? 'text-forest-900' : 'text-stone-600 hover:text-forest-800'
+              }`}
+            >
+              {faCount} first aid
+            </button>
+            {firstAidOnly && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  onClick={() => setFirstAidOnly(false)}
+                  className="text-xs text-stone-500 hover:text-forest-800 underline underline-offset-2"
+                >
+                  Clear
+                </button>
+              </>
+            )}
           </p>
         </div>
         <button onClick={() => { setShowForm(true); setSelected(null); setEditingMember(null) }}
