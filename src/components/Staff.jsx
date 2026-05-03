@@ -20,7 +20,8 @@ const TAB_OPTIONS = [
   { id: 'dressing-rooms', label: 'Dressing Rooms' },
   { id: 'medical',        label: 'Medical' },
   { id: 'behaviour',      label: 'Behaviour Log' },
-  { id: 'incidents',      label: 'Reporting' },
+  { id: 'log-incidents',  label: 'Log Incidents' },
+  { id: 'incidents',      label: 'Reports' },
   { id: 'staff',          label: 'Staff' },
   { id: 'documents',      label: 'Documents' },
 ]

@@ -87,6 +87,7 @@ const ROUTE_PREFETCHERS = {
   behaviour: loadBehaviourLogs,
   timetable: loadTimetable,
   incidents: loadIncidents,
+  'log-incidents': loadIncidents,
   staff: loadStaff,
   documents: loadDocuments,
 }
@@ -103,6 +104,7 @@ const TAB_PATHS = {
   behaviour: '/behaviour',
   timetable: '/timetable',
   incidents: '/incidents',
+  'log-incidents': '/log-incidents',
   staff: '/staff',
   documents: '/documents',
 }
@@ -358,14 +360,14 @@ export default function App() {
   const tableCacheScope = currentUser?.id || 'anon'
   const tableQueriesEnabled = authed && !authLoading
 
-  const needsParticipants = ['dashboard', 'signin', 'shared-info', 'attendance', 'star-of-day', 'participants', 'participant', 'parents', 'dressing-rooms', 'medical', 'incidents', 'behaviour'].includes(page)
+  const needsParticipants = ['dashboard', 'signin', 'shared-info', 'attendance', 'star-of-day', 'participants', 'participant', 'parents', 'dressing-rooms', 'medical', 'incidents', 'log-incidents', 'behaviour'].includes(page)
   const needsAttendance = ['dashboard', 'signin', 'attendance', 'participant'].includes(page)
-  const needsIncidents = ['dashboard', 'signin', 'participant', 'incidents', 'behaviour'].includes(page)
+  const needsIncidents = ['dashboard', 'signin', 'participant', 'incidents', 'log-incidents', 'behaviour'].includes(page)
   const needsMedicationAdministration = ['signin', 'medical', 'dashboard'].includes(page)
   const needsBehaviourLogs = ['behaviour'].includes(page)
   const needsTimetable = ['timetable'].includes(page)
   const needsStarOfDay = ['star-of-day'].includes(page)
-  const needsStaff = ['participant', 'incidents', 'staff', 'documents', 'timetable'].includes(page) || permissionsLoading
+  const needsStaff = ['participant', 'incidents', 'log-incidents', 'staff', 'documents', 'timetable'].includes(page) || permissionsLoading
 
   const [rawParticipants, , loadingP, reloadP] = useSupabaseTable('participants', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsParticipants, cacheScope: tableCacheScope })
   const [rawAttendance, , loadingA, reloadA] = useSupabaseTable('attendance', 'date', { enabled: tableQueriesEnabled && needsAttendance, cacheScope: tableCacheScope })
@@ -1000,12 +1002,13 @@ export default function App() {
       setCanViewTimetableOverview(false)
       setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
-      return
-    }
-
-    const userEmail = (user.email || '').toLowerCase()
-    if (OWNER_EMAIL && userEmail === OWNER_EMAIL) {
-      setIsAdminUser(true)
+      return (
+        allowedTabIds.includes('participants')
+        || allowedTabIds.includes('incidents')
+        || allowedTabIds.includes('log-incidents')
+        || allowedTabIds.includes('medical')
+        || allowedTabIds.includes('parents')
+      )
       setAllowedTabIds(ALL_TABS)
       setCanViewTimetableOverview(true)
       setCanViewSafeguardingPerm(true)
@@ -1372,7 +1375,7 @@ export default function App() {
   useEffect(() => {
     if (!authed || permissionsLoading) return
 
-    const likelyTabs = ['dashboard', 'signin', 'participants', 'incidents', 'attendance', 'star-of-day', 'medical', 'documents']
+    const likelyTabs = ['dashboard', 'signin', 'participants', 'incidents', 'log-incidents', 'attendance', 'star-of-day', 'medical', 'documents']
       .filter(tab => allowedTabIds.includes(tab) && tab !== page)
       .slice(0, 4)
 
@@ -1643,6 +1646,7 @@ export default function App() {
         />
       )
       case 'incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} setParticipants={setParticipants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={isOwnerUser || isAdminUser} onNavigate={navigate} onView={(id) => navigate('participant', id)} />
+      case 'log-incidents': return <Incidents incidents={incidents} setIncidents={setIncidents} participants={participants} setParticipants={setParticipants} staffList={staffList} actorInitials={actorInitials} actorUserId={currentUser?.id || ''} currentStaffName={actorFullName || currentUserEmail} canViewSafeguarding={canViewSafeguarding} canViewParticipant={false} logOnly={true} onNavigate={navigate} onView={(id) => navigate('participant', id)} />
       case 'staff': return <Staff staffList={staffList} setStaffList={setStaffList} campPeriods={campPeriods} setCampPeriods={setCampPeriods} canManageCampPeriod={isOwnerUser || isAdminUser} />
       default: return null
     }

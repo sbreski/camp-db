@@ -31,9 +31,11 @@ function resolvedAtForIncident(incident) {
   return incident.resolvedAt || incident.resolved_at || null
 }
 
-function canAccessIncidentUpdates(incident, canViewSafeguarding) {
+function canAccessIncidentUpdates(incident, canViewSafeguarding, actorUserId) {
   if (incident.type !== 'Safeguarding') return true
-  return Boolean(canViewSafeguarding)
+  if (Boolean(canViewSafeguarding)) return true
+  if (actorUserId && createdUserIdForIncident(incident) === actorUserId) return true
+  return false
 }
 
 function incidentNotesForIncident(incident) {
@@ -46,7 +48,7 @@ function incidentDocumentsForIncident(incident) {
   return Array.isArray(docs) ? docs : []
 }
 
-export default function Incidents({ incidents, setIncidents, participants, setParticipants, attendance = [], setAttendance, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, onNavigate, onView }) {
+export default function Incidents({ incidents, setIncidents, participants, setParticipants, attendance = [], setAttendance, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, logOnly = false, onNavigate, onView }) {
   const [showForm, setShowForm] = useState(false)
   const [selectedParticipant, setSelectedParticipant] = useState('')
   const [editingIncidentId, setEditingIncidentId] = useState(null)
@@ -299,7 +301,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     setOpeningIncidentId(inc.id)
     try {
       if (inc.type === 'Safeguarding') {
-        if (!canViewSafeguarding) {
+        const canAccessOwn = logOnly && createdUserIdForIncident(inc) === actorUserId
+        if (!canViewSafeguarding && !canAccessOwn) {
           alert('Safeguarding report access is restricted.')
           return
         }
@@ -328,7 +331,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       let sourceUrl = ''
 
       if (inc.type === 'Safeguarding') {
-        if (!canViewSafeguarding) {
+        const canAccessOwn = logOnly && createdUserIdForIncident(inc) === actorUserId
+        if (!canViewSafeguarding && !canAccessOwn) {
           alert('Safeguarding report access is restricted.')
           return
         }
@@ -393,7 +397,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function addIncidentNote(incident) {
-    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding, actorUserId)) return
     const noteText = String(noteDraftByIncident[incident.id] || '').trim()
     if (!noteText) return
 
@@ -466,7 +470,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function uploadIncidentDocument(incident, file) {
-    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding, actorUserId)) return
     if (!file) return
     if (file.size > 8 * 1024 * 1024) {
       alert('File must be under 8MB.')
@@ -505,7 +509,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function deleteIncidentNote(incident, noteId) {
-    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding, actorUserId)) return
     if (!window.confirm('Delete this note? You can recover it later.')) return
 
     await setIncidents(prev => prev.map(inc => {
@@ -532,7 +536,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function deleteIncidentDocument(incident, docId) {
-    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding, actorUserId)) return
     if (!window.confirm('Delete this document from the report updates list? You can recover it later.')) return
 
     await setIncidents(prev => prev.map(inc => {
@@ -555,7 +559,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function recoverIncidentNote(incident, noteId) {
-    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding, actorUserId)) return
     await setIncidents(prev => prev.map(inc => {
       if (inc.id !== incident.id) return inc
       return {
@@ -572,7 +576,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function recoverIncidentDocument(incident, docId) {
-    if (!canAccessIncidentUpdates(incident, canViewSafeguarding)) return
+    if (!canAccessIncidentUpdates(incident, canViewSafeguarding, actorUserId)) return
     await setIncidents(prev => prev.map(inc => {
       if (inc.id !== incident.id) return inc
       return {
@@ -744,6 +748,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }, [activeMainTab])
 
   const filtered = incidents
+    .filter(inc => !logOnly || createdUserIdForIncident(inc) === actorUserId)
     .filter(inc => {
       const p = participants.find(x => x.id === inc.participantId)
       return !search || p?.name.toLowerCase().includes(search.toLowerCase())
@@ -771,8 +776,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     <div className="fade-in space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-display font-bold text-forest-950">Reporting</h2>
-          <p className="text-stone-500 text-sm">{incidents.length} total logged</p>
+          <h2 className="text-2xl font-display font-bold text-forest-950">{logOnly ? 'Log Incidents' : 'Reports'}</h2>
+          <p className="text-stone-500 text-sm">{logOnly ? `${filtered.length} submission${filtered.length !== 1 ? 's' : ''} by you` : `${incidents.length} total logged`}</p>
           {canViewSafeguarding && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
               Safeguarding Access Enabled
@@ -935,7 +940,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             const incidentDocuments = incidentDocumentsForIncident(inc)
             const activeIncidentNotes = incidentNotes.filter(note => !note.deletedAt)
             const activeIncidentDocuments = incidentDocuments.filter(doc => !doc.deletedAt)
-            const isUpdatesAllowed = canAccessIncidentUpdates(inc, canViewSafeguarding)
+            const isUpdatesAllowed = canAccessIncidentUpdates(inc, canViewSafeguarding, actorUserId)
             const isUpdatesOpen = isUpdatesAllowed && expandedIncidentId === inc.id
             const noteDraft = noteDraftByIncident[inc.id] || ''
             const isUploadingExtra = uploadingExtraIncidentId === inc.id
