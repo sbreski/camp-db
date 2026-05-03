@@ -21,21 +21,46 @@ const loadStaff = () => import('./components/Staff')
 const loadDressingRooms = () => import('./components/DressingRooms')
 const loadDocuments = () => import('./components/Documents')
 
-const Dashboard = lazy(loadDashboard)
-const SignInOut = lazy(loadSignInOut)
-const SharedInfo = lazy(loadSharedInfo)
-const Participants = lazy(loadParticipants)
-const ParticipantDetail = lazy(loadParticipantDetail)
-const StarOfTheDay = lazy(loadStarOfTheDay)
-const Parents = lazy(loadParents)
-const Medical = lazy(loadMedical)
-const BehaviourLogs = lazy(loadBehaviourLogs)
-const Timetable = lazy(loadTimetable)
-const Incidents = lazy(loadIncidents)
-const AttendanceOverview = lazy(loadAttendanceOverview)
-const Staff = lazy(loadStaff)
-const DressingRooms = lazy(loadDressingRooms)
-const Documents = lazy(loadDocuments)
+function lazyWithRetry(importer, chunkKey) {
+  return lazy(async () => {
+    const storageKey = `lazy-retry-${chunkKey}`
+
+    try {
+      const module = await importer()
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(storageKey)
+      }
+      return module
+    } catch (error) {
+      if (typeof window !== 'undefined') {
+        const alreadyRetried = sessionStorage.getItem(storageKey) === '1'
+        if (!alreadyRetried) {
+          sessionStorage.setItem(storageKey, '1')
+          window.location.reload()
+          return new Promise(() => {})
+        }
+      }
+
+      throw error
+    }
+  })
+}
+
+const Dashboard = lazyWithRetry(loadDashboard, 'dashboard')
+const SignInOut = lazyWithRetry(loadSignInOut, 'signin')
+const SharedInfo = lazyWithRetry(loadSharedInfo, 'shared-info')
+const Participants = lazyWithRetry(loadParticipants, 'participants')
+const ParticipantDetail = lazyWithRetry(loadParticipantDetail, 'participant')
+const StarOfTheDay = lazyWithRetry(loadStarOfTheDay, 'star-of-day')
+const Parents = lazyWithRetry(loadParents, 'parents')
+const Medical = lazyWithRetry(loadMedical, 'medical')
+const BehaviourLogs = lazyWithRetry(loadBehaviourLogs, 'behaviour')
+const Timetable = lazyWithRetry(loadTimetable, 'timetable')
+const Incidents = lazyWithRetry(loadIncidents, 'incidents')
+const AttendanceOverview = lazyWithRetry(loadAttendanceOverview, 'attendance')
+const Staff = lazyWithRetry(loadStaff, 'staff')
+const DressingRooms = lazyWithRetry(loadDressingRooms, 'dressing-rooms')
+const Documents = lazyWithRetry(loadDocuments, 'documents')
 
 
 
