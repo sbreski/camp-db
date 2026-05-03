@@ -644,7 +644,13 @@ function StaffDetailPanel({
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
-            <button onClick={() => onEdit(member, false)} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white">
+            <button onClick={() => onEdit({
+              ...member,
+              firstAidTrained: training.firstAidTrained,
+              safeguardingTrained: training.safeguardingTrained,
+              firstAidExpiresOn: training.firstAidExpiresOn,
+              safeguardingExpiresOn: training.safeguardingExpiresOn,
+            }, false)} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white">
               <Edit2 size={15} />
             </button>
             <button onClick={onClose} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white">
@@ -766,7 +772,13 @@ function StaffDetailPanel({
               <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-3">
                 <p className="text-sm font-medium text-stone-700">No login account linked</p>
                 <p className="text-xs text-stone-500">This staff member doesn't have a login account. Edit their profile and set a temporary password to create one.</p>
-                <button onClick={() => onEdit(member, false)}
+                <button onClick={() => onEdit({
+                  ...member,
+                  firstAidTrained: training.firstAidTrained,
+                  safeguardingTrained: training.safeguardingTrained,
+                  firstAidExpiresOn: training.firstAidExpiresOn,
+                  safeguardingExpiresOn: training.safeguardingExpiresOn,
+                }, false)}
                   className="btn-secondary text-xs flex items-center gap-1.5">
                   <Key size={13} /> Add Login Account
                 </button>
@@ -981,6 +993,9 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
 
   const [search, setSearch] = useState('')
   const [filterSeason, setFilterSeason] = useState('all') // all | active | inactive
+  const [trainingById, setTrainingById] = useState({})
+  const [liveActiveCount, setLiveActiveCount] = useState(null)
+  const [liveTrainingCounts, setLiveTrainingCounts] = useState({ firstAid: null, safeguarding: null })
 
   const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 
@@ -998,12 +1013,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     const fresh = staffList.find(s => s.id === selected.id)
     if (fresh) setSelected(fresh)
   }, [staffList, selected?.id])
-
-  useEffect(() => {
-    if (!editingMember?.id) return
-    const fresh = staffList.find(s => s.id === editingMember.id)
-    if (fresh) setEditingMember(prev => (prev ? { ...fresh, tempPassword: prev.tempPassword || '' } : fresh))
-  }, [staffList, editingMember?.id])
 
   async function withAccessToken() {
     const { data, error } = await supabase.auth.getSession()
@@ -1094,6 +1103,13 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     const byUsername = loginUserByEmail.get(normalizeUsername(member.name))
     if (byUsername) return byUsername
     return null
+  }
+
+  function isInactiveForFilter(member) {
+    const assignedThisSeason = member.isAssignedThisSeason !== false
+    const linkedLogin = getLinkedLoginUser(member)
+    const loginArchived = Boolean(linkedLogin?.isArchived)
+    return !assignedThisSeason || loginArchived
   }
 
   async function attemptCreateLoginAccount({ identifier, password, allowedTabs, isAdmin, canViewSafeguarding, fullName }) {
@@ -1368,14 +1384,17 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         s.email?.toLowerCase().includes(q)
       )
     }
-    if (filterSeason === 'active') list = list.filter(s => s.isAssignedThisSeason !== false)
-    if (filterSeason === 'inactive') list = list.filter(s => s.isAssignedThisSeason === false)
+    if (filterSeason === 'active') list = list.filter(s => !isInactiveForFilter(s))
+    if (filterSeason === 'inactive') list = list.filter(s => isInactiveForFilter(s))
     return list
-  }, [staffList, search, filterSeason])
+  }, [staffList, search, filterSeason, loginUserByEmail])
 
-  const activeCount = staffList.filter(s => s.isAssignedThisSeason !== false).length
-  const faCount = staffList.filter(s => getTrainingMeta(s).firstAidTrained).length
-  const sgCount = staffList.filter(s => getTrainingMeta(s).safeguardingTrained).length
+  const activeCountFallback = staffList.filter(s => s.isAssignedThisSeason !== false).length
+  const activeCount = liveActiveCount ?? activeCountFallback
+  const faCountFallback = staffList.filter(s => (trainingById[s.id] || getTrainingMeta(s)).firstAidTrained).length
+  const sgCountFallback = staffList.filter(s => (trainingById[s.id] || getTrainingMeta(s)).safeguardingTrained).length
+  const faCount = liveTrainingCounts.firstAid ?? faCountFallback
+  const sgCount = liveTrainingCounts.safeguarding ?? sgCountFallback
 
   // Detect missing training columns: if the DB column doesn't exist, select('*') simply
   // won't return it, so the key is entirely absent from every staffList member.
@@ -1387,6 +1406,77 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       const first = staffList[0]
       setMissingTrainingColumns(!('firstAidTrained' in first) && !('first_aid_trained' in first))
     }
+  }, [staffList])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadTrainingBadges() {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('id,first_aid_trained,safeguarding_trained,first_aid_expires_on,safeguarding_expires_on')
+
+      if (!active || error || !Array.isArray(data)) return
+
+      const next = {}
+      data.forEach(row => {
+        if (row?.id) next[row.id] = getTrainingMeta(row)
+      })
+      setTrainingById(next)
+    }
+
+    loadTrainingBadges().catch(() => {})
+    return () => { active = false }
+  }, [staffList])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadActiveCount() {
+      const { count, error } = await supabase
+        .from('staff')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_assigned_this_season', true)
+        .is('deleted_at', null)
+
+      if (!active || error) return
+      setLiveActiveCount(count ?? 0)
+    }
+
+    loadActiveCount().catch(() => {})
+
+    return () => { active = false }
+  }, [staffList])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadTrainingCounts() {
+      const [faResult, sgResult] = await Promise.all([
+        supabase
+          .from('staff')
+          .select('id', { count: 'exact', head: true })
+          .eq('first_aid_trained', true)
+          .is('deleted_at', null),
+        supabase
+          .from('staff')
+          .select('id', { count: 'exact', head: true })
+          .eq('safeguarding_trained', true)
+          .is('deleted_at', null),
+      ])
+
+      if (!active) return
+
+      if (!faResult.error && !sgResult.error) {
+        setLiveTrainingCounts({
+          firstAid: faResult.count ?? 0,
+          safeguarding: sgResult.count ?? 0,
+        })
+      }
+    }
+
+    loadTrainingCounts().catch(() => {})
+    return () => { active = false }
   }, [staffList])
 
   // Unlinked login accounts (no matching staff profile)
@@ -1489,7 +1579,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
             const loginUser = getLinkedLoginUser(s)
             const hasLogin = Boolean(loginUser)
             const isArchived = loginUser?.isArchived
-            const training = getTrainingMeta(s)
+            const training = trainingById[s.id] || getTrainingMeta(s)
             const faExp = expiryStatus(training.firstAidExpiresOn)
             const sgExp = expiryStatus(training.safeguardingExpiresOn)
             const dbsMeta = getDbsMeta(s)
