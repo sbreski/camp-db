@@ -220,8 +220,9 @@ export default function Dashboard({
             value: participants.length,
             icon: Users,
             color: 'bg-forest-900 text-white',
-            onClick: () => onNavigate('participants'),
-            visible: canAccess('participants'),
+            onClick: canAccess('participants') ? () => onNavigate('participants') : null,
+            inactive: !canAccess('participants'),
+            visible: true,
           },
           {
             label: 'Signed In Now',
