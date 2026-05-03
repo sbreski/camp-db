@@ -323,6 +323,7 @@ export default function App() {
   const [forcePasswordError, setForcePasswordError] = useState('')
   const [attendanceError, setAttendanceError] = useState('')
   const [schemaWarnings, setSchemaWarnings] = useState([])
+  const [sessionDebugNow, setSessionDebugNow] = useState(Date.now())
   const authWatchdogRef = useRef(null)
   const permissionsWatchdogRef = useRef(null)
   const inactivityTimeoutRef = useRef(null)
@@ -1049,6 +1050,8 @@ export default function App() {
         setCurrentUser(data.session?.user || null)
         setAuthLoading(false)
         if (hasSession) {
+          // Start inactivity timing from the current login/session restore moment.
+          setStoredLastActivity()
           setPermissionsLoading(true)
           loadPermissionsForUser(data.session.user)
         } else {
@@ -1094,6 +1097,8 @@ export default function App() {
         setCurrentUser(session?.user || null)
         setPermissionsLoading(hasSession)
         if (hasSession) {
+          // Reset baseline activity on login/session re-establishment.
+          setStoredLastActivity()
           loadPermissionsForUser(session.user)
         } else {
           setAllowedTabIds(BASIC_TABS)
@@ -1235,7 +1240,21 @@ export default function App() {
       || isAdminUser
       || allowedTabIds.includes('medical')
   )
+  const canViewSessionDebug = Boolean(isOwnerUser || isAdminUser)
   const requiresPasswordChange = Boolean(currentUser?.user_metadata?.must_change_password)
+
+  const debugLastActivity = getStoredLastActivity()
+  const debugElapsedMs = debugLastActivity ? Math.max(0, sessionDebugNow - debugLastActivity) : 0
+  const debugRemainingMs = Math.max(0, INACTIVITY_TIMEOUT_MS - debugElapsedMs)
+  const debugLastActivityLabel = debugLastActivity
+    ? new Date(debugLastActivity).toLocaleTimeString('en-GB')
+    : 'none'
+
+  useEffect(() => {
+    if (!canViewSessionDebug || !authed) return undefined
+    const id = setInterval(() => setSessionDebugNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [canViewSessionDebug, authed])
 
   async function submitForcedPasswordChange(e) {
     e.preventDefault()
@@ -1669,6 +1688,16 @@ export default function App() {
               <button onClick={logout} className="btn-secondary">Sign out now</button>
             </div>
           </div>
+        </div>
+      )}
+      {canViewSessionDebug && authed && (
+        <div className="fixed bottom-3 right-3 z-40 rounded-lg border border-stone-300 bg-white/95 px-2.5 py-1.5 text-[11px] text-stone-700 shadow">
+          <p>Last interaction: <span className="font-semibold">{debugLastActivityLabel}</span></p>
+          <p>
+            {showSessionWarning
+              ? `Warning: ${warningCountdown}s remaining`
+              : `Warning in: ${Math.ceil(debugRemainingMs / 1000)}s`}
+          </p>
         </div>
       )}
     </div>
