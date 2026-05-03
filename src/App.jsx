@@ -1731,13 +1731,17 @@ export default function App() {
         </div>
       )}
       {canViewSessionDebug && authed && (
-        <div className="fixed bottom-3 right-3 z-40 rounded-lg border border-stone-300 bg-white/95 px-2.5 py-1.5 text-[11px] text-stone-700 shadow">
-          <p>Last interaction: <span className="font-semibold">{debugLastActivityLabel}</span></p>
-          <p>
-            {showSessionWarning
-              ? `Warning: ${warningCountdown}s remaining`
-              : `Warning in: ${Math.ceil(debugRemainingMs / 1000)}s`}
-          </p>
+        <div className="fixed top-3 right-3 z-40 rounded-lg border border-stone-300 bg-white/95 px-2.5 py-1.5 text-[11px] text-stone-700 shadow">
+          <p>Time remaining: <span className="font-semibold tabular-nums">
+            {(() => {
+              const totalSecs = showSessionWarning
+                ? warningCountdown
+                : Math.ceil(debugRemainingMs / 1000)
+              const m = Math.floor(totalSecs / 60)
+              const s = totalSecs % 60
+              return `${m}:${String(s).padStart(2, '0')}`
+            })()}
+          </span></p>
         </div>
       )}
     </div>
