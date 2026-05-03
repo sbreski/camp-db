@@ -166,6 +166,7 @@
 </head>
 <body>
 
+<div id="print_root">
 <div class="header-banner">Incident and Accident Reporting Record — Impact Kidz Summer Camp</div>
 
 <div class="title-block">
@@ -179,7 +180,7 @@
 
   <!-- A: TYPE -->
   <div class="section">
-    <div class="section-title">A — Incident type</div>
+    <div class="section-title">Incident type</div>
     <div class="field">
       <label>Type of report</label>
       <div class="radio-group">
@@ -193,7 +194,7 @@
 
   <!-- B: INDIVIDUAL -->
   <div class="section">
-    <div class="section-title">B — Individual involved</div>
+    <div class="section-title">Individual involved</div>
     <div class="two-col">
       <div class="field"><label>Full name</label><input type="text" id="f-name" placeholder="Full name"/></div>
       <div class="field"><label>Age</label><input type="text" id="f-age" placeholder="e.g. 8"/></div>
@@ -202,7 +203,7 @@
 
   <!-- C: DATE / TIME / LOCATION -->
   <div class="section">
-    <div class="section-title">C — Date, time &amp; location</div>
+    <div class="section-title">Date, time &amp; location</div>
     <div style="font-size:12px;color:#555;margin-bottom:12px;"><strong>artsdepot</strong> — 5 Nether St, London N12 0GA</div>
     <div class="three-col">
       <div class="field"><label>Date</label><input type="date" id="f-date"/></div>
@@ -223,7 +224,7 @@
 
   <!-- D: INJURY (accident only) -->
   <div class="section" id="sectionD">
-    <div class="section-title">D — Nature and location of injury</div>
+    <div class="section-title">Nature and location of injury</div>
     <div class="body-diagram-wrapper">
       <div style="flex:0 0 auto;">
         <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
@@ -288,7 +289,7 @@
 
   <!-- E: WHAT HAPPENED -->
   <div class="section">
-    <div class="section-title">E — What happened</div>
+    <div class="section-title">What happened</div>
     <div class="field">
       <div class="hint">Describe the sequence of events in factual language.</div>
       <textarea id="f-whathappened" style="min-height:70px;" placeholder="Describe what happened..."></textarea>
@@ -297,7 +298,7 @@
 
   <!-- F: ACTION TAKEN -->
   <div class="section">
-    <div class="section-title">F — Action taken</div>
+    <div class="section-title">Action taken</div>
     <div class="field"><label>Action taken</label><textarea id="f-action" placeholder="All steps taken in response..."></textarea></div>
     <div class="field"><label>Anything requiring monitoring</label><textarea id="f-monitoring" style="min-height:44px;" placeholder="Ongoing monitoring notes..."></textarea></div>
     <div class="field">
@@ -319,7 +320,7 @@
 
   <!-- G: SIGN OFF -->
   <div class="section">
-    <div class="section-title">G — Sign off</div>
+    <div class="section-title">Sign off</div>
     <div style="font-size:11px;color:#777;font-style:italic;margin-bottom:14px;">Print and obtain parent/carer handwritten signature before filing. Keep original on child's file.</div>
     <div style="margin-bottom:14px;">
       <div style="font-weight:700;font-size:12px;color:#333;margin-bottom:8px;">Reported by</div>
@@ -343,7 +344,7 @@
 
   <!-- H: COORDINATOR / DIRECTOR REVIEW -->
   <div class="section">
-    <div class="section-title">H — Coordinator / Director Review</div>
+    <div class="section-title">Coordinator / Director Review</div>
     <div style="font-size:11px;color:#777;font-style:italic;margin-bottom:14px;">To be completed by hand after printing by the Camp Coordinator or Director.</div>
     <div class="signoff-row">
       <div class="field" style="margin:0;"><label>Print name</label><div class="sig-line"></div><div class="sig-note">Print name</div></div>
@@ -353,6 +354,8 @@
   </div>
 
   <div class="saved-note" id="saved_note"></div>
+</div>
+
 </div>
 
 <div class="action-bar">
@@ -610,7 +613,7 @@
         alert('Open this form inside Camp DB to send PDF directly to incident log.')
         return
       }
-      const { pdf, fileName } = await generateFormPdf('body', 'incident-accident', 'f-name')
+      const { pdf, fileName } = await generateFormPdf('#print_root', 'incident-accident', 'f-name')
       window.parent.postMessage(
         { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
         window.location.origin,

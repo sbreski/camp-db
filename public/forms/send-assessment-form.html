@@ -222,7 +222,7 @@
 
   <!-- SECTION A -->
   <div class="section">
-    <div class="section-header">Section A — Child and context</div>
+    <div class="section-header">Child and context</div>
     <div class="section-body">
       <div class="field-row">
         <div class="field">
@@ -276,7 +276,7 @@
 
   <!-- SECTION B -->
   <div class="section">
-    <div class="section-header">Section B — Assessment criteria</div>
+    <div class="section-header">Assessment criteria</div>
     <div class="section-body">
       <div class="section-note">Consider each of the following and provide notes. Answer honestly — this record exists to support the child and protect staff, not to find a justification for a particular outcome.</div>
 
@@ -340,7 +340,7 @@
 
   <!-- SECTION C -->
   <div class="section">
-    <div class="section-header">Section C — Reasonable adjustments considered</div>
+    <div class="section-header">Reasonable adjustments considered</div>
     <div class="section-body">
       <div class="section-note">Before reaching a conclusion, record any adjustments tried or considered. This is important for demonstrating a fair and thorough process was followed.</div>
       <div class="field">
@@ -407,7 +407,7 @@
 
   <!-- SECTION E -->
   <div class="section">
-    <div class="section-header">Section E — Next steps and communication</div>
+    <div class="section-header">Next steps and communication</div>
     <div class="section-body">
       <div class="field">
         <label>Has the parent or carer been contacted?</label>
@@ -448,7 +448,7 @@
 
   <!-- SECTION F -->
   <div class="section">
-    <div class="section-header">Section F — Sign off</div>
+    <div class="section-header">Sign off</div>
     <div class="section-body">
       <div class="section-note">This form should be signed by the Camp Coordinator and kept on the child's file. A copy should be shared with the parent or carer where appropriate. If the child is asked to leave camp, this form provides the written record of the process followed.</div>
       <div class="field-row">
@@ -643,7 +643,7 @@
         alert('Open this form inside Camp DB to send PDF directly to the log.')
         return
       }
-      const { pdf, fileName } = await generateFormPdf('.form-body', 'send-assessment', 'child_name')
+      const { pdf, fileName } = await generateFormPdf('body', 'send-assessment', 'child_name')
       window.parent.postMessage(
         { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
         window.location.origin,

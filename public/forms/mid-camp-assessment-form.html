@@ -155,7 +155,7 @@
 
   <!-- SECTION A -->
   <div class="section">
-    <div class="section-header">Section A — Child and situation</div>
+    <div class="section-header">Child and situation</div>
     <div class="section-body">
       <div class="field-row">
         <div class="field">
@@ -219,7 +219,7 @@
 
   <!-- SECTION B -->
   <div class="section">
-    <div class="section-header">Section B — Assessment of current situation</div>
+    <div class="section-header">Assessment of current situation</div>
     <div class="section-body">
       <div class="section-note">Work through each consideration below. These are not tick-box decisions — they require your professional judgement as a childcare professional. Be specific and factual in your notes.</div>
 
@@ -284,7 +284,7 @@
 
   <!-- SECTION C -->
   <div class="section">
-    <div class="section-header">Section C — Steps taken before this assessment</div>
+    <div class="section-header">Steps taken before this assessment</div>
     <div class="section-body">
       <div class="section-note">Record what has already been tried. A formal assessment should not be the first response to a concern — it follows a staged process. Document that process here.</div>
       <div class="field">
@@ -335,7 +335,7 @@
 
   <!-- SECTION D -->
   <div class="section">
-    <div class="section-header">Section D — Decision</div>
+    <div class="section-header">Decision</div>
     <div class="section-body">
       <div class="field">
         <label>What is the decision following this assessment?</label>
@@ -372,7 +372,7 @@
 
   <!-- SECTION E -->
   <div class="section">
-    <div class="section-header">Section E — Communication with parent or carer</div>
+    <div class="section-header">Communication with parent or carer</div>
     <div class="section-body">
       <div class="field">
         <label>Has the parent or carer been contacted?</label>
@@ -419,7 +419,7 @@
 
   <!-- SECTION F -->
   <div class="section">
-    <div class="section-header">Section F — Sign off</div>
+    <div class="section-header">Sign off</div>
     <div class="section-body">
       <div class="section-note">This form should be completed and signed on the day of the assessment. It is kept on the child's file and may be referred to if the decision is questioned by the family, Impact Kidz, artsdepot, or a third party.</div>
       <div class="field-row">
@@ -622,7 +622,7 @@
         alert('Open this form inside Camp DB to send PDF directly to the log.')
         return
       }
-      const { pdf, fileName } = await generateFormPdf('.form-body', 'mid-camp-assessment', 'child_name')
+      const { pdf, fileName } = await generateFormPdf('body', 'mid-camp-assessment', 'child_name')
       window.parent.postMessage(
         { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
         window.location.origin,
