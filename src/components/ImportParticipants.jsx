@@ -250,6 +250,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'yes',
       'Autism spectrum condition',
       'yes',
+      'yes',
       'Prefers quiet check-in',
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
 
