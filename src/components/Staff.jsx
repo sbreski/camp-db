@@ -102,12 +102,36 @@ function asBool(value) {
   return false
 }
 
+function normalizeKey(key) {
+  return String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function pickAny(source, keys) {
+  if (!source || typeof source !== 'object') return undefined
+
+  for (const key of keys) {
+    if (source[key] !== undefined) return source[key]
+  }
+
+  const wanted = new Set(keys.map(normalizeKey))
+  for (const [k, v] of Object.entries(source)) {
+    if (wanted.has(normalizeKey(k))) return v
+  }
+
+  return undefined
+}
+
 function getTrainingMeta(source) {
+  const firstAidTrainedRaw = pickAny(source, ['firstAidTrained', 'first_aid_trained'])
+  const safeguardingTrainedRaw = pickAny(source, ['safeguardingTrained', 'safeguarding_trained'])
+  const firstAidExpiresRaw = pickAny(source, ['firstAidExpiresOn', 'first_aid_expires_on'])
+  const safeguardingExpiresRaw = pickAny(source, ['safeguardingExpiresOn', 'safeguarding_expires_on'])
+
   return {
-    firstAidTrained: asBool(source?.firstAidTrained ?? source?.first_aid_trained),
-    safeguardingTrained: asBool(source?.safeguardingTrained ?? source?.safeguarding_trained),
-    firstAidExpiresOn: source?.firstAidExpiresOn || source?.first_aid_expires_on || '',
-    safeguardingExpiresOn: source?.safeguardingExpiresOn || source?.safeguarding_expires_on || '',
+    firstAidTrained: asBool(firstAidTrainedRaw),
+    safeguardingTrained: asBool(safeguardingTrainedRaw),
+    firstAidExpiresOn: firstAidExpiresRaw || '',
+    safeguardingExpiresOn: safeguardingExpiresRaw || '',
   }
 }
 
@@ -451,7 +475,36 @@ function StaffDetailPanel({
   const [activeTab, setActiveTab] = useState('overview')
   const [uploadingDoc, setUploadingDoc] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [freshTraining, setFreshTraining] = useState(null)
   const fileRef = useRef()
+
+  useEffect(() => {
+    let active = true
+
+    async function loadFreshTraining() {
+      if (!member?.id) {
+        setFreshTraining(null)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('staff')
+        .select('first_aid_trained,safeguarding_trained,first_aid_expires_on,safeguarding_expires_on')
+        .eq('id', member.id)
+        .maybeSingle()
+
+      if (!active) return
+      if (error || !data) {
+        setFreshTraining(null)
+        return
+      }
+
+      setFreshTraining(getTrainingMeta(data))
+    }
+
+    loadFreshTraining().catch(() => setFreshTraining(null))
+    return () => { active = false }
+  }, [member?.id])
 
   const isCurrentUser = loginUser
     ? (loginUser.internalEmail || loginUser.email || '').toLowerCase() === currentUserEmail
@@ -515,7 +568,7 @@ function StaffDetailPanel({
   }
 
   const staffDocuments = Array.isArray(member.staff_documents) ? member.staff_documents : []
-  const training = getTrainingMeta(member)
+  const training = freshTraining || getTrainingMeta(member)
   const faExpiry = expiryStatus(training.firstAidExpiresOn)
   const sgExpiry = expiryStatus(training.safeguardingExpiresOn)
   const dbsMeta = getDbsMeta(member)
