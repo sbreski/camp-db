@@ -10,9 +10,45 @@ const FIELD_MAP = {
   parentEmail: ['email', 'parent email', 'guardian email', 'e-mail'],
   parentPhone: ['phone', 'mobile', 'telephone', 'contact number', 'parent phone', 'phone number'],
   approvedAdults: ['approved adults', 'approved', 'authorised adults', 'authorized adults', 'collection'],
+  can_leave_alone: ['can leave alone', 'can_leave_alone', 'leave alone', 'can go home alone', 'self leave'],
+  medicalType: ['medical type', 'medical types', 'medical category', 'medical categories'],
   medicalDetails: ['medical', 'medical details', 'medical info', 'health', 'allergies', 'dietary'],
+  dietaryType: ['dietary type', 'dietary requirements', 'dietary'],
+  allergyDetails: ['allergy details', 'allergies', 'allergy info'],
   sendNeeds: ['send', 'send needs', 'support', 'support needs', 'additional needs', 'sen'],
+  sendDiagnosed: ['send diagnosed', 'send_diagnosed', 'diagnosed send'],
+  sendDiagnosis: ['send diagnosis', 'send_diagnosis', 'diagnosis'],
+  photoConsent: ['photo consent', 'photo_consent', 'photos'],
+  otcConsent: ['otc consent', 'otc_consent', 'otc meds consent', 'otc'],
   notes: ['notes', 'additional notes', 'other'],
+}
+
+function parseBoolean(value, defaultValue = false) {
+  const raw = String(value ?? '').trim().toLowerCase()
+  if (!raw) return defaultValue
+  if (['true', '1', 'yes', 'y', 'on'].includes(raw)) return true
+  if (['false', '0', 'no', 'n', 'off'].includes(raw)) return false
+  return defaultValue
+}
+
+function parseCsvList(value) {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return String(value || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function normalizeMedicalTypeList(value) {
+  return parseCsvList(value)
+    .map((item) => {
+      const key = item.toLowerCase()
+      if (key.startsWith('allerg')) return 'Allergy'
+      if (key.startsWith('diet')) return 'Dietary'
+      if (key.startsWith('med')) return 'Medical'
+      return null
+    })
+    .filter(Boolean)
 }
 
 function detectField(header) {
@@ -63,7 +99,11 @@ export default function ImportParticipants({ onImport, onClose }) {
     name: 'Full Name *', pronouns: 'Pronouns', age: 'Age',
     parentName: 'Parent Name', parentEmail: 'Parent Email', parentPhone: 'Parent Phone',
     approvedAdults: 'Approved Adults', medicalDetails: 'Medical Details',
-    sendNeeds: 'SEND / Support Needs', notes: 'Notes',
+    can_leave_alone: 'Can Leave Alone',
+    medicalType: 'Medical Type', dietaryType: 'Dietary Type', allergyDetails: 'Allergy Details',
+    sendNeeds: 'SEND / Support Needs', sendDiagnosed: 'SEND Diagnosed', sendDiagnosis: 'SEND Diagnosis',
+    photoConsent: 'Photo Consent', otcConsent: 'OTC Consent',
+    notes: 'Notes',
   }
 
   function handleFile(e) {
@@ -93,19 +133,60 @@ export default function ImportParticipants({ onImport, onClose }) {
       const p = { id: crypto.randomUUID() }
       OUR_FIELDS.forEach(field => {
         const header = mapping[field]
-        if (header) p[field] = row[header] || ''
+        if (!header) return
+        const raw = row[header]
+        if (field === 'age') {
+          const parsed = parseInt(String(raw || '').trim(), 10)
+          p.age = Number.isNaN(parsed) ? '' : parsed
+          return
+        }
+        if (field === 'can_leave_alone') {
+          p.can_leave_alone = parseBoolean(raw, false)
+          return
+        }
+        if (field === 'isActiveThisSeason') {
+          p.isActiveThisSeason = parseBoolean(raw, true)
+          return
+        }
+        if (field === 'sendDiagnosed' || field === 'otcConsent') {
+          p[field] = parseBoolean(raw, false)
+          return
+        }
+        if (field === 'medicalType') {
+          p[field] = parseCsvList(raw)
+          return
+        }
+        if (field === 'photoConsent') {
+          const normalized = String(raw || '').trim().toLowerCase()
+          if (!normalized) {
+            p.photoConsent = 'yes'
+          } else if (normalized === 'internal use only' || normalized === 'internal') {
+            p.photoConsent = 'internal'
+          } else if (normalized === 'no') {
+            p.photoConsent = 'no'
+          } else {
+            p.photoConsent = 'yes'
+          }
+          return
+        }
+        p[field] = raw || ''
       })
+
+      p.medicalType = normalizeMedicalTypeList(p.medicalType)
+
       // Normalise medicalType from medicalDetails text
-      if (p.medicalDetails) {
+      if (p.medicalType.length === 0 && p.medicalDetails) {
         const types = []
         const d = p.medicalDetails.toLowerCase()
         if (d.includes('allerg')) types.push('Allergy')
         if (d.includes('medical') || d.includes('asthma') || d.includes('diabetes') || d.includes('inhaler')) types.push('Medical')
         if (d.includes('vegetarian') || d.includes('vegan') || d.includes('gluten') || d.includes('dietary') || d.includes('halal') || d.includes('kosher')) types.push('Dietary')
         p.medicalType = types
-      } else {
-        p.medicalType = []
       }
+
+      if (!Array.isArray(p.medicalType)) p.medicalType = []
+      if (p.sendDiagnosis && p.sendDiagnosed !== true) p.sendDiagnosed = true
+
       return p
     }).filter(p => p.name?.trim())
   }
@@ -119,8 +200,47 @@ export default function ImportParticipants({ onImport, onClose }) {
   }
 
   function downloadTemplate() {
-    const headers = 'Name,Pronouns,Age,Parent Name,Parent Email,Parent Phone,Approved Adults,Medical Details,SEND Needs,Notes'
-    const example = 'Jane Smith,she/her,10,Dorothy,Sarah Smith,sarah@email.com,07700000000,"Grandma Smith (Grandmother)",Allergy to nuts - carries EpiPen,,Room 1,'
+    const headers = [
+      'Name',
+      'Pronouns',
+      'Age',
+      'Parent Name',
+      'Parent Email',
+      'Parent Phone',
+      'Approved Adults',
+      'Can Leave Alone',
+      'Medical Type',
+      'Medical Details',
+      'Dietary Type',
+      'Allergy Details',
+      'SEND Needs',
+      'SEND Diagnosed',
+      'SEND Diagnosis',
+      'Photo Consent',
+      'OTC Consent',
+      'Notes',
+    ].join(',')
+
+    const example = [
+      'Jane Smith',
+      'she/her',
+      '10',
+      'Sarah Smith',
+      'sarah@email.com',
+      '07700000000',
+      'Sarah Smith (Parent), Grandma Smith (Grandmother)',
+      'no',
+      'Allergy, Dietary',
+      'Carries EpiPen',
+      'Vegetarian',
+      'Peanut allergy',
+      'Needs visual timetable and movement breaks',
+      'yes',
+      'Autism spectrum condition',
+      'yes',
+      'Prefers quiet check-in',
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+
     const blob = new Blob([headers + '\n' + example], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'participants_template.csv'; a.click()

@@ -679,7 +679,6 @@ export default function Medical({ participants, setParticipants, actorInitials =
           { id: 'overview', label: 'Needs Overview' },
           { id: 'mar', label: 'Medication Administration (MAR)' },
           { id: 'forms', label: 'Medical Forms' },
-          { id: 'meal', label: 'Dietary & Allergy Matrix' },
         ].map(section => (
           <button
             key={section.id}
@@ -973,60 +972,6 @@ export default function Medical({ participants, setParticipants, actorInitials =
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {activeSection === 'meal' && (
-        <div className="card space-y-4">
-          <h3 className="font-display font-semibold text-forest-950">Dietary & Allergy Meal Matrix</h3>
-          <p className="text-xs text-stone-500">Per-child allergen matrix and meal-safe tags for kitchen/serving teams.</p>
-
-          <div>
-            <label className="label">Participant</label>
-            <select className="input" value={selectedMatrixParticipantId} onChange={e => setSelectedMatrixParticipantId(e.target.value)}>
-              {participants.map(participant => (
-                <option key={participant.id} value={participant.id}>{participant.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="label">Allergen Matrix</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-stone-200 p-3">
-              {ALLERGEN_OPTIONS.map(option => {
-                const key = normalizeText(option)
-                return (
-                  <label key={option} className="inline-flex items-center gap-2 text-sm text-forest-900">
-                    <input type="checkbox" className="h-4 w-4" checked={Boolean(allergenDraft[key])} onChange={() => toggleAllergen(option)} />
-                    {option}
-                  </label>
-                )
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Meal Safe Tags (comma separated)</label>
-            <input
-              className="input"
-              value={mealSafeTagsDraft}
-              onChange={e => setMealSafeTagsDraft(e.target.value)}
-              placeholder="e.g. no-nuts, dairy-free, gluten-free"
-            />
-          </div>
-
-          <div>
-            <label className="label">Kitchen / Serving Notes</label>
-            <textarea
-              className="input resize-none"
-              rows={3}
-              value={mealAdjustmentsDraft}
-              onChange={e => setMealAdjustmentsDraft(e.target.value)}
-              placeholder="Serving separation, cross-contamination precautions, substitutions..."
-            />
-          </div>
-
-          <button onClick={saveMealMatrix} className="btn-primary">Save Meal Matrix</button>
         </div>
       )}
 
