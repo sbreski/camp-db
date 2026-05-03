@@ -261,7 +261,7 @@ export default function Dashboard({
               <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform`}>
                 <Icon size={18} strokeWidth={2.5} />
               </div>
-              {value !== null && <p className="text-2xl font-display font-bold text-forest-950">{value}</p>}
+              <p className="text-2xl font-display font-bold text-forest-950">{value !== null ? value : 'Open ↗'}</p>
               <p className="text-xs text-stone-500 font-body mt-0.5">{label}</p>
             </>
           )
@@ -550,8 +550,8 @@ export default function Dashboard({
               <Users size={15} /> Add Participant
             </button>
           )}
-          {canAccess('incidents') && (
-            <button onClick={() => onNavigate('incidents')} className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto">
+          {canAccess('log-incidents') && (
+            <button onClick={() => onNavigate('log-incidents')} className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto">
               <AlertTriangle size={15} /> Log Incident
             </button>
           )}
