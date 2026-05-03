@@ -598,7 +598,14 @@ export default function App() {
     })
     for (const s of added) {
       const { id, ...rest } = toSnake(s)
-      const { error } = await supabase.from('staff').insert({ id: s.id, ...rest })
+      let payload = { id: s.id, ...rest }
+      let { error } = await supabase.from('staff').insert(payload)
+      while (error && String(error.message).includes('does not exist')) {
+        const stripped = stripMissingColumn(error, payload)
+        if (!stripped) break
+        payload = stripped
+        ;({ error } = await supabase.from('staff').insert(payload))
+      }
       if (error) {
         console.error('STAFF INSERT ERROR:', error.message)
         if (!firstError) firstError = new Error(`Failed to add staff member: ${error.message}`)
@@ -613,7 +620,14 @@ export default function App() {
     }
     for (const s of changed) {
       const { id, ...rest } = toSnake(s)
-      const { error } = await supabase.from('staff').update(rest).eq('id', s.id)
+      let payload = { ...rest }
+      let { error } = await supabase.from('staff').update(payload).eq('id', s.id)
+      while (error && String(error.message).includes('does not exist')) {
+        const stripped = stripMissingColumn(error, payload)
+        if (!stripped) break
+        payload = stripped
+        ;({ error } = await supabase.from('staff').update(payload).eq('id', s.id))
+      }
       if (error) {
         console.error('STAFF UPDATE ERROR:', error.message)
         if (!firstError) firstError = new Error(`Failed to update staff member: ${error.message}`)
