@@ -1171,7 +1171,11 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       {hasSend && (
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-help ${p.sendDiagnosed ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-purple-100 text-purple-700 border-purple-200'}`}
-                          title={p.sendDiagnosed ? `Formally diagnosed SEND${p.sendNeeds ? ': ' + p.sendNeeds : ''}` : (String(p.sendNeeds || '').trim() || 'No SEND/support details recorded')}
+                          title={p.sendDiagnosed ? [
+                            'Formally diagnosed SEND',
+                            p.sendDiagnosis ? `Diagnosis: ${p.sendDiagnosis}` : '',
+                            p.sendNeeds ? `Support needs: ${p.sendNeeds}` : '',
+                          ].filter(Boolean).join('\n') : (String(p.sendNeeds || '').trim() || 'No SEND/support details recorded')}
                         >
                           S
                         </span>
