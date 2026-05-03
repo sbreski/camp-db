@@ -994,7 +994,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   const [search, setSearch] = useState('')
   const [filterSeason, setFilterSeason] = useState('all') // all | active | inactive
   const [trainingById, setTrainingById] = useState({})
-  const [liveActiveCount, setLiveActiveCount] = useState(null)
   const [liveTrainingCounts, setLiveTrainingCounts] = useState({ firstAid: null, safeguarding: null })
 
   const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
@@ -1389,8 +1388,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     return list
   }, [staffList, search, filterSeason, loginUserByEmail])
 
-  const activeCountFallback = staffList.filter(s => s.isAssignedThisSeason !== false).length
-  const activeCount = liveActiveCount ?? activeCountFallback
+  const activeCount = staffList.filter(s => !isInactiveForFilter(s)).length
   const faCountFallback = staffList.filter(s => (trainingById[s.id] || getTrainingMeta(s)).firstAidTrained).length
   const sgCountFallback = staffList.filter(s => (trainingById[s.id] || getTrainingMeta(s)).safeguardingTrained).length
   const faCount = liveTrainingCounts.firstAid ?? faCountFallback
@@ -1426,25 +1424,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
 
     loadTrainingBadges().catch(() => {})
-    return () => { active = false }
-  }, [staffList])
-
-  useEffect(() => {
-    let active = true
-
-    async function loadActiveCount() {
-      const { count, error } = await supabase
-        .from('staff')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_assigned_this_season', true)
-        .is('deleted_at', null)
-
-      if (!active || error) return
-      setLiveActiveCount(count ?? 0)
-    }
-
-    loadActiveCount().catch(() => {})
-
     return () => { active = false }
   }, [staffList])
 
