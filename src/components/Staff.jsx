@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import {
-  AlertCircle, Check, ChevronRight, Edit2, Plus, RefreshCw, Save,
+  AlertCircle, Check, Edit2, Plus, RefreshCw, Save,
   Shield, Trash2, User, X, FileText, Upload, Download, Eye, EyeOff,
   Key, Lock, Unlock, Star, Heart, Award, ChevronDown, ChevronUp,
   Paperclip, Calendar, Phone, Mail, AlertTriangle,
@@ -50,14 +50,46 @@ function initials(name) {
   return String(name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 }
 
-function expiryStatus(dateStr) {
+function expiryStatus(dateStr, warnDays = 60) {
   if (!dateStr) return null
   const today = new Date()
   const exp = new Date(dateStr)
   const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24))
   if (diffDays < 0) return 'expired'
-  if (diffDays <= 60) return 'soon'
+  if (diffDays <= warnDays) return 'soon'
   return 'ok'
+}
+
+function toYmd(date) {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addYearsToDate(dateStr, years) {
+  if (!dateStr) return ''
+  const date = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return ''
+  date.setFullYear(date.getFullYear() + years)
+  return toYmd(date)
+}
+
+function getDbsMeta(source) {
+  const issueDate = source?.dbsIssueDate || source?.dbs_issue_date || ''
+  const onUpdateService = Boolean(source?.dbsOnUpdateService ?? source?.dbs_on_update_service)
+  if (!issueDate) return { issueDate: '', onUpdateService, expiryDate: '', status: null }
+
+  const expiryDate = addYearsToDate(issueDate, 3)
+  if (!expiryDate) return { issueDate: '', onUpdateService, expiryDate: '', status: null }
+  if (onUpdateService) return { issueDate, onUpdateService, expiryDate, status: 'ok' }
+
+  return {
+    issueDate,
+    onUpdateService,
+    expiryDate,
+    status: expiryStatus(expiryDate, 90),
+  }
 }
 
 function ExpiryBadge({ dateStr }) {
@@ -82,6 +114,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
     emergencyContact: '', emergencyPhone: '', notes: '',
     firstAidTrained: false, safeguardingTrained: false,
     firstAidExpiresOn: '', safeguardingExpiresOn: '',
+    dbsOnUpdateService: false, dbsIssueDate: '',
     isAssignedThisSeason: true,
     // login
     tempPassword: '',
@@ -97,6 +130,8 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
     safeguardingTrained: Boolean(initial?.safeguardingTrained),
     firstAidExpiresOn: initial?.firstAidExpiresOn || '',
     safeguardingExpiresOn: initial?.safeguardingExpiresOn || '',
+    dbsOnUpdateService: Boolean(initial?.dbsOnUpdateService ?? initial?.dbs_on_update_service),
+    dbsIssueDate: initial?.dbsIssueDate || initial?.dbs_issue_date || '',
     isAssignedThisSeason: (initial?.isAssignedThisSeason ?? initial?.is_assigned_this_season) !== false,
     isAdmin: Boolean(initial?.isAdmin),
     canViewSafeguarding: Boolean(initial?.canViewSafeguarding),
@@ -120,6 +155,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
   const loginId = form.email?.trim()
     ? form.email.trim().toLowerCase()
     : normalizeUsername(form.name)
+  const dbsMeta = getDbsMeta(form)
 
   function submit(e) {
     e.preventDefault()
@@ -237,6 +273,37 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="label mb-2">DBS</p>
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-3">
+                <label className="flex items-center gap-2 text-sm text-forest-900 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={form.dbsOnUpdateService}
+                    onChange={e => set('dbsOnUpdateService', e.target.checked)}
+                  />
+                  <Shield size={13} className="text-indigo-500" /> On DBS update service
+                </label>
+                <div>
+                  <label className="label">DBS issue date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={form.dbsIssueDate}
+                    onChange={e => set('dbsIssueDate', e.target.value)}
+                  />
+                </div>
+                {dbsMeta.issueDate && (
+                  <div className="text-xs text-stone-500">
+                    {dbsMeta.onUpdateService
+                      ? `On update service. DBS issued ${dbsMeta.issueDate}.`
+                      : `DBS expires ${dbsMeta.expiryDate} (3 years from issue date). Warning starts 3 months before expiry.`}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -430,6 +497,7 @@ function StaffDetailPanel({
   const staffDocuments = Array.isArray(member.staff_documents) ? member.staff_documents : []
   const faExpiry = expiryStatus(member.firstAidExpiresOn)
   const sgExpiry = expiryStatus(member.safeguardingExpiresOn)
+  const dbsMeta = getDbsMeta(member)
 
   const detailTabs = [
     { id: 'overview', label: 'Overview' },
@@ -470,6 +538,22 @@ function StaffDetailPanel({
                     <Shield size={9} /> Safeguarding
                     {sgExpiry === 'expired' && ' · EXPIRED'}
                     {sgExpiry === 'soon' && ' · Expiring soon'}
+                  </span>
+                )}
+                {dbsMeta.issueDate && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                    dbsMeta.onUpdateService
+                      ? 'bg-indigo-900/40 text-indigo-200 border-indigo-700'
+                      : dbsMeta.status === 'expired'
+                        ? 'bg-red-900/40 text-red-200 border-red-700'
+                        : dbsMeta.status === 'soon'
+                          ? 'bg-amber-900/40 text-amber-200 border-amber-700'
+                          : 'bg-emerald-900/40 text-emerald-200 border-emerald-700'
+                  }`}>
+                    <Shield size={9} /> DBS
+                    {dbsMeta.onUpdateService ? ' · Update service' : ` · ${dbsMeta.expiryDate}`}
+                    {!dbsMeta.onUpdateService && dbsMeta.status === 'expired' && ' · EXPIRED'}
+                    {!dbsMeta.onUpdateService && dbsMeta.status === 'soon' && ' · Expiring soon'}
                   </span>
                 )}
                 {member.isAssignedThisSeason === false && (
@@ -569,6 +653,21 @@ function StaffDetailPanel({
                     </span>
                   </div>
                   {member.safeguardingTrained && <ExpiryBadge dateStr={member.safeguardingExpiresOn} />}
+                </div>
+                <div className={`rounded-xl border p-3 ${dbsMeta.issueDate ? 'border-indigo-200 bg-indigo-50' : 'border-stone-200 bg-stone-50'}`}>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Shield size={14} className={dbsMeta.issueDate ? 'text-indigo-500' : 'text-stone-300'} />
+                    <span className={dbsMeta.issueDate ? 'text-indigo-900' : 'text-stone-400'}>
+                      {dbsMeta.issueDate ? 'DBS Logged' : 'No DBS details'}
+                    </span>
+                  </div>
+                  {dbsMeta.issueDate && (
+                    <p className="text-[10px] mt-1 text-stone-600">
+                      {dbsMeta.onUpdateService
+                        ? `Issue date ${dbsMeta.issueDate} · On update service`
+                        : `Issue date ${dbsMeta.issueDate} · Expires ${dbsMeta.expiryDate}${dbsMeta.status === 'expired' ? ' (expired)' : dbsMeta.status === 'soon' ? ' (expiring soon)' : ''}`}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1261,29 +1360,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         />
       )}
 
-      {/* Selected staff detail */}
-      {selected && !editingMember && (
-        <StaffDetailPanel
-          member={selected}
-          loginUser={getLinkedLoginUser(selected)}
-          onEdit={(member, saveOnly) => {
-            if (saveOnly) { saveEditStaff(member, true); return }
-            setEditingMember(member)
-          }}
-          onClose={() => setSelected(null)}
-          onDelete={deleteStaff}
-          onSavePermissions={savePermissions}
-          onResetPassword={resetPassword}
-          onToggleArchive={toggleArchive}
-          onDeleteAccount={deleteLoginAccount}
-          accessActionLoading={accessActionLoading}
-          canManageAccess={canManageAccess}
-          currentUserEmail={currentUserEmail}
-          accessEdits={accessEdits}
-          setAccessEdit={setAccessEdit}
-        />
-      )}
-
       {/* Search + filter */}
       <div className="flex flex-col sm:flex-row gap-2">
         <input
@@ -1317,72 +1393,127 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
             const isArchived = loginUser?.isArchived
             const faExp = expiryStatus(s.firstAidExpiresOn)
             const sgExp = expiryStatus(s.safeguardingExpiresOn)
+            const dbsMeta = getDbsMeta(s)
             const isActive = s.isAssignedThisSeason !== false
+            const isExpanded = selected?.id === s.id
+
+            function toggleExpanded() {
+              setSelected(prev => (prev?.id === s.id ? null : s))
+              setEditingMember(null)
+              setShowForm(false)
+            }
 
             return (
-              <div key={s.id}
-                className={`card flex items-center gap-4 hover:shadow-sm transition-all group cursor-pointer ${selected?.id === s.id ? 'ring-2 ring-forest-400' : ''} ${!isActive ? 'opacity-60' : ''}`}
-                onClick={() => { setSelected(s); setEditingMember(null); setShowForm(false) }}>
+              <div key={s.id} className="space-y-2">
+                <div className={`card flex items-center gap-4 hover:shadow-sm transition-all group ${isExpanded ? 'ring-2 ring-forest-400' : ''} ${!isActive ? 'opacity-60' : ''}`}>
 
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-display font-bold text-sm flex-shrink-0 ${
-                  isActive ? 'bg-forest-900' : 'bg-stone-400'
-                }`}>
-                  {initials(s.name)}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-display font-bold text-sm flex-shrink-0 ${
+                    isActive ? 'bg-forest-900' : 'bg-stone-400'
+                  }`}>
+                    {initials(s.name)}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={toggleExpanded}
+                        className="font-display font-semibold text-forest-950 hover:text-forest-700 transition-colors text-left"
+                      >
+                        {s.name}
+                      </button>
+                      {hasLogin && !isArchived && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-forest-100 text-forest-800 border border-forest-200 flex items-center gap-0.5">
+                          <Key size={8} /> Login
+                        </span>
+                      )}
+                      {hasLogin && isArchived && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                          Login archived
+                        </span>
+                      )}
+                      {!hasLogin && (
+                        <span className="text-[10px] text-stone-400 italic">No login</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-stone-400 truncate mt-0.5">{s.role || 'Staff'}{s.email ? ` · ${s.email}` : ''}</p>
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {s.firstAidTrained && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
+                          faExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
+                          faExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                          'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        }`}>
+                          <Heart size={8} /> FA
+                          {faExp === 'expired' && ' ⚠'}
+                          {faExp === 'soon' && ' !'}
+                        </span>
+                      )}
+                      {s.safeguardingTrained && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
+                          sgExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
+                          sgExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                          'bg-blue-100 text-blue-800 border-blue-200'
+                        }`}>
+                          <Shield size={8} /> SG
+                          {sgExp === 'expired' && ' ⚠'}
+                          {sgExp === 'soon' && ' !'}
+                        </span>
+                      )}
+                      {dbsMeta.issueDate && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
+                          dbsMeta.onUpdateService ? 'bg-indigo-100 text-indigo-800 border-indigo-200' :
+                          dbsMeta.status === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
+                          dbsMeta.status === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                          'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        }`}>
+                          <Shield size={8} /> DBS
+                          {!dbsMeta.onUpdateService && dbsMeta.status === 'expired' && ' ⚠'}
+                          {!dbsMeta.onUpdateService && dbsMeta.status === 'soon' && ' !'}
+                        </span>
+                      )}
+                      {!isActive && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Not this season</span>
+                      )}
+                      {loginUser?.isAdmin && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-0.5">
+                          <Star size={8} /> Admin
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={toggleExpanded}
+                    className="p-1.5 rounded-lg text-stone-400 hover:text-forest-700 hover:bg-forest-50 transition-colors flex-shrink-0"
+                    aria-label={isExpanded ? `Collapse ${s.name}` : `Expand ${s.name}`}
+                  >
+                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </button>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-display font-semibold text-forest-950 group-hover:text-forest-700">{s.name}</p>
-                    {hasLogin && !isArchived && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-forest-100 text-forest-800 border border-forest-200 flex items-center gap-0.5">
-                        <Key size={8} /> Login
-                      </span>
-                    )}
-                    {hasLogin && isArchived && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                        Login archived
-                      </span>
-                    )}
-                    {!hasLogin && (
-                      <span className="text-[10px] text-stone-400 italic">No login</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-stone-400 truncate mt-0.5">{s.role || 'Staff'}{s.email ? ` · ${s.email}` : ''}</p>
-                  <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                    {s.firstAidTrained && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
-                        faExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
-                        faExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                        'bg-emerald-100 text-emerald-800 border-emerald-200'
-                      }`}>
-                        <Heart size={8} /> FA
-                        {faExp === 'expired' && ' ⚠'}
-                        {faExp === 'soon' && ' !'}
-                      </span>
-                    )}
-                    {s.safeguardingTrained && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
-                        sgExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
-                        sgExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                        'bg-blue-100 text-blue-800 border-blue-200'
-                      }`}>
-                        <Shield size={8} /> SG
-                        {sgExp === 'expired' && ' ⚠'}
-                        {sgExp === 'soon' && ' !'}
-                      </span>
-                    )}
-                    {!isActive && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">Not this season</span>
-                    )}
-                    {loginUser?.isAdmin && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-0.5">
-                        <Star size={8} /> Admin
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <ChevronRight size={18} className="text-stone-400 group-hover:text-forest-700 flex-shrink-0" />
+                {isExpanded && !editingMember && (
+                  <StaffDetailPanel
+                    member={s}
+                    loginUser={getLinkedLoginUser(s)}
+                    onEdit={(member, saveOnly) => {
+                      if (saveOnly) { saveEditStaff(member, true); return }
+                      setEditingMember(member)
+                    }}
+                    onClose={() => setSelected(null)}
+                    onDelete={deleteStaff}
+                    onSavePermissions={savePermissions}
+                    onResetPassword={resetPassword}
+                    onToggleArchive={toggleArchive}
+                    onDeleteAccount={deleteLoginAccount}
+                    accessActionLoading={accessActionLoading}
+                    canManageAccess={canManageAccess}
+                    currentUserEmail={currentUserEmail}
+                    accessEdits={accessEdits}
+                    setAccessEdit={setAccessEdit}
+                  />
+                )}
               </div>
             )
           })

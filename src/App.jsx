@@ -205,6 +205,7 @@ function toSnake(obj) {
     uploadedByInitials: 'uploaded_by_initials',
     firstAidTrained: 'first_aid_trained', safeguardingTrained: 'safeguarding_trained',
     firstAidExpiresOn: 'first_aid_expires_on', safeguardingExpiresOn: 'safeguarding_expires_on',
+    dbsOnUpdateService: 'dbs_on_update_service', dbsIssueDate: 'dbs_issue_date',
     isActiveThisSeason: 'is_active_this_season', isAssignedThisSeason: 'is_assigned_this_season',
     awardDate: 'award_date',
     startDate: 'start_date', endDate: 'end_date',
@@ -227,6 +228,7 @@ function toSnake(obj) {
   const nullableDateKeys = [
     'first_aid_expires_on',
     'safeguarding_expires_on',
+    'dbs_issue_date',
     'follow_up_due_date',
   ]
   for (const key of nullableDateKeys) {
@@ -289,6 +291,7 @@ function toCamel(obj) {
     uploaded_by_initials: 'uploadedByInitials',
     first_aid_trained: 'firstAidTrained', safeguarding_trained: 'safeguardingTrained',
     first_aid_expires_on: 'firstAidExpiresOn', safeguarding_expires_on: 'safeguardingExpiresOn',
+    dbs_on_update_service: 'dbsOnUpdateService', dbs_issue_date: 'dbsIssueDate',
     is_active_this_season: 'isActiveThisSeason', is_assigned_this_season: 'isAssignedThisSeason',
     award_date: 'awardDate',
     start_date: 'startDate', end_date: 'endDate',
@@ -1464,6 +1467,12 @@ export default function App() {
           table: 'staff',
           columns: 'id,is_assigned_this_season',
           label: 'Seasonal staff toggle column is missing (is_assigned_this_season). Run db/23_seasonal_signin_assignments.sql.',
+        },
+        {
+          key: 'staff_dbs_columns',
+          table: 'staff',
+          columns: 'id,dbs_on_update_service,dbs_issue_date',
+          label: 'Staff DBS columns are missing (dbs_on_update_service/dbs_issue_date). Run db/30_staff_dbs_fields.sql.',
         },
         {
           key: 'star_of_day_table',
