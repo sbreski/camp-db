@@ -44,8 +44,8 @@ export const STAFF_PASSWORD = import.meta.env.VITE_STAFF_PASSWORD || ''
 const OWNER_EMAIL = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 const BASIC_TABS = ['dashboard', 'signin', 'shared-info']
 const ALL_TABS = NAV_ITEMS.map(item => item.id)
-const INACTIVITY_TIMEOUT_MS = 15 * 1000 // TEST: 15s — restore to 10 * 60 * 1000
-const SESSION_WARNING_SECONDS = 10 // TEST: 10s — restore to 60
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
+const SESSION_WARNING_SECONDS = 60
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
 const LAST_ACTIVITY_STORAGE_KEY = 'camp_db_last_activity_at'
