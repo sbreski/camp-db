@@ -792,7 +792,7 @@ export default function AttendanceOverview({ participants, attendance, setAttend
                 <th>Duration</th>
                 <th>Collected by</th>
                 <th>Late</th>
-                <th>Reason</th>
+                <th>Absence Reason</th>
               </tr>
             </thead>
             <tbody>
@@ -841,7 +841,7 @@ export default function AttendanceOverview({ participants, attendance, setAttend
                 <th>Duration</th>
                 <th>Collected by</th>
                 <th>Late</th>
-                <th>Reason</th>
+                <th>Absence Reason</th>
               </tr>
             </thead>
             <tbody>
