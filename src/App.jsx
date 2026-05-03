@@ -1292,21 +1292,19 @@ export default function App() {
 
     checkInactivityThreshold()
 
-    window.addEventListener('mousemove', handleActivity)
-    window.addEventListener('keydown', handleActivity)
-    window.addEventListener('click', handleActivity)
-    window.addEventListener('scroll', handleActivity)
-    window.addEventListener('touchstart', handleActivity)
+    // Treat only explicit user interactions as activity (not cursor movement).
+    const activityEvents = ['click', 'keydown', 'touchstart', 'input', 'change', 'submit']
+    for (const eventName of activityEvents) {
+      window.addEventListener(eventName, handleActivity)
+    }
     window.addEventListener('focus', handleVisibilityOrFocus)
     window.addEventListener('pageshow', handleVisibilityOrFocus)
     document.addEventListener('visibilitychange', handleVisibilityOrFocus)
 
     return () => {
-      window.removeEventListener('mousemove', handleActivity)
-      window.removeEventListener('keydown', handleActivity)
-      window.removeEventListener('click', handleActivity)
-      window.removeEventListener('scroll', handleActivity)
-      window.removeEventListener('touchstart', handleActivity)
+      for (const eventName of activityEvents) {
+        window.removeEventListener(eventName, handleActivity)
+      }
       window.removeEventListener('focus', handleVisibilityOrFocus)
       window.removeEventListener('pageshow', handleVisibilityOrFocus)
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus)
