@@ -865,14 +865,19 @@ export default function App() {
   }
 
   function startInactivityTimer() {
-    if (!authed || !isAdminUser) return
+    if (!authed) {
+      console.warn('[SESSION] startInactivityTimer: not authed')
+      return
+    }
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current)
 
     const lastActivity = getStoredLastActivity() || Date.now()
     const elapsed = Date.now() - lastActivity
     const remaining = Math.max(0, INACTIVITY_TIMEOUT_MS - elapsed)
 
+    console.log('[SESSION] Setting inactivity timeout', { remaining: Math.round(remaining / 1000) + 's' })
     inactivityTimeoutRef.current = setTimeout(() => {
+      console.log('[SESSION] Inactivity timeout fired - showing warning')
       sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
@@ -881,31 +886,42 @@ export default function App() {
 
   // Debounce activity updates to reduce localStorage writes
   function touchSessionActivity() {
+    console.log('[SESSION] Touch activity', { showSessionWarning })
     if (!showSessionWarning) {
       setStoredLastActivity()
       startInactivityTimer()
+    } else {
+      console.log('[SESSION] Activity ignored - warning is showing')
     }
   }
 
   // Only handles showing warning when inactivity threshold is exceeded
   function checkInactivityThreshold() {
-    if (!authed || !isAdminUser) return
-    if (showSessionWarning) return // Already warning
+    if (!authed) return
+    if (showSessionWarning) {
+      console.log('[SESSION] checkInactivityThreshold: already showing warning')
+      return // Already warning
+    }
 
     const lastActivity = getStoredLastActivity()
+    console.log('[SESSION] checkInactivityThreshold', { lastActivity, now: Date.now() })
     if (!lastActivity) {
+      console.log('[SESSION] No last activity stored - initializing')
       setStoredLastActivity()
       startInactivityTimer()
       return
     }
 
-    if ((Date.now() - lastActivity) >= INACTIVITY_TIMEOUT_MS) {
+    const elapsed = Date.now() - lastActivity
+    if (elapsed >= INACTIVITY_TIMEOUT_MS) {
+      console.log('[SESSION] INACTIVITY EXCEEDED', { elapsed: Math.round(elapsed / 1000) + 's' })
       sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
       return
     }
 
+    console.log('[SESSION] Still active - restarting timer', { elapsed: Math.round(elapsed / 1000) + 's' })
     // Keep the timeout aligned with the latest known activity timestamp.
     startInactivityTimer()
   }
@@ -1280,7 +1296,11 @@ export default function App() {
     }
 
     function handleActivity() {
-      if (showSessionWarning) return
+      if (showSessionWarning) {
+        console.log('[SESSION] Activity during warning - ignoring')
+        return
+      }
+      console.log('[SESSION] Activity detected')
       touchSessionActivity()
     }
 
@@ -1291,6 +1311,7 @@ export default function App() {
     }
 
     checkInactivityThreshold()
+    console.log('[SESSION] Activity listeners setup', { authed, isAdminUser, showSessionWarning, activityEvents })
 
     // Treat only explicit user interactions as activity (not cursor movement).
     const activityEvents = ['click', 'keydown', 'touchstart', 'input', 'change', 'submit']
@@ -1302,6 +1323,7 @@ export default function App() {
     document.addEventListener('visibilitychange', handleVisibilityOrFocus)
 
     return () => {
+      console.log('[SESSION] Cleaning up activity listeners')
       for (const eventName of activityEvents) {
         window.removeEventListener(eventName, handleActivity)
       }
@@ -1318,12 +1340,14 @@ export default function App() {
         warningIntervalRef.current = null
       }
       sessionWarningDeadlineRef.current = null
+      console.log('[SESSION] Warning interval cleanup/disabled')
       return
     }
 
     if (!sessionWarningDeadlineRef.current) {
       sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setWarningCountdown(SESSION_WARNING_SECONDS)
+      console.log('[SESSION] Warning interval starting')
     }
 
     if (warningIntervalRef.current) clearInterval(warningIntervalRef.current)
@@ -1336,11 +1360,14 @@ export default function App() {
           clearInterval(warningIntervalRef.current)
           warningIntervalRef.current = null
         }
+        console.log('[SESSION] Warning countdown expired - logging out')
         logout()
         return
       }
 
-      setWarningCountdown(Math.max(1, Math.ceil(remainingMs / 1000)))
+      const newCountdown = Math.max(1, Math.ceil(remainingMs / 1000))
+      console.log('[SESSION] Warning countdown', { remaining: newCountdown + 's' })
+      setWarningCountdown(newCountdown)
     }, 1000)
 
     return () => {
