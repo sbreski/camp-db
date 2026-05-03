@@ -564,7 +564,8 @@
       '  white-space: normal !important; box-sizing: border-box !important;',
       '}',
       'textarea { min-height: 30px !important; }',
-      '.action-bar, #saved_note, .intro { display: none !important; }',
+      '.action-bar, #saved_note, .intro, .title-block .subtitle { display: none !important; }',
+      'body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg, input, textarea, select { background: #fff !important; }',
     ].join('\n')
     document.head.appendChild(tempStyle)
 
@@ -603,8 +604,12 @@
       backgroundColor: '#ffffff',
       scrollY: -window.scrollY,
       onclone: (doc) => {
-        doc.querySelectorAll('.action-bar, #saved_note, .intro').forEach(e => e.style.display = 'none')
+        doc.querySelectorAll('.action-bar, #saved_note, .intro, .title-block .subtitle').forEach(e => e.style.display = 'none')
+        doc.querySelectorAll('body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg').forEach(e => {
+          e.style.background = '#fff'
+        })
         doc.querySelectorAll('input, textarea, select').forEach(e => {
+          e.style.background = '#fff'
           e.style.overflow = 'visible'
           e.style.height = 'auto'
           e.style.minHeight = e.tagName === 'TEXTAREA' ? '30px' : ''
