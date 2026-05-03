@@ -92,6 +92,25 @@ function getDbsMeta(source) {
   }
 }
 
+function asBool(value) {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value === 1
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    return normalized === 'true' || normalized === 't' || normalized === '1' || normalized === 'yes'
+  }
+  return false
+}
+
+function getTrainingMeta(source) {
+  return {
+    firstAidTrained: asBool(source?.firstAidTrained ?? source?.first_aid_trained),
+    safeguardingTrained: asBool(source?.safeguardingTrained ?? source?.safeguarding_trained),
+    firstAidExpiresOn: source?.firstAidExpiresOn || source?.first_aid_expires_on || '',
+    safeguardingExpiresOn: source?.safeguardingExpiresOn || source?.safeguarding_expires_on || '',
+  }
+}
+
 function ExpiryBadge({ dateStr }) {
   const status = expiryStatus(dateStr)
   if (!status) return null
@@ -109,6 +128,7 @@ function ExpiryBadge({ dateStr }) {
 // ─── Staff Profile Form ────────────────────────────────────────────────────────
 
 function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
+  const initialTraining = getTrainingMeta(initial)
   const empty = {
     name: '', role: '', phone: '', email: '',
     emergencyContact: '', emergencyPhone: '', notes: '',
@@ -126,10 +146,10 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
   const [form, setForm] = useState({
     ...empty,
     ...initial,
-    firstAidTrained: Boolean(initial?.firstAidTrained),
-    safeguardingTrained: Boolean(initial?.safeguardingTrained),
-    firstAidExpiresOn: initial?.firstAidExpiresOn || '',
-    safeguardingExpiresOn: initial?.safeguardingExpiresOn || '',
+    firstAidTrained: initialTraining.firstAidTrained,
+    safeguardingTrained: initialTraining.safeguardingTrained,
+    firstAidExpiresOn: initialTraining.firstAidExpiresOn,
+    safeguardingExpiresOn: initialTraining.safeguardingExpiresOn,
     dbsOnUpdateService: Boolean(initial?.dbsOnUpdateService ?? initial?.dbs_on_update_service),
     dbsIssueDate: initial?.dbsIssueDate || initial?.dbs_issue_date || '',
     isAssignedThisSeason: (initial?.isAssignedThisSeason ?? initial?.is_assigned_this_season) !== false,
@@ -495,8 +515,9 @@ function StaffDetailPanel({
   }
 
   const staffDocuments = Array.isArray(member.staff_documents) ? member.staff_documents : []
-  const faExpiry = expiryStatus(member.firstAidExpiresOn)
-  const sgExpiry = expiryStatus(member.safeguardingExpiresOn)
+  const training = getTrainingMeta(member)
+  const faExpiry = expiryStatus(training.firstAidExpiresOn)
+  const sgExpiry = expiryStatus(training.safeguardingExpiresOn)
   const dbsMeta = getDbsMeta(member)
 
   const detailTabs = [
@@ -518,7 +539,7 @@ function StaffDetailPanel({
               <h3 className="font-display font-bold text-xl leading-tight">{member.name}</h3>
               {member.role && <p className="text-forest-200 text-sm mt-0.5">{member.role}</p>}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                {member.firstAidTrained && (
+                {training.firstAidTrained && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
                     faExpiry === 'expired' ? 'bg-red-900/40 text-red-200 border-red-700'
                     : faExpiry === 'soon' ? 'bg-amber-900/40 text-amber-200 border-amber-700'
@@ -529,7 +550,7 @@ function StaffDetailPanel({
                     {faExpiry === 'soon' && ' · Expiring soon'}
                   </span>
                 )}
-                {member.safeguardingTrained && (
+                {training.safeguardingTrained && (
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
                     sgExpiry === 'expired' ? 'bg-red-900/40 text-red-200 border-red-700'
                     : sgExpiry === 'soon' ? 'bg-amber-900/40 text-amber-200 border-amber-700'
@@ -636,23 +657,23 @@ function StaffDetailPanel({
             <div className="pt-3 border-t border-stone-100 space-y-3">
               <p className="label">Training & Qualifications</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className={`rounded-xl border p-3 ${member.firstAidTrained ? 'border-emerald-200 bg-emerald-50' : 'border-stone-200 bg-stone-50'}`}>
+                <div className={`rounded-xl border p-3 ${training.firstAidTrained ? 'border-emerald-200 bg-emerald-50' : 'border-stone-200 bg-stone-50'}`}>
                   <div className="flex items-center gap-2 text-sm font-medium">
-                    <Heart size={14} className={member.firstAidTrained ? 'text-rose-500' : 'text-stone-300'} />
-                    <span className={member.firstAidTrained ? 'text-emerald-900' : 'text-stone-400'}>
-                      {member.firstAidTrained ? 'First Aid Trained' : 'No First Aid'}
+                    <Heart size={14} className={training.firstAidTrained ? 'text-rose-500' : 'text-stone-300'} />
+                    <span className={training.firstAidTrained ? 'text-emerald-900' : 'text-stone-400'}>
+                      {training.firstAidTrained ? 'First Aid Trained' : 'No First Aid'}
                     </span>
                   </div>
-                  {member.firstAidTrained && <ExpiryBadge dateStr={member.firstAidExpiresOn} />}
+                  {training.firstAidTrained && <ExpiryBadge dateStr={training.firstAidExpiresOn} />}
                 </div>
-                <div className={`rounded-xl border p-3 ${member.safeguardingTrained ? 'border-blue-200 bg-blue-50' : 'border-stone-200 bg-stone-50'}`}>
+                <div className={`rounded-xl border p-3 ${training.safeguardingTrained ? 'border-blue-200 bg-blue-50' : 'border-stone-200 bg-stone-50'}`}>
                   <div className="flex items-center gap-2 text-sm font-medium">
-                    <Shield size={14} className={member.safeguardingTrained ? 'text-blue-500' : 'text-stone-300'} />
-                    <span className={member.safeguardingTrained ? 'text-blue-900' : 'text-stone-400'}>
-                      {member.safeguardingTrained ? 'Safeguarding Trained' : 'No Safeguarding'}
+                    <Shield size={14} className={training.safeguardingTrained ? 'text-blue-500' : 'text-stone-300'} />
+                    <span className={training.safeguardingTrained ? 'text-blue-900' : 'text-stone-400'}>
+                      {training.safeguardingTrained ? 'Safeguarding Trained' : 'No Safeguarding'}
                     </span>
                   </div>
-                  {member.safeguardingTrained && <ExpiryBadge dateStr={member.safeguardingExpiresOn} />}
+                  {training.safeguardingTrained && <ExpiryBadge dateStr={training.safeguardingExpiresOn} />}
                 </div>
                 <div className={`rounded-xl border p-3 ${dbsMeta.issueDate ? 'border-indigo-200 bg-indigo-50' : 'border-stone-200 bg-stone-50'}`}>
                   <div className="flex items-center gap-2 text-sm font-medium">
@@ -1287,8 +1308,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   }, [staffList, search, filterSeason])
 
   const activeCount = staffList.filter(s => s.isAssignedThisSeason !== false).length
-  const faCount = staffList.filter(s => s.firstAidTrained).length
-  const sgCount = staffList.filter(s => s.safeguardingTrained).length
+  const faCount = staffList.filter(s => getTrainingMeta(s).firstAidTrained).length
+  const sgCount = staffList.filter(s => getTrainingMeta(s).safeguardingTrained).length
 
   // Detect missing training columns: if the DB column doesn't exist, select('*') simply
   // won't return it, so the key is entirely absent from every staffList member.
@@ -1297,7 +1318,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   const [missingTrainingColumns, setMissingTrainingColumns] = useState(false)
   useEffect(() => {
     if (staffList.length > 0) {
-      setMissingTrainingColumns(!('firstAidTrained' in staffList[0]))
+      const first = staffList[0]
+      setMissingTrainingColumns(!('firstAidTrained' in first) && !('first_aid_trained' in first))
     }
   }, [staffList])
 
@@ -1401,8 +1423,9 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
             const loginUser = getLinkedLoginUser(s)
             const hasLogin = Boolean(loginUser)
             const isArchived = loginUser?.isArchived
-            const faExp = expiryStatus(s.firstAidExpiresOn)
-            const sgExp = expiryStatus(s.safeguardingExpiresOn)
+            const training = getTrainingMeta(s)
+            const faExp = expiryStatus(training.firstAidExpiresOn)
+            const sgExp = expiryStatus(training.safeguardingExpiresOn)
             const dbsMeta = getDbsMeta(s)
             const isActive = s.isAssignedThisSeason !== false
             const isExpanded = selected?.id === s.id
@@ -1447,7 +1470,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                       </div>
                       <p className="text-xs text-stone-400 truncate mt-0.5">{s.role || 'Staff'}{s.email ? ` · ${s.email}` : ''}</p>
                       <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                        {s.firstAidTrained && (
+                        {training.firstAidTrained && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
                             faExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
                             faExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
@@ -1458,7 +1481,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                             {faExp === 'soon' && ' !'}
                           </span>
                         )}
-                        {s.safeguardingTrained && (
+                        {training.safeguardingTrained && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
                             sgExp === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
                             sgExp === 'soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
