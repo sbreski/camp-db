@@ -1290,6 +1290,17 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   const faCount = staffList.filter(s => s.firstAidTrained).length
   const sgCount = staffList.filter(s => s.safeguardingTrained).length
 
+  // Detect missing training columns: if the DB column doesn't exist, select('*') simply
+  // won't return it, so the key is entirely absent from every staffList member.
+  // PostgREST silently ignores unknown columns on UPDATE, so saves appear to succeed
+  // with no error — we must detect the missing column from the read side instead.
+  const [missingTrainingColumns, setMissingTrainingColumns] = useState(false)
+  useEffect(() => {
+    if (staffList.length > 0) {
+      setMissingTrainingColumns(!('firstAidTrained' in staffList[0]))
+    }
+  }, [staffList])
+
   // Unlinked login accounts (no matching staff profile)
   const unlinkedLoginUsers = useMemo(() => {
     return accessUsers.filter(user => {
@@ -1321,6 +1332,14 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       </div>
 
       {/* Messages */}
+      {missingTrainingColumns && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 text-red-800 text-sm space-y-2">
+          <p className="font-bold flex items-center gap-2"><AlertCircle size={16} className="flex-shrink-0" /> Database migration required — training fields will not save</p>
+          <p>The <code className="bg-red-100 px-1 rounded font-mono text-xs">first_aid_trained</code> and <code className="bg-red-100 px-1 rounded font-mono text-xs">safeguarding_trained</code> columns are missing from the staff table. Run the following in <strong>Supabase SQL Editor</strong>:</p>
+          <pre className="bg-red-100 rounded-lg p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`alter table public.staff\n  add column if not exists first_aid_trained boolean not null default false,\n  add column if not exists safeguarding_trained boolean not null default false,\n  add column if not exists first_aid_expires_on date,\n  add column if not exists safeguarding_expires_on date;`}</pre>
+          <p className="text-xs text-red-600">This is the content of <strong>db/31_staff_training_fields.sql</strong>. After running it, refresh the page.</p>
+        </div>
+      )}
       {staffError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm flex items-start gap-2">
           <AlertCircle size={16} className="mt-0.5 flex-shrink-0" /><span>{staffError}</span>

@@ -376,7 +376,7 @@ export default function App() {
   const [rawTimetableSpaces, , loadingTS, reloadTS] = useSupabaseTable('timetable_spaces', 'name', { enabled: tableQueriesEnabled && needsTimetable, cacheScope: tableCacheScope })
   const [rawStarAwards, setRawStarAwardsState, loadingStar, reloadStar] = useSupabaseTable('star_of_day_awards', 'award_date', { enabled: tableQueriesEnabled && needsStarOfDay, cacheScope: tableCacheScope })
   const [rawCampPeriodRows, setRawCampPeriodRowsState, loadingCampPeriod, reloadCampPeriod] = useSupabaseTable('camp_period_settings', 'updated_at', { enabled: tableQueriesEnabled, cacheScope: tableCacheScope })
-  const [rawStaff, , loadingS, reloadS] = useSupabaseTable('staff', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsStaff, cacheScope: tableCacheScope })
+  const [rawStaff, setRawStaffState, loadingS, reloadS] = useSupabaseTable('staff', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsStaff, cacheScope: tableCacheScope })
 
   const participants = rawParticipants.map(toCamel)
   const attendance = rawAttendance.map(toCamel)
@@ -675,6 +675,8 @@ export default function App() {
         if (!firstError) firstError = new Error(`Failed to update staff member: ${error.message}`)
       }
     }
+    // Keep UI in sync immediately; realtime reload still runs to confirm server state.
+    setRawStaffState(next.map(item => toSnake(item)))
     reloadS()
 
     // Surface any silently-dropped required columns as a real error.
