@@ -1076,7 +1076,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     const target = saveOnly ? data : editingMember
     setStaffActionLoading(true)
     try {
-      const { tempPassword, ...staffData } = data
+      // Strip fields that belong to the login/permissions system, not the staff DB table.
+      const { tempPassword, isAdmin, canViewSafeguarding, allowedTabs, ...staffData } = data
       await setStaffList(prev => prev.map(s => s.id === target.id ? { ...s, ...staffData } : s))
       if (selected?.id === target.id) setSelected(s => ({ ...s, ...staffData }))
       if (!saveOnly) {
