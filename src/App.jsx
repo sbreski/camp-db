@@ -917,6 +917,7 @@ export default function App() {
       return (
         allowedTabIds.includes('participants')
         || allowedTabIds.includes('incidents')
+        || allowedTabIds.includes('log-incidents')
         || allowedTabIds.includes('medical')
         || allowedTabIds.includes('parents')
       )
@@ -1000,17 +1001,18 @@ export default function App() {
       setIsAdminUser(false)
       setAllowedTabIds(BASIC_TABS)
       setCanViewTimetableOverview(false)
+      setCanEditTimetable(false)
       setCanViewSafeguardingPerm(false)
       setPermissionsLoading(false)
-      return (
-        allowedTabIds.includes('participants')
-        || allowedTabIds.includes('incidents')
-        || allowedTabIds.includes('log-incidents')
-        || allowedTabIds.includes('medical')
-        || allowedTabIds.includes('parents')
-      )
+      return
+    }
+
+    const userEmail = (user.email || '').toLowerCase()
+    if (OWNER_EMAIL && userEmail === OWNER_EMAIL) {
+      setIsAdminUser(true)
       setAllowedTabIds(ALL_TABS)
       setCanViewTimetableOverview(true)
+      setCanEditTimetable(true)
       setCanViewSafeguardingPerm(true)
       setPermissionsLoading(false)
       return
@@ -1066,6 +1068,7 @@ export default function App() {
         setIsAdminUser(true)
         setAllowedTabIds(ALL_TABS)
         setCanViewTimetableOverview(true)
+        setCanEditTimetable(true)
         setCanViewSafeguardingPerm(true)
         setPermissionsLoading(false)
         return
@@ -1150,7 +1153,7 @@ export default function App() {
         const hasSession = !!session
 
         // TOKEN_REFRESHED fires every time the browser regains focus and Supabase
-        // silently refreshes the JWT. We only need to update the user object —
+        // silently refreshes the JWT. We only need to update the user object -
         // re-running the full permissions load causes a visible reload for non-admin
         // users because permissionsLoading flips to true while the DB query runs.
         if (event === 'TOKEN_REFRESHED') {

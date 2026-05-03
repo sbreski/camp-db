@@ -12,6 +12,7 @@ const TAB_IDS = [
   'medical',
   'behaviour',
   'timetable',
+  'log-incidents',
   'incidents',
   'staff',
   'documents',
