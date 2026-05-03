@@ -64,6 +64,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   const [isReceivingStaffVisitorPdf, setIsReceivingStaffVisitorPdf] = useState(false)
   const [staffVisitorUploadNotice, setStaffVisitorUploadNotice] = useState('')
   const [activeMainTab, setActiveMainTab] = useState('reports')
+  const [activeLogTab, setActiveLogTab] = useState('log-incidents')
   const [staffVisitorForms, setStaffVisitorForms] = useState([])
   const [loadingStaffVisitorForms, setLoadingStaffVisitorForms] = useState(false)
   const [editingStaffVisitorId, setEditingStaffVisitorId] = useState(null)
@@ -163,6 +164,11 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       return
     }
 
+    if (logOnly) {
+      setActiveLogTab('log-incidents')
+    } else {
+      setActiveMainTab('reports')
+    }
     setSelectedParticipant(inc.participantId)
     setEditingIncidentId(inc.id)
     setShowForm(true)
@@ -678,8 +684,21 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       filepath: filePath,
       category,
       uploaded_by_initials: actorInitials,
+      uploaded_by_user_id: actorUserId || null,
       created_at: new Date().toISOString(),
     })
+
+    if (dbError && String(dbError.message || '').toLowerCase().includes('uploaded_by_user_id') && String(dbError.message || '').toLowerCase().includes('does not exist')) {
+      const fallback = await supabase.from('documents').insert({
+        section: 'staff-visitor',
+        filename: fileDisplayName,
+        filepath: filePath,
+        category,
+        uploaded_by_initials: actorInitials,
+        created_at: new Date().toISOString(),
+      })
+      dbError = fallback.error
+    }
 
     if (dbError && String(dbError.message || '').toLowerCase().includes('uploaded_by_initials') && String(dbError.message || '').toLowerCase().includes('does not exist')) {
       const fallback = await supabase.from('documents').insert({
@@ -742,10 +761,10 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }, [])
 
   useEffect(() => {
-    if (activeMainTab === 'staff-visitor') {
+    if (logOnly || activeMainTab === 'staff-visitor') {
       loadStaffVisitorForms()
     }
-  }, [activeMainTab])
+  }, [activeMainTab, logOnly])
 
   const filtered = incidents
     .filter(inc => !logOnly || createdUserIdForIncident(inc) === actorUserId)
@@ -772,19 +791,35 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     return a.localeCompare(b)
   })
 
+  const myStaffVisitorForms = staffVisitorForms.filter(doc => {
+    const uploadedByUserId = String(doc.uploaded_by_user_id || doc.uploadedByUserId || '').trim()
+    if (actorUserId && uploadedByUserId) return uploadedByUserId === actorUserId
+
+    const uploadedByInitials = normalizeInitials(doc.uploaded_by_initials || doc.uploadedByInitials)
+    return Boolean(uploadedByInitials) && uploadedByInitials === actorInitialsNormalized
+  })
+
+  const shouldShowIncidentForm = logOnly || showForm
+
   return (
     <div className="fade-in space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">{logOnly ? 'Log Incidents' : 'Reports'}</h2>
-          <p className="text-stone-500 text-sm">{logOnly ? `${filtered.length} submission${filtered.length !== 1 ? 's' : ''} by you` : `${incidents.length} total logged`}</p>
+          <p className="text-stone-500 text-sm">
+            {logOnly
+              ? (activeLogTab === 'log-incidents'
+                ? 'Use the forms below to submit a new report.'
+                : `${filtered.length} participant report${filtered.length !== 1 ? 's' : ''} and ${myStaffVisitorForms.length} staff/visitor form${myStaffVisitorForms.length !== 1 ? 's' : ''} uploaded by you`)
+              : `${incidents.length} total logged`}
+          </p>
           {canViewSafeguarding && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
               Safeguarding Access Enabled
             </p>
           )}
         </div>
-        {activeMainTab === 'reports' && (
+        {!logOnly && activeMainTab === 'reports' && (
           <button onClick={() => {
             setShowForm(s => {
               const next = !s
@@ -802,31 +837,60 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
       {/* Main tabs */}
       <div className="flex gap-2 flex-wrap">
-        <button
-          type="button"
-          onClick={() => setActiveMainTab('reports')}
-          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
-            activeMainTab === 'reports'
-              ? 'bg-amber-500 text-white'
-              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-          }`}
-        >
-          Reports
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveMainTab('staff-visitor')}
-          className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
-            activeMainTab === 'staff-visitor'
-              ? 'bg-amber-500 text-white'
-              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-          }`}
-        >
-          Staff/Visitor Form
-        </button>
+        {logOnly ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveLogTab('log-incidents')}
+              className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
+                activeLogTab === 'log-incidents'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+              }`}
+            >
+              Log Incidents
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveLogTab('my-reports')}
+              className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
+                activeLogTab === 'my-reports'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+              }`}
+            >
+              My Reports
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('reports')}
+              className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
+                activeMainTab === 'reports'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+              }`}
+            >
+              Reports
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMainTab('staff-visitor')}
+              className={`px-4 py-2 rounded-lg text-sm font-display font-medium transition-all w-full sm:w-auto ${
+                activeMainTab === 'staff-visitor'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+              }`}
+            >
+              Staff/Visitor Form
+            </button>
+          </>
+        )}
       </div>
 
-      {activeMainTab === 'reports' && <>
+      {((!logOnly && activeMainTab === 'reports') || (logOnly && activeLogTab === 'log-incidents')) && <>
 
       {saveNotice && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 flex flex-wrap items-center gap-2">
@@ -834,15 +898,21 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
           <button
             type="button"
             className="ml-auto text-xs font-semibold underline"
-            onClick={() => onNavigate?.('signin')}
+            onClick={() => {
+              if (logOnly) {
+                setActiveLogTab('my-reports')
+                return
+              }
+              onNavigate?.('signin')
+            }}
           >
-            Go to Sign In/Out
+            {logOnly ? 'View My Reports' : 'Go to Sign In/Out'}
           </button>
         </div>
       )}
 
       {/* New incident form */}
-      {showForm && (
+      {shouldShowIncidentForm && (
         <div className="card border-2 border-amber-200 fade-in">
           <h3 className="font-display font-semibold text-forest-950 mb-3">
             {editingIncident ? 'Edit Submission' : 'Select Participant'}
@@ -873,11 +943,37 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
               }}
             />
           )}
-          {!selectedParticipant && (
+          {!selectedParticipant && !logOnly && (
             <button onClick={() => { setShowForm(false); setEditingIncidentId(null) }} className="btn-secondary text-sm">Cancel</button>
           )}
         </div>
       )}
+
+      {logOnly && activeLogTab === 'log-incidents' && (
+        <div className="card space-y-3">
+          <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
+          <p className="text-xs text-stone-500">
+            Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
+          </p>
+          <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
+            <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
+              {isReceivingStaffVisitorPdf
+                ? 'Receiving PDF from staff/visitor form...'
+                : 'When submitted, the PDF is saved to your reports automatically.'}
+            </div>
+            <iframe
+              title="Staff and Visitor Incident Form"
+              src="/forms/staff-visitor-incident-reporting-form.html"
+              className="w-full h-[560px] border-0"
+            />
+          </div>
+          {staffVisitorUploadNotice && (
+            <p className="text-xs text-green-700">{staffVisitorUploadNotice}</p>
+          )}
+        </div>
+      )}
+
+      {!logOnly && <>
 
       {/* Search */}
       <div className="relative">
@@ -1320,8 +1416,459 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       )}
 
       </>}
+      </>}
 
-      {activeMainTab === 'staff-visitor' && (
+      {logOnly && activeLogTab === 'my-reports' && <>
+
+      <div className="relative">
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+        <input type="text" placeholder="Search my reports by participant name..." value={search}
+          onChange={e => setSearch(e.target.value)} className="input pl-9" />
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setReportSubTab('all')}
+          className={`btn-secondary text-sm ${reportSubTab === 'all' ? 'bg-forest-900 text-white border-forest-900' : ''}`}
+        >
+          All Reports
+        </button>
+        {REPORT_TYPE_ORDER.map(type => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => setReportSubTab(type)}
+            className={`btn-secondary text-sm ${reportSubTab === type ? 'bg-forest-900 text-white border-forest-900' : ''}`}
+          >
+            {type}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && myStaffVisitorForms.length === 0 ? (
+        <div className="card text-center py-12">
+          <AlertTriangle size={32} className="text-stone-300 mx-auto mb-3" />
+          <p className="text-stone-500 font-medium">You have not uploaded any reports yet</p>
+        </div>
+      ) : (
+        <>
+          {filtered.length === 0 ? (
+            <div className="card text-center py-8">
+              <p className="text-stone-400 text-sm">No participant reports match your search.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {groupedTypes.map(type => (
+                <section key={type} className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <h3 className="text-sm font-display font-semibold text-forest-900">{type}</h3>
+                    <span className="text-xs text-stone-500">{groupedIncidents[type].length} logged</span>
+                  </div>
+                  <div className="space-y-3">
+                    {groupedIncidents[type].map(inc => {
+            const p = participants.find(x => x.id === inc.participantId)
+            const createdTime = new Date(inc.createdAt).getTime()
+            const updatedRaw = inc.updatedAt || inc.updated_at || null
+            const updatedTime = updatedRaw ? new Date(updatedRaw).getTime() : 0
+            const isEdited = Boolean(updatedRaw) && updatedTime - createdTime > 1000
+            const createdByInitials = inc.createdByInitials || inc.created_by_initials || null
+            const updatedByInitials = inc.updatedByInitials || inc.updated_by_initials || null
+            const canEditSafeguarding = canEditSafeguardingIncident(inc)
+            const isOpeningReport = openingIncidentId === inc.id
+            const isDownloadingReport = downloadingIncidentId === inc.id
+            const incidentNotes = incidentNotesForIncident(inc)
+            const incidentDocuments = incidentDocumentsForIncident(inc)
+            const activeIncidentNotes = incidentNotes.filter(note => !note.deletedAt)
+            const activeIncidentDocuments = incidentDocuments.filter(doc => !doc.deletedAt)
+            const isUpdatesAllowed = canAccessIncidentUpdates(inc, canViewSafeguarding, actorUserId)
+            const isUpdatesOpen = isUpdatesAllowed && expandedIncidentId === inc.id
+            const noteDraft = noteDraftByIncident[inc.id] || ''
+            const isUploadingExtra = uploadingExtraIncidentId === inc.id
+            const canDownloadReport = inc.type !== 'Safeguarding' || canViewSafeguarding || createdUserIdForIncident(inc) === actorUserId
+            return (
+              <div key={inc.id} className="card hover:shadow-sm transition-shadow group cursor-pointer"
+                onClick={() => openIncidentReport(inc)}>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 bg-amber-400" />
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-display font-semibold text-forest-950 group-hover:text-forest-700">
+                        {p?.name || 'Unknown Participant'}
+                      </span>
+                      <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">{inc.type}</span>
+                      {inc.followUpRequired && !inc.followUpCompletedAt && (
+                        <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Follow Up due</span>
+                      )}
+                      {inc.followUpCompletedAt && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Followed up</span>
+                      )}
+                      {resolvedAtForIncident(inc) && (
+                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Resolved</span>
+                      )}
+                      {isUpdatesAllowed && activeIncidentNotes.length > 0 && (
+                        <span className="text-xs bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">{activeIncidentNotes.length} notes</span>
+                      )}
+                      {isUpdatesAllowed && activeIncidentDocuments.length > 0 && (
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{activeIncidentDocuments.length} docs</span>
+                      )}
+                      {inc.staffMember && <span className="text-xs text-stone-500">· {inc.staffMember}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-stone-400">
+                        {new Date(inc.createdAt).toLocaleDateString('en-GB', {
+                          weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                      {isEdited && (
+                        <span className="text-xs text-forest-700">
+                          Updated {new Date(updatedRaw).toLocaleDateString('en-GB', {
+                            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}{updatedByInitials ? ` by ${updatedByInitials}` : ''}
+                        </span>
+                      )}
+                      {!isEdited && createdByInitials && (
+                        <span className="text-xs text-stone-500">Logged by {createdByInitials}</span>
+                      )}
+                      {inc.followUpRequired && (
+                        <span className="text-xs text-stone-500">
+                          {inc.followUpCompletedAt
+                            ? `Followed up ${new Date(inc.followUpCompletedAt).toLocaleDateString('en-GB')}`
+                            : `Follow up due ${new Date((inc.followUpDueDate || inc.createdAt) + 'T12:00:00').toLocaleDateString('en-GB')}`}
+                        </span>
+                      )}
+                      {resolvedAtForIncident(inc) && (
+                        <span className="text-xs text-emerald-700">
+                          Resolved {new Date(resolvedAtForIncident(inc)).toLocaleDateString('en-GB')}{inc.resolvedBy ? ` by ${inc.resolvedBy}` : ''}
+                        </span>
+                      )}
+                      {inc.pdfName && (
+                        <span className="flex items-center gap-1 text-xs text-forest-700 font-medium max-w-[160px] sm:max-w-none">
+                          <FileText size={11} /> <span className="truncate">{inc.pdfName}</span>
+                          {!canDownloadReport ? (
+                            <span className="ml-1 text-stone-500">Restricted</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                downloadIncidentReport(inc)
+                              }}
+                              className="ml-1 underline hover:text-forest-900"
+                            >
+                              {isDownloadingReport ? 'Downloading...' : 'Download'}
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                    {isUpdatesAllowed && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedIncidentId(prev => (prev === inc.id ? '' : inc.id))
+                          setEditingNote(null)
+                        }}
+                        className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                      >
+                        Updates
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startEditIncident(inc)
+                      }}
+                      className="p-1.5 text-stone-400 hover:text-forest-700 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                      title={inc.type === 'Safeguarding' && !canEditSafeguarding
+                        ? 'Safeguarding edits require authorised access or original submitter'
+                        : 'Edit submission'}
+                    >
+                      <Edit2 size={15} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteIncident(inc.id) }}
+                      className="p-1.5 text-stone-400 hover:text-red-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                      <Trash2 size={15} />
+                    </button>
+                    <ChevronRight size={16} className="text-stone-300 group-hover:text-stone-500 mt-1" />
+                  </div>
+                </div>
+
+                {isUpdatesOpen && (
+                  <div
+                    className="mt-4 pt-4 border-t border-stone-200 space-y-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-forest-900">
+                        <MessageSquare size={14} /> Notes & Updates
+                      </div>
+                      {incidentNotes.length === 0 ? (
+                        <p className="text-xs text-stone-500">No notes yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {incidentNotes.map(note => {
+                            const isEditingThisNote = editingNote?.incidentId === inc.id && editingNote?.noteId === note.id
+                            const isDeleted = Boolean(note.deletedAt)
+                            return (
+                              <div key={note.id} className={`rounded-lg border px-3 py-2 ${isDeleted ? 'border-stone-200 bg-stone-100 opacity-75' : 'border-stone-200 bg-stone-50'}`}>
+                                {isEditingThisNote && !isDeleted ? (
+                                  <div className="space-y-2">
+                                    <textarea
+                                      className="input min-h-[84px]"
+                                      value={editingNote?.text || ''}
+                                      onChange={(e) => setEditingNote(prev => prev ? { ...prev, text: e.target.value } : prev)}
+                                    />
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={saveEditedIncidentNote}
+                                        className="text-xs px-2 py-1 rounded-md border border-emerald-200 text-emerald-800 hover:text-emerald-900 hover:border-emerald-300 bg-white inline-flex items-center gap-1"
+                                      >
+                                        <Check size={13} /> Save Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingNote(null)}
+                                        className="text-xs px-2 py-1 rounded-md border border-stone-200 text-stone-700 hover:text-stone-900 hover:border-stone-300 bg-white inline-flex items-center gap-1"
+                                      >
+                                        <X size={13} /> Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className={`text-sm whitespace-pre-wrap ${isDeleted ? 'text-stone-500 line-through' : 'text-stone-800'}`}>{note.text}</p>
+                                    <div className="mt-1 flex items-center gap-3 text-[11px] text-stone-500 flex-wrap">
+                                      <span>
+                                        Added {new Date(note.createdAt).toLocaleDateString('en-GB', {
+                                          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        })}
+                                        {note.createdBy ? ` by ${note.createdBy}` : ''}
+                                      </span>
+                                      {note.updatedAt && (
+                                        <span>
+                                          Edited {new Date(note.updatedAt).toLocaleDateString('en-GB', {
+                                            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                          })}
+                                          {note.updatedBy ? ` by ${note.updatedBy}` : ''}
+                                        </span>
+                                      )}
+                                      {!isDeleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() => beginEditIncidentNote(inc.id, { ...note, incidentType: inc.type })}
+                                          className="underline text-forest-700 hover:text-forest-900"
+                                        >
+                                          Edit note
+                                        </button>
+                                      )}
+                                      {!isDeleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteIncidentNote(inc, note.id)}
+                                          className="underline text-red-700 hover:text-red-900"
+                                        >
+                                          Delete note
+                                        </button>
+                                      )}
+                                      {isDeleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() => recoverIncidentNote(inc, note.id)}
+                                          className="underline text-emerald-700 hover:text-emerald-900"
+                                        >
+                                          Recover
+                                        </button>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-3 space-y-2">
+                        <label className="text-xs font-semibold text-sky-900">Add note</label>
+                        <textarea
+                          className="input min-h-[84px]"
+                          placeholder="Add update details here..."
+                          value={noteDraft}
+                          onChange={(e) => setNoteDraftByIncident(prev => ({ ...prev, [inc.id]: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addIncidentNote(inc)}
+                          className="text-xs px-2 py-1 rounded-md border border-sky-200 text-sky-800 hover:text-sky-900 hover:border-sky-300 bg-white"
+                        >
+                          Add Note
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-forest-900">
+                        <Paperclip size={14} /> Additional Documents
+                      </div>
+                      {incidentDocuments.length === 0 ? (
+                        <p className="text-xs text-stone-500">No additional documents yet.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {incidentDocuments.map(doc => (
+                            <div key={doc.id} className="text-xs text-stone-700 flex items-center gap-2 flex-wrap">
+                              {doc.deletedAt ? (
+                                <span className="text-stone-500 line-through">{doc.name}</span>
+                              ) : (
+                                <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                              )}
+                              <span className="text-stone-500">
+                                Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
+                                  day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}
+                                {doc.uploadedBy ? ` by ${doc.uploadedBy}` : ''}
+                              </span>
+                              {!doc.deletedAt && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteIncidentDocument(inc, doc.id)}
+                                  className="underline text-red-700 hover:text-red-900"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                              {doc.deletedAt && (
+                                <button
+                                  type="button"
+                                  onClick={() => recoverIncidentDocument(inc, doc.id)}
+                                  className="underline text-emerald-700 hover:text-emerald-900"
+                                >
+                                  Recover
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-3">
+                        <label className="text-xs font-semibold text-indigo-900 block mb-2">Upload another form/document</label>
+                        <input
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            uploadIncidentDocument(inc, file)
+                            e.target.value = ''
+                          }}
+                          className="block w-full text-xs text-stone-700"
+                        />
+                        {isUploadingExtra && (
+                          <p className="mt-2 text-xs text-indigo-800">Uploading document...</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+
+          <div className="card space-y-3">
+            <h3 className="font-display font-semibold text-forest-950">My Staff/Visitor Forms</h3>
+            {loadingStaffVisitorForms ? (
+              <p className="text-xs text-stone-500">Loading...</p>
+            ) : myStaffVisitorForms.length === 0 ? (
+              <p className="text-xs text-stone-500">No staff/visitor forms uploaded by you yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {myStaffVisitorForms.map(doc => (
+                  <div key={doc.id} className="flex items-start justify-between gap-3 py-2 border-b border-stone-100 last:border-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <FileText size={14} className="text-stone-400 flex-shrink-0" />
+                      {editingStaffVisitorId === doc.id ? (
+                        <input
+                          className="input text-sm py-0.5 px-2"
+                          value={editingStaffVisitorName}
+                          onChange={e => setEditingStaffVisitorName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') saveStaffVisitorFormName(doc)
+                            if (e.key === 'Escape') setEditingStaffVisitorId(null)
+                          }}
+                          autoFocus
+                        />
+                      ) : (
+                        <span className="text-sm text-stone-800 truncate">{doc.filename}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                      <span className="text-xs text-stone-500">
+                        {new Date(doc.created_at).toLocaleDateString('en-GB', {
+                          day: 'numeric', month: 'short', year: 'numeric',
+                        })}
+                      </span>
+                      {editingStaffVisitorId === doc.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => saveStaffVisitorFormName(doc)}
+                            className="text-xs text-emerald-700 underline hover:text-emerald-900"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingStaffVisitorId(null)}
+                            className="text-xs text-stone-500 underline hover:text-stone-700"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => downloadStaffVisitorForm(doc.filepath, doc.filename)}
+                            className="text-xs text-forest-700 underline hover:text-forest-900"
+                          >
+                            Download
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingStaffVisitorId(doc.id); setEditingStaffVisitorName(doc.filename) }}
+                            className="text-xs text-stone-500 underline hover:text-stone-700"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteStaffVisitorForm(doc)}
+                            className="text-xs text-red-600 underline hover:text-red-800"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      </>}
+
+      {!logOnly && activeMainTab === 'staff-visitor' && (
         <div className="space-y-5">
           <div className="card space-y-3">
             <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
