@@ -258,7 +258,19 @@ export default function Participants({ participants, setParticipants, onView }) 
   }
 
   function importParticipants(list) {
-    setParticipants(prev => [...prev, ...list])
+    setParticipants(prev => {
+      // Merge: update existing records matched by id, then append genuinely new ones
+      const updated = prev.map(p => {
+        const match = list.find(item => item.id === p.id)
+        if (!match) return p
+        const { _isUpdate, ...fields } = match
+        return { ...p, ...fields }
+      })
+      const newOnes = list
+        .filter(item => !prev.find(p => p.id === item.id))
+        .map(({ _isUpdate, ...fields }) => fields)
+      return [...updated, ...newOnes]
+    })
   }
 
   function deleteParticipant(id) {
@@ -380,6 +392,7 @@ export default function Participants({ participants, setParticipants, onView }) 
       {showImport && (
         <ImportParticipants
           onImport={importParticipants}
+          existingParticipants={participants}
           onClose={() => setShowImport(false)}
         />
       )}

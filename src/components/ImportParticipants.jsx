@@ -86,12 +86,12 @@ function parseCSV(text) {
   return { headers, rows }
 }
 
-export default function ImportParticipants({ onImport, onClose }) {
+export default function ImportParticipants({ onImport, onClose, existingParticipants = [] }) {
   const [step, setStep] = useState('upload') // upload | map | preview | done
   const [headers, setHeaders] = useState([])
   const [rawRows, setRawRows] = useState([])
   const [mapping, setMapping] = useState({}) // fieldKey -> headerName
-  const [imported, setImported] = useState(0)
+  const [importCounts, setImportCounts] = useState({ added: 0, updated: 0 })
   const fileRef = useRef()
 
   const OUR_FIELDS = Object.keys(FIELD_MAP)
@@ -128,9 +128,18 @@ export default function ImportParticipants({ onImport, onClose }) {
     reader.readAsText(file)
   }
 
+  function normalizeName(name) {
+    return String(name || '').trim().toLowerCase()
+  }
+
   function buildParticipants() {
     return rawRows.map(row => {
-      const p = { id: crypto.randomUUID() }
+      const nameFromRow = String(row[mapping.name] || '').trim()
+      const existing = existingParticipants.find(
+        p => normalizeName(p.name) === normalizeName(nameFromRow)
+      )
+      // Reuse existing ID if matched so App.jsx routes this through the update path
+      const p = { ...(existing || {}), id: existing ? existing.id : crypto.randomUUID(), _isUpdate: Boolean(existing) }
       OUR_FIELDS.forEach(field => {
         const header = mapping[field]
         if (!header) return
@@ -195,7 +204,10 @@ export default function ImportParticipants({ onImport, onClose }) {
 
   function doImport() {
     onImport(preview)
-    setImported(preview.length)
+    setImportCounts({
+      added: preview.filter(p => !p._isUpdate).length,
+      updated: preview.filter(p => p._isUpdate).length,
+    })
     setStep('done')
   }
 
@@ -325,13 +337,21 @@ export default function ImportParticipants({ onImport, onClose }) {
             <div className="space-y-4">
               <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-sm text-amber-800 border border-amber-200">
                 <AlertCircle size={16} className="flex-shrink-0" />
-                <span>Review before importing. This will <strong>add</strong> {preview.length} participants (existing ones are not affected).</span>
+                <span>
+                  {preview.filter(p => !p._isUpdate).length > 0 && (
+                    <><strong>{preview.filter(p => !p._isUpdate).length} new</strong> participant{preview.filter(p => !p._isUpdate).length !== 1 ? 's' : ''} will be added. </>
+                  )}
+                  {preview.filter(p => p._isUpdate).length > 0 && (
+                    <><strong>{preview.filter(p => p._isUpdate).length}</strong> existing participant{preview.filter(p => p._isUpdate).length !== 1 ? 's' : ''} will be updated. </>
+                  )}
+                  No duplicates will be created.
+                </span>
               </div>
               <div className="overflow-x-auto max-h-72 border border-stone-100 rounded-xl">
                 <table className="w-full text-xs">
                   <thead className="bg-stone-50 sticky top-0">
                     <tr>
-                      {['Name', 'Age', 'Parent', 'Medical'].map(h => (
+                      {['', 'Name', 'Age', 'Parent', 'Medical'].map(h => (
                         <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
@@ -339,6 +359,12 @@ export default function ImportParticipants({ onImport, onClose }) {
                   <tbody className="divide-y divide-stone-50">
                     {preview.map((p, i) => (
                       <tr key={i} className="hover:bg-stone-50">
+                        <td className="px-3 py-2">
+                          {p._isUpdate
+                            ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Update</span>
+                            : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">New</span>
+                          }
+                        </td>
                         <td className="px-3 py-2 font-medium text-forest-950">{p.name}</td>
                         <td className="px-3 py-2 text-stone-600">{p.age || '—'}</td>
                         <td className="px-3 py-2 text-stone-600">{p.parentName || '—'}</td>
@@ -359,7 +385,7 @@ export default function ImportParticipants({ onImport, onClose }) {
               </div>
               <div className="flex gap-3">
                 <button onClick={doImport} className="btn-primary flex-1">
-                  Import {preview.length} Participants
+                  Import ({preview.filter(p => !p._isUpdate).length} new{preview.filter(p => p._isUpdate).length > 0 ? `, ${preview.filter(p => p._isUpdate).length} updated` : ''})
                 </button>
                 <button onClick={() => setStep('map')} className="btn-secondary">Back</button>
               </div>
@@ -374,7 +400,10 @@ export default function ImportParticipants({ onImport, onClose }) {
               </div>
               <div>
                 <p className="font-display font-bold text-forest-950 text-xl">Import complete!</p>
-                <p className="text-stone-500 mt-1">{imported} participants added successfully.</p>
+                <p className="text-stone-500 mt-1">
+                  {importCounts.added > 0 && <>{importCounts.added} participant{importCounts.added !== 1 ? 's' : ''} added. </>}
+                  {importCounts.updated > 0 && <>{importCounts.updated} participant{importCounts.updated !== 1 ? 's' : ''} updated.</>}
+                </p>
               </div>
               <button onClick={onClose} className="btn-primary px-8">Done</button>
             </div>
