@@ -606,8 +606,29 @@ export default function App() {
     })
   }
 
+  // Columns in the staff table that must not be silently dropped on save.
+  const STAFF_REQUIRED_COLUMNS = new Set([
+    'first_aid_trained', 'safeguarding_trained',
+    'first_aid_expires_on', 'safeguarding_expires_on',
+    'dbs_on_update_service', 'dbs_issue_date',
+    'is_assigned_this_season',
+  ])
+
+  function stripMissingStaffColumn(error, payload) {
+    // PostgREST may quote identifiers with double or single quotes depending on version.
+    const msg = String(error?.message || '')
+    const match = msg.match(/column "([^"]+)" of relation "[^"]+" does not exist/)
+      || msg.match(/column '([^']+)' of relation '[^']+' does not exist/i)
+      || msg.match(/PGRST204/) && msg.match(/"([^"]+)"/)  // fallback for PGRST204 format
+    if (!match) return { stripped: null, col: null }
+    const col = match[1]
+    const { [col]: _dropped, ...rest } = payload
+    return { stripped: rest, col }
+  }
+
   async function setStaffList(updater) {
     let firstError = null
+    const droppedColumns = new Set()
     const next = typeof updater === 'function' ? updater(staffList) : updater
     const added = next.filter(s => !staffList.find(x => x.id === s.id))
     const removed = staffList.filter(s => !next.find(x => x.id === s.id))
@@ -620,8 +641,9 @@ export default function App() {
       let payload = { id: s.id, ...rest }
       let { error } = await supabase.from('staff').insert(payload)
       while (error && String(error.message).includes('does not exist')) {
-        const stripped = stripMissingColumn(error, payload)
+        const { stripped, col } = stripMissingStaffColumn(error, payload)
         if (!stripped) break
+        if (col) droppedColumns.add(col)
         payload = stripped
         ;({ error } = await supabase.from('staff').insert(payload))
       }
@@ -642,8 +664,9 @@ export default function App() {
       let payload = { ...rest }
       let { error } = await supabase.from('staff').update(payload).eq('id', s.id)
       while (error && String(error.message).includes('does not exist')) {
-        const stripped = stripMissingColumn(error, payload)
+        const { stripped, col } = stripMissingStaffColumn(error, payload)
         if (!stripped) break
+        if (col) droppedColumns.add(col)
         payload = stripped
         ;({ error } = await supabase.from('staff').update(payload).eq('id', s.id))
       }
@@ -653,6 +676,21 @@ export default function App() {
       }
     }
     reloadS()
+
+    // Surface any silently-dropped required columns as a real error.
+    const missingRequired = [...droppedColumns].filter(c => STAFF_REQUIRED_COLUMNS.has(c))
+    if (missingRequired.length > 0 && !firstError) {
+      const trainingMissing = missingRequired.some(c => c.startsWith('first_aid') || c.startsWith('safeguarding'))
+      const dbsMissing = missingRequired.some(c => c.startsWith('dbs'))
+      const migrations = [
+        ...(trainingMissing ? ['db/31_staff_training_fields.sql'] : []),
+        ...(dbsMissing ? ['db/30_staff_dbs_fields.sql'] : []),
+      ]
+      firstError = new Error(
+        `Some fields were not saved because these database columns are missing: ${missingRequired.join(', ')}. ` +
+        `Please run the following migration(s) in Supabase: ${migrations.join(', ')}`
+      )
+    }
 
     if (firstError) {
       throw firstError
