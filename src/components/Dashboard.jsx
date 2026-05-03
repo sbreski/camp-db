@@ -245,7 +245,8 @@ export default function Dashboard({
             value: followUpsDue.length,
             icon: AlertTriangle,
             color: 'bg-amber-600 text-white',
-            inactive: true,
+            onClick: canAccess('incidents') ? () => onNavigate('incidents') : null,
+            inactive: !canAccess('incidents'),
             visible: true,
           },
           {
@@ -268,8 +269,12 @@ export default function Dashboard({
           )
           if (href) {
             return (
-              <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="card hover:shadow-md transition-shadow text-left group">
-                {inner}
+              <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="card hover:shadow-md transition-shadow text-center group flex flex-col items-center justify-center gap-2 border-2 border-dashed border-forest-300 bg-forest-50 hover:bg-forest-100">
+                <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center group-hover:scale-105 transition-transform`}>
+                  <Icon size={18} strokeWidth={2.5} />
+                </div>
+                <p className="text-xs font-semibold text-forest-800 font-body">{label}</p>
+                <p className="text-[11px] text-forest-500">Open in new tab ↗</p>
               </a>
             )
           }
