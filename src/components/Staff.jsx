@@ -331,7 +331,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
                     checked={form.dbsOnUpdateService}
                     onChange={e => set('dbsOnUpdateService', e.target.checked)}
                   />
-                  <Shield size={13} className="text-indigo-500" /> On DBS update service
+                  <SquareCheckBig size={13} className="text-indigo-500" /> On DBS update service
                 </label>
                 <div>
                   <label className="label">DBS issue date</label>
