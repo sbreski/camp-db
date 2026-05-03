@@ -1483,6 +1483,12 @@ export default function App() {
           label: 'Seasonal staff toggle column is missing (is_assigned_this_season). Run db/23_seasonal_signin_assignments.sql.',
         },
         {
+          key: 'staff_training_columns',
+          table: 'staff',
+          columns: 'id,first_aid_trained,safeguarding_trained,first_aid_expires_on,safeguarding_expires_on',
+          label: 'Staff training columns are missing (first_aid_trained/safeguarding_trained/expiry dates). Run db/31_staff_training_fields.sql.',
+        },
+        {
           key: 'staff_dbs_columns',
           table: 'staff',
           columns: 'id,dbs_on_update_service,dbs_issue_date',
