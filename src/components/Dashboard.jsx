@@ -4,6 +4,8 @@ import ParticipantNameText from './ParticipantNameText'
 import { getFollowUpsDue } from '../utils/workflow'
 import { supabase } from '../supabase'
 
+const TIMETABLE_URL = 'https://docs.google.com/spreadsheets/d/1Ts4Z2fneVbuid-KLp8AjJzUlgEB2vUOIfs1aaLTSVGI/edit?usp=sharing'
+
 function isMissingTableError(error, tableName) {
   const message = String(error?.message || '').toLowerCase()
   return message.includes(String(tableName || '').toLowerCase()) && message.includes('does not exist')
@@ -34,8 +36,6 @@ export default function Dashboard({
   const todayAttendance = attendance.filter(a => a.date === today)
   const signedInIds = new Set(todayAttendance.filter(a => a.signIn && !a.signOut).map(a => a.participantId))
   const signedOutToday = todayAttendance.filter(a => a.signOut).length
-  const medicalCount = participants.filter(p => p.medicalType && p.medicalType.length > 0).length
-  const safeguardingCount = participants.filter(p => p.safeguardingFlag).length
   const recentIncidents = incidents.slice(-3).reverse()
   const followUpsDue = getFollowUpsDue(incidents, participants, today)
   const noteFollowUps = canManageUserResets
@@ -240,34 +240,51 @@ export default function Dashboard({
             visible: canAccess('signin'),
           },
           {
-            label: 'Medical Flags',
-            value: medicalCount,
-            icon: Stethoscope,
-            color: 'bg-red-600 text-white',
-            onClick: () => onNavigate('medical'),
-            visible: canAccess('medical'),
+            label: 'Follow Ups Due',
+            value: followUpsDue.length,
+            icon: AlertTriangle,
+            color: 'bg-amber-600 text-white',
+            inactive: true,
+            visible: true,
           },
           {
-            label: 'Safeguarding Flags',
-            value: safeguardingCount,
-            icon: AlertTriangle,
-            color: 'bg-rose-700 text-white',
-            onClick: () => onNavigate('participants'),
-            visible: canAccess('participants'),
+            label: 'Timetable',
+            value: null,
+            icon: Clock,
+            color: 'bg-forest-700 text-white',
+            href: TIMETABLE_URL,
+            visible: true,
           },
-        ].filter(card => card.visible).map(({ label, value, icon: Icon, color, onClick }) => (
-          <button
-            key={label}
-            onClick={onClick}
-            className="card hover:shadow-md transition-shadow text-left group"
-          >
-            <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform`}>
-              <Icon size={18} strokeWidth={2.5} />
-            </div>
-            <p className="text-2xl font-display font-bold text-forest-950">{value}</p>
-            <p className="text-xs text-stone-500 font-body mt-0.5">{label}</p>
-          </button>
-        ))}
+        ].filter(card => card.visible).map(({ label, value, icon: Icon, color, onClick, href, inactive }) => {
+          const inner = (
+            <>
+              <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform`}>
+                <Icon size={18} strokeWidth={2.5} />
+              </div>
+              {value !== null && <p className="text-2xl font-display font-bold text-forest-950">{value}</p>}
+              <p className="text-xs text-stone-500 font-body mt-0.5">{label}</p>
+            </>
+          )
+          if (href) {
+            return (
+              <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="card hover:shadow-md transition-shadow text-left group">
+                {inner}
+              </a>
+            )
+          }
+          if (inactive) {
+            return (
+              <div key={label} className="card text-left">
+                {inner}
+              </div>
+            )
+          }
+          return (
+            <button key={label} onClick={onClick} className="card hover:shadow-md transition-shadow text-left group">
+              {inner}
+            </button>
+          )
+        })}
       </div>
 
 
@@ -545,7 +562,7 @@ export default function Dashboard({
           )}
           {/* Timetable is always visible */}
           <a
-            href="https://docs.google.com/spreadsheets/d/1Ts4Z2fneVbuid-KLp8AjJzUlgEB2vUOIfs1aaLTSVGI/edit?usp=sharing"
+            href={TIMETABLE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
