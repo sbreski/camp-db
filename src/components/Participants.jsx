@@ -244,6 +244,8 @@ export default function Participants({ participants, setParticipants, onView }) 
   const [showImport, setShowImport] = useState(false)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([])
   const [subTab, setSubTab] = useState('active')
+  const [sortKey, setSortKey] = useState('firstName')
+  const [sortDirection, setSortDirection] = useState('asc')
 
   // Demographics / filter state
   const [ageSplits, setAgeSplits] = useState([10, 14, 18])
@@ -271,9 +273,49 @@ export default function Participants({ participants, setParticipants, onView }) 
     return flag !== false
   }
 
+  function nameParts(participant) {
+    const full = String(participant?.name || '').trim()
+    const parts = full.split(/\s+/).filter(Boolean)
+    return {
+      firstName: parts[0] || '',
+      lastName: parts.length > 1 ? parts[parts.length - 1] : '',
+      fullName: full,
+    }
+  }
+
+  function compareParticipants(a, b) {
+    const direction = sortDirection === 'asc' ? 1 : -1
+
+    if (sortKey === 'age') {
+      const ageA = parseInt(a.age)
+      const ageB = parseInt(b.age)
+      const hasAgeA = !Number.isNaN(ageA)
+      const hasAgeB = !Number.isNaN(ageB)
+      if (!hasAgeA && !hasAgeB) return participantDisplayName(a).localeCompare(participantDisplayName(b))
+      if (!hasAgeA) return 1
+      if (!hasAgeB) return -1
+      if (ageA !== ageB) return (ageA - ageB) * direction
+      return participantDisplayName(a).localeCompare(participantDisplayName(b))
+    }
+
+    if (sortKey === 'gender') {
+      const genderA = genderOf(a)
+      const genderB = genderOf(b)
+      if (genderA !== genderB) return genderA.localeCompare(genderB) * direction
+      return participantDisplayName(a).localeCompare(participantDisplayName(b))
+    }
+
+    const nameA = nameParts(a)
+    const nameB = nameParts(b)
+    const keyA = sortKey === 'lastName' ? nameA.lastName : nameA.firstName
+    const keyB = sortKey === 'lastName' ? nameB.lastName : nameB.firstName
+    const primary = keyA.localeCompare(keyB)
+    if (primary !== 0) return primary * direction
+    return nameA.fullName.localeCompare(nameB.fullName)
+  }
+
   const filteredBySearch = useMemo(() => (
     [...participants]
-      .sort((a, b) => participantDisplayName(a).localeCompare(participantDisplayName(b)))
       .filter(p => participantDisplayName(p).toLowerCase().includes(search.toLowerCase()))
       .filter(p => genderFilter.has(genderOf(p)))
       .filter(p => {
@@ -282,7 +324,8 @@ export default function Participants({ participants, setParticipants, onView }) 
         if (isNaN(age)) return false
         return ageGroupIndex(age, ageSplits) === ageGroupFilter
       })
-  ), [participants, search, genderFilter, ageGroupFilter, ageSplits])
+      .sort(compareParticipants)
+  ), [participants, search, genderFilter, ageGroupFilter, ageSplits, sortKey, sortDirection])
 
   const activeParticipants = filteredBySearch.filter(isIncludedThisSeason)
   const inactiveParticipants = filteredBySearch.filter(p => !isIncludedThisSeason(p))
@@ -369,6 +412,29 @@ export default function Participants({ participants, setParticipants, onView }) 
           onChange={e => setSearch(e.target.value)}
           className="input pl-9"
         />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-xs text-stone-500" htmlFor="participants-sort-by">Sort by</label>
+        <select
+          id="participants-sort-by"
+          className="input py-1.5 text-sm w-auto min-w-40"
+          value={sortKey}
+          onChange={e => setSortKey(e.target.value)}
+        >
+          <option value="firstName">First name</option>
+          <option value="lastName">Last name</option>
+          <option value="age">Age</option>
+          <option value="gender">Gender</option>
+        </select>
+        <button
+          type="button"
+          onClick={() => setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))}
+          className="btn-secondary text-xs py-1.5"
+          aria-label="Toggle sort direction"
+        >
+          {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+        </button>
       </div>
 
       {/* Demographics & filter panel */}

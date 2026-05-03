@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { X, Plus } from 'lucide-react'
+import { X, Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import ParticipantNameText from './ParticipantNameText'
 import { isIncludedThisSeason } from './AttendanceOverview'
 
@@ -17,6 +17,9 @@ const GENDER_COLORS = {
 }
 
 export default function DressingRooms({ participants }) {
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDirection, setSortDirection] = useState('asc')
+
     // Memoized list of included participants
     const includedParticipants = useMemo(() => participants.filter(isIncludedThisSeason), [participants])
 
@@ -47,6 +50,61 @@ export default function DressingRooms({ participants }) {
         ))
       }
     }
+
+    function toggleSort(nextKey) {
+      if (sortKey === nextKey) {
+        setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'))
+        return
+      }
+      setSortKey(nextKey)
+      setSortDirection('asc')
+    }
+
+    function compareBySort(a, b) {
+      const multiplier = sortDirection === 'asc' ? 1 : -1
+      const nameA = String(a.name || '').trim()
+      const nameB = String(b.name || '').trim()
+
+      if (sortKey === 'age') {
+        const ageA = getAge(a)
+        const ageB = getAge(b)
+        if (ageA === null && ageB === null) return nameA.localeCompare(nameB)
+        if (ageA === null) return 1
+        if (ageB === null) return -1
+        if (ageA !== ageB) return (ageA - ageB) * multiplier
+        return nameA.localeCompare(nameB)
+      }
+
+      if (sortKey === 'gender') {
+        const genderA = genderOf(a)
+        const genderB = genderOf(b)
+        if (genderA !== genderB) return genderA.localeCompare(genderB) * multiplier
+        return nameA.localeCompare(nameB)
+      }
+
+      return nameA.localeCompare(nameB) * multiplier
+    }
+
+    const sortedIncludedParticipants = useMemo(
+      () => [...includedParticipants].sort(compareBySort),
+      [includedParticipants, sortKey, sortDirection]
+    )
+
+    function SortHeader({ label, columnKey }) {
+      const active = sortKey === columnKey
+      return (
+        <button
+          type="button"
+          onClick={() => toggleSort(columnKey)}
+          className={`inline-flex items-center gap-1 transition-colors ${active ? 'text-forest-800' : 'text-stone-600 hover:text-stone-800'}`}
+          aria-label={`Sort by ${label}`}
+        >
+          <span>{label}</span>
+          {active && (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+        </button>
+      )
+    }
+
   const [rooms, setRooms] = useState(() => {
     const initialRooms = []
     for (let i = 1; i <= 5; i++) {
@@ -130,14 +188,14 @@ export default function DressingRooms({ participants }) {
           <table className="min-w-full border border-stone-200 rounded-lg">
             <thead>
               <tr className="bg-stone-50">
-                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Name</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Age</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Pronouns</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600"><SortHeader label="Name" columnKey="name" /></th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600"><SortHeader label="Age" columnKey="age" /></th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600"><SortHeader label="Pronouns" columnKey="gender" /></th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-stone-600">Room</th>
               </tr>
             </thead>
             <tbody>
-              {includedParticipants.map(p => (
+              {sortedIncludedParticipants.map(p => (
                 <tr key={p.id} className="border-t border-stone-100">
                   <td className="px-3 py-2"><ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-medium text-sm text-stone-900" /></td>
                   <td className="px-3 py-2">{getAge(p) !== null ? getAge(p) : <span className="text-stone-400">—</span>}</td>
