@@ -44,11 +44,8 @@ export const STAFF_PASSWORD = import.meta.env.VITE_STAFF_PASSWORD || ''
 const OWNER_EMAIL = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 const BASIC_TABS = ['dashboard', 'signin', 'shared-info']
 const ALL_TABS = NAV_ITEMS.map(item => item.id)
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
-const SESSION_WARNING_SECONDS = 60
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
-const LAST_ACTIVITY_STORAGE_KEY = 'camp_db_last_activity_at'
 const tableCache = new Map()
 const ROUTE_PREFETCHERS = {
   dashboard: loadDashboard,
@@ -318,20 +315,14 @@ export default function App() {
     const [canViewTimetableOverview, setCanViewTimetableOverview] = useState(false)
   const [canEditTimetable, setCanEditTimetable] = useState(false)
   const [canViewSafeguardingPerm, setCanViewSafeguardingPerm] = useState(false)
-  const [showSessionWarning, setShowSessionWarning] = useState(false)
-  const [warningCountdown, setWarningCountdown] = useState(SESSION_WARNING_SECONDS)
   const [forcePassword, setForcePassword] = useState('')
   const [forcePasswordConfirm, setForcePasswordConfirm] = useState('')
   const [forcePasswordSaving, setForcePasswordSaving] = useState(false)
   const [forcePasswordError, setForcePasswordError] = useState('')
   const [attendanceError, setAttendanceError] = useState('')
   const [schemaWarnings, setSchemaWarnings] = useState([])
-  const [sessionDebugNow, setSessionDebugNow] = useState(Date.now())
   const authWatchdogRef = useRef(null)
   const permissionsWatchdogRef = useRef(null)
-  const inactivityTimeoutRef = useRef(null)
-  const warningIntervalRef = useRef(null)
-  const sessionWarningDeadlineRef = useRef(null)
   const prefetchedRoutesRef = useRef(new Set())
   const routeState = getRouteState(location.pathname)
   const page = routeState.page
@@ -843,90 +834,6 @@ export default function App() {
     }
   }
 
-  function clearSessionTimers() {
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current)
-      inactivityTimeoutRef.current = null
-    }
-    if (warningIntervalRef.current) {
-      clearInterval(warningIntervalRef.current)
-      warningIntervalRef.current = null
-    }
-    sessionWarningDeadlineRef.current = null
-  }
-
-  function getStoredLastActivity() {
-    try {
-      const raw = localStorage.getItem(LAST_ACTIVITY_STORAGE_KEY)
-      if (!raw) return null
-      const parsed = Number(raw)
-      return Number.isFinite(parsed) ? parsed : null
-    } catch {
-      return null
-    }
-  }
-
-  function setStoredLastActivity(value = Date.now()) {
-    try {
-      localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, String(value))
-    } catch {
-      // Ignore storage failures and continue with in-memory timers.
-    }
-  }
-
-  function clearStoredLastActivity() {
-    try {
-      localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY)
-    } catch {
-      // Ignore storage failures.
-    }
-  }
-
-  function startInactivityTimer() {
-    if (!authed) return
-    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current)
-
-    const lastActivity = getStoredLastActivity() || Date.now()
-    const elapsed = Date.now() - lastActivity
-    const remaining = Math.max(0, INACTIVITY_TIMEOUT_MS - elapsed)
-
-    inactivityTimeoutRef.current = setTimeout(() => {
-      setShowSessionWarning(true)
-      setWarningCountdown(SESSION_WARNING_SECONDS)
-    }, remaining)
-  }
-
-  // Debounce activity updates to reduce localStorage writes
-  function touchSessionActivity() {
-    if (!showSessionWarning) {
-      setStoredLastActivity()
-      startInactivityTimer()
-    }
-  }
-
-  // Only handles showing warning when inactivity threshold is exceeded
-  function checkInactivityThreshold() {
-    if (!authed) return
-    if (showSessionWarning) return // Already warning
-
-    const lastActivity = getStoredLastActivity()
-    if (!lastActivity) {
-      setStoredLastActivity()
-      startInactivityTimer()
-      return
-    }
-
-    const elapsed = Date.now() - lastActivity
-    if (elapsed >= INACTIVITY_TIMEOUT_MS) {
-      setShowSessionWarning(true)
-      setWarningCountdown(SESSION_WARNING_SECONDS)
-      return
-    }
-
-    // Keep the timeout aligned with the latest known activity timestamp.
-    startInactivityTimer()
-  }
-
   function sanitizeAllowedTabs(tabIds) {
     const valid = (tabIds || []).filter(tab => ALL_TABS.includes(tab))
     if (!valid.includes('dashboard')) valid.unshift('dashboard')
@@ -1065,8 +972,6 @@ export default function App() {
         setCurrentUser(data.session?.user || null)
         setAuthLoading(false)
         if (hasSession) {
-          // Start inactivity timing from the current login/session restore moment.
-          setStoredLastActivity()
           setPermissionsLoading(true)
           loadPermissionsForUser(data.session.user)
         } else {
@@ -1112,8 +1017,6 @@ export default function App() {
         setCurrentUser(session?.user || null)
         setPermissionsLoading(hasSession)
         if (hasSession) {
-          // Reset baseline activity on login/session re-establishment.
-          setStoredLastActivity()
           loadPermissionsForUser(session.user)
         } else {
           setAllowedTabIds(BASIC_TABS)
@@ -1213,31 +1116,13 @@ export default function App() {
   }, [permissionsLoading])
 
   async function logout() {
-    clearSessionTimers()
-    clearStoredLastActivity()
     await supabase.auth.signOut()
     routerNavigate(pathForPage('dashboard'), { replace: true })
     setCurrentUser(null)
     setIsAdminUser(false)
     setAllowedTabIds(BASIC_TABS)
     setCanViewTimetableOverview(false)
-      setCanViewSafeguardingPerm(false)
-    setShowSessionWarning(false)
-    setWarningCountdown(SESSION_WARNING_SECONDS)
-  }
-
-  function staySignedIn() {
-    // Null the deadline first so any concurrent interval tick sees it and stops
-    // without setting warningCountdown to 0 (which would trigger the logout effect).
-    sessionWarningDeadlineRef.current = null
-    if (warningIntervalRef.current) {
-      clearInterval(warningIntervalRef.current)
-      warningIntervalRef.current = null
-    }
-    setShowSessionWarning(false)
-    setWarningCountdown(SESSION_WARNING_SECONDS)
-    setStoredLastActivity()
-    startInactivityTimer()
+    setCanViewSafeguardingPerm(false)
   }
 
   const currentUserEmail = (currentUser?.email || '').toLowerCase()
@@ -1261,21 +1146,7 @@ export default function App() {
       || isAdminUser
       || allowedTabIds.includes('medical')
   )
-  const canViewSessionDebug = Boolean(isOwnerUser || isAdminUser)
   const requiresPasswordChange = Boolean(currentUser?.user_metadata?.must_change_password)
-
-  const debugLastActivity = getStoredLastActivity()
-  const debugElapsedMs = debugLastActivity ? Math.max(0, sessionDebugNow - debugLastActivity) : 0
-  const debugRemainingMs = Math.max(0, INACTIVITY_TIMEOUT_MS - debugElapsedMs)
-  const debugLastActivityLabel = debugLastActivity
-    ? new Date(debugLastActivity).toLocaleTimeString('en-GB')
-    : 'none'
-
-  useEffect(() => {
-    if (!canViewSessionDebug || !authed) return undefined
-    const id = setInterval(() => setSessionDebugNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [canViewSessionDebug, authed])
 
   async function submitForcedPasswordChange(e) {
     e.preventDefault()
@@ -1311,101 +1182,6 @@ export default function App() {
       setForcePasswordSaving(false)
     }
   }
-
-  useEffect(() => {
-    if (!authed || !isAdminUser) {
-      clearSessionTimers()
-      clearStoredLastActivity()
-      setShowSessionWarning(false)
-      setWarningCountdown(SESSION_WARNING_SECONDS)
-      return
-    }
-
-    function handleActivity() {
-      if (showSessionWarning) return
-      touchSessionActivity()
-    }
-
-    function handleVisibilityOrFocus() {
-      if (document.visibilityState === 'visible') {
-        checkInactivityThreshold()
-      }
-    }
-
-    // Treat only explicit user interactions as activity (not cursor movement).
-    const activityEvents = ['click', 'keydown', 'touchstart', 'input', 'change', 'submit']
-
-    checkInactivityThreshold()
-
-    for (const eventName of activityEvents) {
-      window.addEventListener(eventName, handleActivity)
-    }
-    window.addEventListener('focus', handleVisibilityOrFocus)
-    window.addEventListener('pageshow', handleVisibilityOrFocus)
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus)
-
-    return () => {
-      for (const eventName of activityEvents) {
-        window.removeEventListener(eventName, handleActivity)
-      }
-      window.removeEventListener('focus', handleVisibilityOrFocus)
-      window.removeEventListener('pageshow', handleVisibilityOrFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus)
-    }
-  }, [authed, showSessionWarning, isAdminUser])
-
-  useEffect(() => {
-    if (!authed || !showSessionWarning) {
-      if (warningIntervalRef.current) {
-        clearInterval(warningIntervalRef.current)
-        warningIntervalRef.current = null
-      }
-      sessionWarningDeadlineRef.current = null
-      return
-    }
-
-    // Set a fresh deadline whenever the warning modal opens.
-    sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
-    setWarningCountdown(SESSION_WARNING_SECONDS)
-
-    if (warningIntervalRef.current) clearInterval(warningIntervalRef.current)
-    warningIntervalRef.current = setInterval(() => {
-      // If staySignedIn() cleared the deadline, stop without triggering logout.
-      const deadline = sessionWarningDeadlineRef.current
-      if (deadline === null) {
-        clearInterval(warningIntervalRef.current)
-        warningIntervalRef.current = null
-        return
-      }
-
-      const remainingMs = deadline - Date.now()
-      if (remainingMs <= 0) {
-        clearInterval(warningIntervalRef.current)
-        warningIntervalRef.current = null
-        // Signal logout via state — the effect below reads fresh React state.
-        setWarningCountdown(0)
-        return
-      }
-
-      setWarningCountdown(Math.max(1, Math.ceil(remainingMs / 1000)))
-    }, 1000)
-
-    return () => {
-      if (warningIntervalRef.current) {
-        clearInterval(warningIntervalRef.current)
-        warningIntervalRef.current = null
-      }
-    }
-  }, [authed, showSessionWarning])
-
-  // Logout trigger — runs with fresh React state, so showSessionWarning is
-  // guaranteed to be true only when the user has NOT clicked "Stay signed in".
-  useEffect(() => {
-    if (authed && showSessionWarning && warningCountdown === 0) {
-      logout()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, showSessionWarning, warningCountdown])
 
   useEffect(() => {
     if (!authed || permissionsLoading) return
@@ -1722,34 +1498,7 @@ export default function App() {
           </Suspense>
         </div>
       </main>
-      {showSessionWarning && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white border border-stone-200 shadow-xl p-5">
-            <h3 className="font-display font-semibold text-forest-950 text-lg">Stay signed in?</h3>
-            <p className="text-sm text-stone-600 mt-2">
-              You have been inactive. You will be signed out in <span className="font-semibold text-rose-700">{warningCountdown}s</span>.
-            </p>
-            <div className="mt-4 flex items-center gap-2">
-              <button onClick={staySignedIn} className="btn-primary flex-1">Yes, stay signed in</button>
-              <button onClick={logout} className="btn-secondary">Sign out now</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {canViewSessionDebug && authed && (
-        <div className="fixed top-3 right-3 z-40 rounded-lg border border-stone-300 bg-white/95 px-2.5 py-1.5 text-[11px] text-stone-700 shadow">
-          <p>Time remaining: <span className="font-semibold tabular-nums">
-            {(() => {
-              const totalSecs = showSessionWarning
-                ? warningCountdown
-                : Math.ceil(debugRemainingMs / 1000)
-              const m = Math.floor(totalSecs / 60)
-              const s = totalSecs % 60
-              return `${m}:${String(s).padStart(2, '0')}`
-            })()}
-          </span></p>
-        </div>
-      )}
+
     </div>
   )
 }
