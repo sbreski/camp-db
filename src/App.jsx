@@ -71,6 +71,7 @@ const BASIC_TABS = ['dashboard', 'signin', 'shared-info']
 const ALL_TABS = NAV_ITEMS.map(item => item.id)
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
+const SESSION_MAX_DURATION_MS = 12 * 60 * 60 * 1000
 const tableCache = new Map()
 const ROUTE_PREFETCHERS = {
   dashboard: loadDashboard,
@@ -346,8 +347,10 @@ export default function App() {
   const [forcePasswordError, setForcePasswordError] = useState('')
   const [attendanceError, setAttendanceError] = useState('')
   const [schemaWarnings, setSchemaWarnings] = useState([])
+  const [sessionExpiryAt, setSessionExpiryAt] = useState(null)
   const authWatchdogRef = useRef(null)
   const permissionsWatchdogRef = useRef(null)
+  const sessionExpiryTimeoutRef = useRef(null)
   const prefetchedRoutesRef = useRef(new Set())
   const routeState = getRouteState(location.pathname)
   const page = routeState.page
@@ -879,6 +882,77 @@ export default function App() {
     return allowedTabIds.includes(tabId)
   }
 
+  function clearSessionExpiryTimer() {
+    if (sessionExpiryTimeoutRef.current) {
+      clearTimeout(sessionExpiryTimeoutRef.current)
+      sessionExpiryTimeoutRef.current = null
+    }
+  }
+
+  // Load the server-side expiry for this user. Returns the expiry as a ms timestamp,
+  // or null if no record exists or the request fails.
+  async function loadServerSessionExpiry(userId) {
+    if (!userId) return null
+    try {
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select('expires_at')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (error) return null
+      if (!data?.expires_at) return null
+      const ms = new Date(data.expires_at).getTime()
+      return Number.isFinite(ms) ? ms : null
+    } catch {
+      return null
+    }
+  }
+
+  // Write (or overwrite) the expiry for this user in the server table.
+  async function upsertServerSessionExpiry(userId, expiresAtMs) {
+    if (!userId || !Number.isFinite(expiresAtMs)) return
+    try {
+      await supabase.from('user_sessions').upsert({
+        user_id: userId,
+        expires_at: new Date(expiresAtMs).toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+    } catch {
+      // Ignore write failures — timer was already set in state.
+    }
+  }
+
+  // Delete the server record when the user logs out.
+  async function deleteServerSessionExpiry(userId) {
+    if (!userId) return
+    try {
+      await supabase.from('user_sessions').delete().eq('user_id', userId)
+    } catch {
+      // Ignore failures.
+    }
+  }
+
+  // Called on app load when there is an existing Supabase session.
+  // Reads the server expiry; creates a fresh 12-hour window if missing or already expired.
+  async function initServerSessionExpiry(userId) {
+    if (!userId) return
+    const now = Date.now()
+    let expiresAt = await loadServerSessionExpiry(userId)
+    if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+      expiresAt = now + SESSION_MAX_DURATION_MS
+      upsertServerSessionExpiry(userId, expiresAt)
+    }
+    setSessionExpiryAt(expiresAt)
+  }
+
+  // Called on a fresh SIGNED_IN event — always resets to a new 12-hour window.
+  async function resetServerSessionExpiry(userId) {
+    if (!userId) return
+    const expiresAt = Date.now() + SESSION_MAX_DURATION_MS
+    upsertServerSessionExpiry(userId, expiresAt)
+    setSessionExpiryAt(expiresAt)
+  }
+
   async function loadPermissionsForUser(user) {
     if (!user) {
       setIsAdminUser(false)
@@ -997,9 +1071,12 @@ export default function App() {
         setCurrentUser(data.session?.user || null)
         setAuthLoading(false)
         if (hasSession) {
+          initServerSessionExpiry(data.session.user.id)
           setPermissionsLoading(true)
           loadPermissionsForUser(data.session.user)
         } else {
+          clearSessionExpiryTimer()
+          setSessionExpiryAt(null)
           setPermissionsLoading(false)
           setAllowedTabIds(BASIC_TABS)
           setCanViewTimetableOverview(false)
@@ -1042,8 +1119,13 @@ export default function App() {
         setCurrentUser(session?.user || null)
         setPermissionsLoading(hasSession)
         if (hasSession) {
+          if (event === 'SIGNED_IN') {
+            resetServerSessionExpiry(session.user.id)
+          }
           loadPermissionsForUser(session.user)
         } else {
+          clearSessionExpiryTimer()
+          setSessionExpiryAt(null)
           setAllowedTabIds(BASIC_TABS)
           setCanViewTimetableOverview(false)
           setCanEditTimetable(false)
@@ -1141,7 +1223,11 @@ export default function App() {
   }, [permissionsLoading])
 
   async function logout() {
+    clearSessionExpiryTimer()
+    const userId = currentUser?.id
+    setSessionExpiryAt(null)
     await supabase.auth.signOut()
+    if (userId) deleteServerSessionExpiry(userId)
     routerNavigate(pathForPage('dashboard'), { replace: true })
     setCurrentUser(null)
     setIsAdminUser(false)
@@ -1149,6 +1235,30 @@ export default function App() {
     setCanViewTimetableOverview(false)
     setCanViewSafeguardingPerm(false)
   }
+
+  // Schedule the hard logout when the server-side expiry is known.
+  useEffect(() => {
+    if (!authed || !Number.isFinite(sessionExpiryAt)) {
+      clearSessionExpiryTimer()
+      return
+    }
+
+    const remainingMs = sessionExpiryAt - Date.now()
+    if (remainingMs <= 0) {
+      logout()
+      return
+    }
+
+    clearSessionExpiryTimer()
+    sessionExpiryTimeoutRef.current = setTimeout(() => {
+      logout()
+    }, remainingMs)
+
+    return () => {
+      clearSessionExpiryTimer()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, sessionExpiryAt])
 
   const currentUserEmail = (currentUser?.email || '').toLowerCase()
   const isOwnerUser = Boolean(OWNER_EMAIL && currentUserEmail === OWNER_EMAIL)
