@@ -1163,7 +1163,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       {hasMedical && (
                         <span
                           className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 cursor-help"
-                          title={String(p.medicalType || '').trim() || 'No medical details recorded'}
+                          title={String(p.medicalDetails || '').trim() || 'No medical details recorded'}
                         >
                           M
                         </span>

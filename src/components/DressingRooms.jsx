@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { X, Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import ParticipantNameText from './ParticipantNameText'
 import { isIncludedThisSeason } from './AttendanceOverview'
@@ -22,40 +22,77 @@ const GENDER_LABELS = {
   nb: 'Non-binary / other',
 }
 
-const AGE_GROUPS = [
-  { id: 'under-10', label: 'Under 10', min: 0, max: 9 },
-  { id: '10-12', label: '10-12', min: 10, max: 12 },
-  { id: '13-15', label: '13-15', min: 13, max: 15 },
-  { id: '16-plus', label: '16+', min: 16, max: Infinity },
-  { id: 'unknown', label: 'Unknown age', min: null, max: null },
-]
+const DEFAULT_AGE_SPLITS = [10, 13, 16]
 
 const GROUP_BY_OPTIONS = [
   { id: 'gender', label: 'Gender' },
   { id: 'age', label: 'Age group' },
 ]
 
-function ageGroupOf(age) {
+function buildAgeGroups(splits) {
+  const sortedSplits = [...splits]
+    .map(value => Number.parseInt(value, 10))
+    .filter(value => !Number.isNaN(value) && value >= 1 && value <= 98)
+    .sort((a, b) => a - b)
+
+  const groups = []
+  let min = 0
+
+  sortedSplits.forEach(split => {
+    const max = split - 1
+    groups.push({
+      id: `${min}-${max}`,
+      label: min === 0 ? `Under ${split}` : `${min}-${max}`,
+      min,
+      max,
+    })
+    min = split
+  })
+
+  groups.push({
+    id: `${min}-plus`,
+    label: `${min}+`,
+    min,
+    max: Infinity,
+  })
+
+  groups.push({
+    id: 'unknown',
+    label: 'Unknown age',
+    min: null,
+    max: null,
+  })
+
+  return groups
+}
+
+function ageGroupOf(age, ageGroups) {
   if (age === null || age === undefined || Number.isNaN(Number(age))) return 'unknown'
   const numericAge = Number(age)
-  const match = AGE_GROUPS.find(g => g.min !== null && numericAge >= g.min && numericAge <= g.max)
+  const match = ageGroups.find(g => g.min !== null && numericAge >= g.min && numericAge <= g.max)
   return match ? match.id : 'unknown'
 }
 
-function ageGroupLabel(age) {
-  const id = ageGroupOf(age)
-  return AGE_GROUPS.find(g => g.id === id)?.label || 'Unknown age'
+function ageGroupLabel(age, ageGroups) {
+  const id = ageGroupOf(age, ageGroups)
+  return ageGroups.find(g => g.id === id)?.label || 'Unknown age'
 }
 
 export default function DressingRooms({ participants }) {
   const [sortKey, setSortKey] = useState('name')
   const [sortDirection, setSortDirection] = useState('asc')
+  const [ageSplits, setAgeSplits] = useState(DEFAULT_AGE_SPLITS)
+  const ageGroups = useMemo(() => buildAgeGroups(ageSplits), [ageSplits])
   const [genderFilter, setGenderFilter] = useState(new Set(['m', 'f', 'nb']))
-  const [ageFilter, setAgeFilter] = useState(new Set(AGE_GROUPS.map(g => g.id)))
+  const [ageFilter, setAgeFilter] = useState(() => new Set(buildAgeGroups(DEFAULT_AGE_SPLITS).map(g => g.id)))
   const [highlightBy, setHighlightBy] = useState('gender')
   const [viewMode, setViewMode] = useState('table')
   const [groupBy, setGroupBy] = useState('gender')
   const [collapsedGroups, setCollapsedGroups] = useState(new Set())
+
+  useEffect(() => {
+    setAgeFilter(new Set(ageGroups.map(group => group.id)))
+  }, [ageGroups])
 
     // Memoized list of included participants
     const includedParticipants = useMemo(() => participants.filter(isIncludedThisSeason), [participants])
@@ -123,9 +160,30 @@ export default function DressingRooms({ participants }) {
       })
     }
 
+    function updateAgeSplit(index, value) {
+      const parsed = Number.parseInt(value, 10)
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 98) return
+      setAgeSplits(prev => {
+        const next = [...prev]
+        next[index] = parsed
+        return next.sort((a, b) => a - b)
+      })
+    }
+
+    function addAgeSplit() {
+      setAgeSplits(prev => {
+        const nextValue = prev.length ? Math.min(Math.max(...prev) + 3, 98) : 10
+        return [...prev, nextValue].sort((a, b) => a - b)
+      })
+    }
+
+    function removeAgeSplit(index) {
+      setAgeSplits(prev => prev.filter((_, currentIndex) => currentIndex !== index))
+    }
+
     function clearGroupFilters() {
       setGenderFilter(new Set(['m', 'f', 'nb']))
-      setAgeFilter(new Set(AGE_GROUPS.map(g => g.id)))
+      setAgeFilter(new Set(ageGroups.map(g => g.id)))
     }
 
     function compareBySort(a, b) {
@@ -161,9 +219,9 @@ export default function DressingRooms({ participants }) {
     const visibleParticipants = useMemo(() => (
       sortedIncludedParticipants.filter(participant => {
         const participantAge = getAge(participant)
-        return genderFilter.has(genderOf(participant)) && ageFilter.has(ageGroupOf(participantAge))
+        return genderFilter.has(genderOf(participant)) && ageFilter.has(ageGroupOf(participantAge, ageGroups))
       })
-    ), [sortedIncludedParticipants, genderFilter, ageFilter])
+    ), [sortedIncludedParticipants, genderFilter, ageFilter, ageGroups])
 
     const genderCounts = useMemo(() => {
       const counts = { m: 0, f: 0, nb: 0 }
@@ -175,34 +233,34 @@ export default function DressingRooms({ participants }) {
 
     const ageGroupCounts = useMemo(() => {
       const counts = {}
-      AGE_GROUPS.forEach(group => { counts[group.id] = 0 })
+      ageGroups.forEach(group => { counts[group.id] = 0 })
       includedParticipants.forEach(participant => {
-        const group = ageGroupOf(getAge(participant))
+        const group = ageGroupOf(getAge(participant), ageGroups)
         counts[group] += 1
       })
       return counts
-    }, [includedParticipants])
+    }, [includedParticipants, ageGroups])
 
     const groupedParticipants = useMemo(() => {
       const groups = new Map()
       visibleParticipants.forEach(participant => {
-        const key = groupBy === 'gender' ? genderOf(participant) : ageGroupOf(getAge(participant))
+        const key = groupBy === 'gender' ? genderOf(participant) : ageGroupOf(getAge(participant), ageGroups)
         if (!groups.has(key)) groups.set(key, [])
         groups.get(key).push(participant)
       })
 
       const orderedKeys = groupBy === 'gender'
         ? ['m', 'f', 'nb']
-        : AGE_GROUPS.map(g => g.id)
+        : ageGroups.map(g => g.id)
 
       return orderedKeys
         .filter(key => groups.has(key))
         .map(key => ({ key, participants: groups.get(key) }))
-    }, [visibleParticipants, groupBy])
+    }, [visibleParticipants, groupBy, ageGroups])
 
     function groupLabel(groupKey) {
       if (groupBy === 'gender') return GENDER_LABELS[groupKey] || 'Other'
-      return AGE_GROUPS.find(g => g.id === groupKey)?.label || 'Other'
+      return ageGroups.find(g => g.id === groupKey)?.label || 'Other'
     }
 
     function toggleGroup(groupKey) {
@@ -230,11 +288,13 @@ export default function DressingRooms({ participants }) {
         return 'bg-violet-200/70 border-l-4 border-l-violet-500'
       }
 
-      if (groupKey === 'under-10') return 'bg-emerald-200/70 border-l-4 border-l-emerald-500'
-      if (groupKey === '10-12') return 'bg-cyan-200/70 border-l-4 border-l-cyan-500'
-      if (groupKey === '13-15') return 'bg-amber-200/75 border-l-4 border-l-amber-500'
-      if (groupKey === '16-plus') return 'bg-rose-200/70 border-l-4 border-l-rose-500'
-      return 'bg-stone-200/70 border-l-4 border-l-stone-400'
+      const ageIndex = ageGroups.findIndex(group => group.id === groupKey)
+      if (ageIndex === 0) return 'bg-emerald-200/70 border-l-4 border-l-emerald-500'
+      if (ageIndex === 1) return 'bg-cyan-200/70 border-l-4 border-l-cyan-500'
+      if (ageIndex === 2) return 'bg-amber-200/75 border-l-4 border-l-amber-500'
+      if (ageIndex === 3) return 'bg-rose-200/70 border-l-4 border-l-rose-500'
+      if (groupKey === 'unknown') return 'bg-stone-200/70 border-l-4 border-l-stone-400'
+      return 'bg-lime-200/70 border-l-4 border-l-lime-500'
     }
 
     function groupHeaderClasses(groupKey) {
@@ -244,11 +304,13 @@ export default function DressingRooms({ participants }) {
         return 'bg-violet-300 text-violet-950 border-b border-violet-400'
       }
 
-      if (groupKey === 'under-10') return 'bg-emerald-300 text-emerald-950 border-b border-emerald-400'
-      if (groupKey === '10-12') return 'bg-cyan-300 text-cyan-950 border-b border-cyan-400'
-      if (groupKey === '13-15') return 'bg-amber-300 text-amber-950 border-b border-amber-400'
-      if (groupKey === '16-plus') return 'bg-rose-300 text-rose-950 border-b border-rose-400'
-      return 'bg-stone-300 text-stone-900 border-b border-stone-400'
+      const ageIndex = ageGroups.findIndex(group => group.id === groupKey)
+      if (ageIndex === 0) return 'bg-emerald-300 text-emerald-950 border-b border-emerald-400'
+      if (ageIndex === 1) return 'bg-cyan-300 text-cyan-950 border-b border-cyan-400'
+      if (ageIndex === 2) return 'bg-amber-300 text-amber-950 border-b border-amber-400'
+      if (ageIndex === 3) return 'bg-rose-300 text-rose-950 border-b border-rose-400'
+      if (groupKey === 'unknown') return 'bg-stone-300 text-stone-900 border-b border-stone-400'
+      return 'bg-lime-300 text-lime-950 border-b border-lime-400'
     }
 
     function rowGroupClass(participant) {
@@ -257,7 +319,7 @@ export default function DressingRooms({ participants }) {
         return highlightClassesForGroupKey(genderOf(participant), 'gender')
       }
 
-      return highlightClassesForGroupKey(ageGroupOf(getAge(participant)), 'age')
+      return highlightClassesForGroupKey(ageGroupOf(getAge(participant), ageGroups), 'age')
     }
 
     function SortHeader({ label, columnKey }) {
@@ -380,7 +442,7 @@ export default function DressingRooms({ participants }) {
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-stone-500">Age filters:</span>
-            {AGE_GROUPS.map(group => {
+            {ageGroups.map(group => {
               const active = ageFilter.has(group.id)
               return (
                 <button
@@ -398,6 +460,39 @@ export default function DressingRooms({ participants }) {
                 </button>
               )
             })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-stone-500">Age band splits:</span>
+            {ageSplits.map((split, index) => (
+              <div key={`${split}-${index}`} className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={1}
+                  max={98}
+                  value={split}
+                  onChange={e => updateAgeSplit(index, e.target.value)}
+                  className="w-14 rounded-md border border-stone-300 bg-white px-2 py-1 text-xs font-semibold text-stone-700"
+                />
+                {ageSplits.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeAgeSplit(index)}
+                    className="text-xs text-stone-400 hover:text-red-600"
+                    aria-label={`Remove age split ${split}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addAgeSplit}
+              className="inline-flex items-center rounded-md border border-forest-200 bg-forest-50 px-2 py-1 text-xs font-semibold text-forest-700 hover:bg-forest-100"
+            >
+              Add split
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -483,7 +578,7 @@ export default function DressingRooms({ participants }) {
                         <div className="inline-flex items-center gap-1.5">
                           <span className="font-semibold text-stone-800">{getAge(p)}</span>
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border border-stone-200 bg-white text-stone-600">
-                            {ageGroupLabel(getAge(p))}
+                            {ageGroupLabel(getAge(p), ageGroups)}
                           </span>
                         </div>
                       ) : (
@@ -553,7 +648,7 @@ export default function DressingRooms({ participants }) {
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
                               {getAge(p) !== null ? (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border border-stone-200 bg-white text-stone-700">
-                                  Age {getAge(p)} · {ageGroupLabel(getAge(p))}
+                                    Age {getAge(p)} · {ageGroupLabel(getAge(p), ageGroups)}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border border-stone-200 bg-white text-stone-500">
