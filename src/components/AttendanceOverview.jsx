@@ -98,7 +98,7 @@ function attendanceReasonLabel(value) {
 }
 
 // ─── Daily Overview ───────────────────────────────────────────────────────────
-function DailyOverview({ participants, attendance, startEditTime, openCollectionDetail }) {
+function DailyOverview({ participants, attendance, startEditTime, openCollectionDetail, onPrintContextChange }) {
   const [date, setDate] = useState(todayKey())
   const records = attendance.filter(a => a.date === date)
 
@@ -109,6 +109,10 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
   const present = rows.filter(r => r.rec?.signIn).length
   const absent = rows.filter(r => !r.rec?.signIn).length
   const lateCount = rows.filter(r => lateMinutes(r.rec?.signIn) > 0).length
+
+  useEffect(() => {
+    if (typeof onPrintContextChange === 'function') onPrintContextChange(date)
+  }, [date, onPrintContextChange])
 
   return (
     <div className="space-y-4">
@@ -157,7 +161,6 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
                 <div>
                   <div className="flex items-center gap-2">
                     <ParticipantNameText participant={p} showDiagnosedHighlight={false} className="text-sm font-medium text-forest-950" />
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">Included</span>
                   </div>
                   {late > 0 && (
                     <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
@@ -369,7 +372,6 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
                   <td className="px-4 py-2 font-medium text-forest-950 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-medium text-forest-950" />
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">Included</span>
                     </div>
                   </td>
                   {days.map(day => {
@@ -443,7 +445,7 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
 }
 
 // ─── Participant Overview ─────────────────────────────────────────────────────
-function ParticipantOverview({ participants, attendance, startEditTime, openCollectionDetail }) {
+function ParticipantOverview({ participants, attendance, startEditTime, openCollectionDetail, onPrintContextChange }) {
   const [selectedId, setSelectedId] = useState(participants[0]?.id || '')
   const participant = participants.find(p => p.id === selectedId)
 
@@ -456,6 +458,10 @@ function ParticipantOverview({ participants, attendance, startEditTime, openColl
       setSelectedId(participants[0].id)
     }
   }, [participants, selectedId])
+
+  useEffect(() => {
+    if (typeof onPrintContextChange === 'function') onPrintContextChange(selectedId)
+  }, [selectedId, onPrintContextChange])
 
   const records = attendance
     .filter(a => a.participantId === selectedId)
@@ -623,8 +629,20 @@ export default function AttendanceOverview({ participants, attendance, setAttend
   const [editingTime, setEditingTime] = useState(null)
   const [timeInput, setTimeInput] = useState('')
   const [collectionDetail, setCollectionDetail] = useState(null)
+  const [dailyPrintDate, setDailyPrintDate] = useState(todayKey())
+  const [participantPrintId, setParticipantPrintId] = useState('')
   const includedParticipants = participants.filter(isIncludedThisSeason)
   const excludedCount = participants.length - includedParticipants.length
+
+  useEffect(() => {
+    if (!includedParticipants.length) {
+      setParticipantPrintId('')
+      return
+    }
+    if (!includedParticipants.some(p => p.id === participantPrintId)) {
+      setParticipantPrintId(includedParticipants[0].id)
+    }
+  }, [includedParticipants, participantPrintId])
 
   function startEditTime(recordId, type, currentTime, date) {
     const record = attendance.find(r => r.id === recordId)
@@ -692,66 +710,147 @@ export default function AttendanceOverview({ participants, attendance, setAttend
     )))
   }
 
+  function esc(value) {
+    return String(value || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;')
+  }
+
+  function openPrintWindow({ title, subtitle, tableHtml, alignFirstColumn = true }) {
+    const html = `<!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>${esc(title)}</title>
+        <style>
+          body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+          h1 { font-size: 20px; margin: 0 0 6px; }
+          .meta { color: #6b7280; font-size: 12px; margin-bottom: 8px; }
+          .sub { color: #374151; font-size: 13px; margin-bottom: 14px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: middle; text-align: center; }
+          ${alignFirstColumn ? 'th:first-child, td:first-child { text-align: left; }' : ''}
+        </style>
+      </head>
+      <body>
+        <h1>${esc(title)}</h1>
+        <div class="meta">Generated: ${new Date().toLocaleString('en-GB')}</div>
+        ${subtitle ? `<div class="sub">${esc(subtitle)}</div>` : ''}
+        ${tableHtml}
+        <script>window.print();</script>
+      </body>
+    </html>`
+
+    const win = window.open('', '_blank', 'width=1100,height=800')
+    if (!win) {
+      alert('Allow pop-ups to print this report.')
+      return
+    }
+    win.document.write(html)
+    win.document.close()
+  }
+
   // ── Print handler ──────────────────────────────────────────────────────────
   function printAttendanceView() {
-    const printTargetSelectorByTab = {
-      Daily: '[data-daily-attendance-grid]',
-      Weekly: '[data-weekly-attendance-grid]',
-      Participant: '[data-participant-attendance-grid]',
-    }
-    const printTitleByTab = {
-      Daily: 'Daily Attendance Grid',
-      Weekly: 'Weekly Attendance Grid',
-      Participant: 'Participant Attendance Grid',
-    }
-
-    const targetSelector = printTargetSelectorByTab[tab]
-    if (targetSelector) {
-      const targetNode = document.querySelector(targetSelector)
-      if (targetNode) {
-        const printableNode = targetNode.cloneNode(true)
-        printableNode.querySelectorAll('button').forEach((button) => {
-          const replacement = document.createElement('span')
-          replacement.textContent = (button.textContent || '').trim() || '—'
-          replacement.style.display = 'inline-block'
-          replacement.style.minWidth = '1.25rem'
-          replacement.style.textAlign = 'center'
-          replacement.style.fontWeight = '600'
-          button.replaceWith(replacement)
+    if (tab === 'Daily') {
+      const records = attendance.filter(a => a.date === dailyPrintDate)
+      const rows = [...includedParticipants]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((participant) => {
+          const rec = records.find(r => r.participantId === participant.id)
+          const late = lateMinutes(rec?.signIn)
+          const reasonLabel = attendanceReasonLabel(rec?.exceptionReason || rec?.exception_reason)
+          const reasonNotes = rec?.exceptionNotes || rec?.exception_notes || ''
+          const reasonText = reasonLabel ? `${reasonLabel}${reasonNotes ? ` - ${reasonNotes}` : ''}` : '—'
+          return `
+            <tr>
+              <td>${esc(participantDisplayName(participant))}</td>
+              <td>${esc(fmtTime(rec?.signIn))}</td>
+              <td>${esc(fmtTime(rec?.signOut))}</td>
+              <td>${esc(duration(rec?.signIn, rec?.signOut) || (rec?.signIn ? 'On site' : '—'))}</td>
+              <td>${esc(parseCollectionDetails(rec?.collectedBy).summary)}</td>
+              <td>${esc(late > 0 ? `${late} min late` : '—')}</td>
+              <td>${esc(reasonText)}</td>
+            </tr>
+          `
         })
+        .join('')
 
-        const title = printTitleByTab[tab] || 'Attendance Grid'
-        const html = `<!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8" />
-            <title>${title}</title>
-            <style>
-              body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
-              h1 { font-size: 20px; margin: 0 0 6px; }
-              .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
-              table { width: 100%; border-collapse: collapse; font-size: 12px; }
-              th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: middle; text-align: center; }
-              th:first-child, td:first-child { text-align: left; }
-            </style>
-          </head>
-          <body>
-            <h1>${title}</h1>
-            <div class="meta">Generated: ${new Date().toLocaleString('en-GB')}</div>
-            ${printableNode.outerHTML}
-            <script>window.print();</script>
-          </body>
-        </html>`
+      openPrintWindow({
+        title: 'Daily Attendance',
+        subtitle: fmtDate(dailyPrintDate),
+        tableHtml: `
+          <table>
+            <thead>
+              <tr>
+                <th>Participant</th>
+                <th>Sign In</th>
+                <th>Sign Out</th>
+                <th>Duration</th>
+                <th>Collected by</th>
+                <th>Late</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="7">No participants recorded for this date.</td></tr>'}
+            </tbody>
+          </table>
+        `,
+      })
+      return
+    }
 
-        const win = window.open('', '_blank', 'width=1100,height=800')
-        if (!win) {
-          alert('Allow pop-ups to print this report.')
-          return
-        }
-        win.document.write(html)
-        win.document.close()
-        return
-      }
+    if (tab === 'Participant') {
+      const participant = includedParticipants.find(p => p.id === participantPrintId)
+      const records = attendance
+        .filter(a => a.participantId === participantPrintId)
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+
+      const rows = records.map((rec) => {
+        const late = lateMinutes(rec?.signIn)
+        const reasonLabel = attendanceReasonLabel(rec?.exceptionReason || rec?.exception_reason)
+        const reasonNotes = rec?.exceptionNotes || rec?.exception_notes || ''
+        const reasonText = reasonLabel ? `${reasonLabel}${reasonNotes ? ` - ${reasonNotes}` : ''}` : '—'
+        return `
+          <tr>
+            <td>${esc(fmtDate(rec.date))}</td>
+            <td>${esc(fmtTime(rec.signIn))}</td>
+            <td>${esc(fmtTime(rec.signOut))}</td>
+            <td>${esc(duration(rec.signIn, rec.signOut) || '—')}</td>
+            <td>${esc(parseCollectionDetails(rec.collectedBy).summary)}</td>
+            <td>${esc(late > 0 ? `${late} min late` : '—')}</td>
+            <td>${esc(reasonText)}</td>
+          </tr>
+        `
+      }).join('')
+
+      openPrintWindow({
+        title: 'Participant Attendance History',
+        subtitle: participant ? participantDisplayName(participant) : 'Participant not selected',
+        tableHtml: `
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Sign In</th>
+                <th>Sign Out</th>
+                <th>Duration</th>
+                <th>Collected by</th>
+                <th>Late</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="7">No attendance records found for this participant.</td></tr>'}
+            </tbody>
+          </table>
+        `,
+      })
+      return
     }
 
     if (tab === 'Weekly') {
@@ -772,67 +871,15 @@ export default function AttendanceOverview({ participants, attendance, setAttend
         button.replaceWith(replacement)
       })
 
-      const html = `<!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <title>Weekly Attendance Grid</title>
-          <style>
-            body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
-            h1 { font-size: 20px; margin: 0 0 6px; }
-            .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: middle; text-align: center; }
-            th:first-child, td:first-child { text-align: left; }
-          </style>
-        </head>
-        <body>
-          <h1>Weekly Attendance Grid</h1>
-          <div class="meta">Generated: ${new Date().toLocaleString('en-GB')}</div>
-          ${printableTable.outerHTML}
-          <script>window.print();</script>
-        </body>
-      </html>`
-
-      const win = window.open('', '_blank', 'width=1100,height=800')
-      if (!win) {
-        alert('Allow pop-ups to print this report.')
-        return
-      }
-      win.document.write(html)
-      win.document.close()
+      openPrintWindow({
+        title: 'Weekly Attendance Grid',
+        subtitle: '',
+        tableHtml: printableTable.outerHTML,
+      })
       return
     }
 
-    const attendanceNode = document.querySelector('.fade-in.space-y-5')
-        if (!attendanceNode) {
-          window.print()
-          return
-        }
-        const html = `<!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8" />
-            <title>Attendance Grid</title>
-            <style>
-              body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
-              table { width: 100%; border-collapse: collapse; font-size: 12px; }
-              th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
-              th { background: #f3f4f6; }
-            </style>
-          </head>
-          <body>
-            ${attendanceNode.innerHTML}
-            <script>window.print();</script>
-          </body>
-        </html}`
-        const win = window.open('', '_blank', 'width=1100,height=800')
-        if (!win) {
-          alert('Allow pop-ups to print this report.')
-          return
-        }
-        win.document.write(html)
-        win.document.close()
+    window.print()
   }
 
   return (
@@ -938,9 +985,9 @@ export default function AttendanceOverview({ participants, attendance, setAttend
           </div>
         ) : (
           <>
-            {tab === 'Daily' && <DailyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
+            {tab === 'Daily' && <DailyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} onPrintContextChange={setDailyPrintDate} />}
             {tab === 'Weekly' && <WeeklyOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} markPresent={markPresent} markAbsent={markAbsent} campPeriod={campPeriod} campPeriods={campPeriods} />}
-            {tab === 'Participant' && <ParticipantOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} />}
+            {tab === 'Participant' && <ParticipantOverview participants={includedParticipants} attendance={attendance} startEditTime={startEditTime} openCollectionDetail={openCollectionDetail} onPrintContextChange={setParticipantPrintId} />}
           </>
         )}
       </div>
