@@ -72,6 +72,16 @@ function parseCollectionDetails(collectedBy) {
   if (!collectedBy) {
     return { summary: '—', hasReason: false, fullName: '', reason: '' }
   }
+
+  if (/^left by themselves$/i.test(collectedBy)) {
+    return { summary: 'Left by themselves', hasReason: false, fullName: '', reason: '' }
+  }
+
+  const siblingMatch = collectedBy.match(/^leave with sibling,\s*(.+)$/i)
+  if (siblingMatch) {
+    return { summary: `Left with sibling, ${siblingMatch[1].trim()}`, hasReason: false, fullName: '', reason: '' }
+  }
+
   const otherMatch = collectedBy.match(/^Other \(not approved\):\s*(.+?)\s*-\s*Reason:\s*(.+)$/i)
   if (!otherMatch) {
     return { summary: collectedBy, hasReason: false, fullName: '', reason: '' }

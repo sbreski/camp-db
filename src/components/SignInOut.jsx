@@ -70,9 +70,22 @@ function getSiblingLeaveOptions(participant, participants) {
 
 function collectorDisplayLabel(collectedBy) {
   if (!collectedBy) return null
+
+  if (/^left by themselves$/i.test(collectedBy)) {
+    return { label: 'Left by themselves', withPrefix: false }
+  }
+
+  const siblingMatch = collectedBy.match(/^leave with sibling,\s*(.+)$/i)
+  if (siblingMatch) {
+    return { label: `Left with sibling, ${siblingMatch[1].trim()}`, withPrefix: false }
+  }
+
   const otherMatch = collectedBy.match(/^Other \(not approved\):\s*(.+?)\s*-\s*Reason:\s*(.+)$/i)
-  if (!otherMatch) return collectedBy
-  return `Other: ${otherMatch[1].trim()}`
+  if (otherMatch) {
+    return { label: `Other: ${otherMatch[1].trim()}`, withPrefix: true }
+  }
+
+  return { label: collectedBy, withPrefix: true }
 }
 
 function isLikelyFullName(name) {
@@ -1185,11 +1198,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                     </div>
                     <p className="text-xs text-stone-400 mt-0.5">
                       {p.pronouns}{p.age ? ` · Age ${p.age}` : ''}
-                      {collectedByLabel && !rec.signOut === false && (
-                        <span className="ml-2 text-stone-500">· Collected by {collectedByLabel}</span>
-                      )}
                       {isOut && collectedByLabel && (
-                        <span className="ml-2 text-stone-500">· {collectedByLabel}</span>
+                        <span className="ml-2 text-stone-500">· {collectedByLabel.withPrefix ? `Collected by ${collectedByLabel.label}` : collectedByLabel.label}</span>
                       )}
                     </p>
                     <p className={`text-xs mt-1 font-semibold ${statusClass}`}>{statusLabel}</p>
