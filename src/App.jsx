@@ -1310,11 +1310,12 @@ export default function App() {
       }
     }
 
+    // Treat only explicit user interactions as activity (not cursor movement).
+    const activityEvents = ['click', 'keydown', 'touchstart', 'input', 'change', 'submit']
+
     checkInactivityThreshold()
     console.log('[SESSION] Activity listeners setup', { authed, isAdminUser, showSessionWarning, activityEvents })
 
-    // Treat only explicit user interactions as activity (not cursor movement).
-    const activityEvents = ['click', 'keydown', 'touchstart', 'input', 'change', 'submit']
     for (const eventName of activityEvents) {
       window.addEventListener(eventName, handleActivity)
     }
