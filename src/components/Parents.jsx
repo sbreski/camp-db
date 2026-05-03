@@ -20,6 +20,24 @@ function formatParentLabel(name) {
   return clean ? `${clean} (Parent)` : ''
 }
 
+function parseAdultEntry(entry) {
+  const text = String(entry || '').trim()
+  if (!text) return { name: '', relationship: '' }
+  const match = text.match(/^(.*?)\s*\((.*?)\)\s*$/)
+  if (!match) return { name: text, relationship: '' }
+  return {
+    name: (match[1] || '').trim(),
+    relationship: (match[2] || '').trim(),
+  }
+}
+
+function formatAdultEntry(entry) {
+  const name = String(entry?.name || '').trim()
+  const relationship = String(entry?.relationship || '').trim()
+  if (!name) return ''
+  return relationship ? `${name} (${relationship})` : name
+}
+
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -46,6 +64,23 @@ function getDefaultLinkedParticipantIds(participant, allParticipants) {
   return matches.length > 0 ? matches : [participant.id]
 }
 
+function getLikelySiblingIdsFromContact(contact, allParticipants, fallbackParticipantId) {
+  const nameKey = normalizeText(contact.parentName)
+  const emailKey = normalizeText(contact.parentEmail)
+  const phoneKey = normalizePhone(contact.parentPhone)
+
+  const matches = allParticipants
+    .filter(p => {
+      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
+      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
+      const sameName = nameKey && normalizeText(p.parentName) === nameKey
+      return sameEmail || samePhone || sameName
+    })
+    .map(p => p.id)
+
+  return matches.length > 0 ? matches : [fallbackParticipantId]
+}
+
 
 export default function Parents({ participants, onUpdateParticipants }) {
   const [search, setSearch] = useState('')
@@ -54,7 +89,8 @@ export default function Parents({ participants, onUpdateParticipants }) {
   const [editingContact, setEditingContact] = useState({ parentName: '', parentEmail: '', parentPhone: '' })
   const [editingAdults, setEditingAdults] = useState([])
   const [editingLinkedParticipantIds, setEditingLinkedParticipantIds] = useState([])
-  const [newAdult, setNewAdult] = useState('')
+  const [newAdultName, setNewAdultName] = useState('')
+  const [newAdultRelationship, setNewAdultRelationship] = useState('')
   const [sortBy, setSortBy] = useState('parent') // 'parent' or 'child'
 
   function toggleParentSelection(parentId) {
@@ -78,9 +114,10 @@ export default function Parents({ participants, onUpdateParticipants }) {
       parentEmail: participant.parentEmail || '',
       parentPhone: participant.parentPhone || '',
     })
-    setEditingAdults(adults)
+    setEditingAdults(adults.map(parseAdultEntry))
     setEditingLinkedParticipantIds(getDefaultLinkedParticipantIds(participant, participants))
-    setNewAdult('')
+    setNewAdultName('')
+    setNewAdultRelationship('')
   }
 
   function cancelEdit() {
@@ -88,24 +125,43 @@ export default function Parents({ participants, onUpdateParticipants }) {
     setEditingContact({ parentName: '', parentEmail: '', parentPhone: '' })
     setEditingAdults([])
     setEditingLinkedParticipantIds([])
-    setNewAdult('')
+    setNewAdultName('')
+    setNewAdultRelationship('')
   }
 
   function addAdult() {
-    const trimmed = newAdult.trim()
-    if (!trimmed) return
-    if (!editingAdults.some(a => a.toLowerCase() === trimmed.toLowerCase())) {
-      setEditingAdults(prev => [...prev, trimmed])
+    const name = newAdultName.trim()
+    const relationship = newAdultRelationship.trim()
+    if (!name) return
+    const nextEntry = { name, relationship }
+    const nextFormatted = formatAdultEntry(nextEntry).toLowerCase()
+    if (!editingAdults.some(a => formatAdultEntry(a).toLowerCase() === nextFormatted)) {
+      setEditingAdults(prev => [...prev, nextEntry])
     }
-    setNewAdult('')
+    setNewAdultName('')
+    setNewAdultRelationship('')
   }
 
   function removeAdult(index) {
     setEditingAdults(prev => prev.filter((_, i) => i !== index))
   }
 
-  function updateAdult(index, value) {
-    setEditingAdults(prev => prev.map((adult, i) => (i === index ? value : adult)))
+  function updateAdult(index, field, value) {
+    setEditingAdults(prev => prev.map((adult, i) => (
+      i === index ? { ...adult, [field]: value } : adult
+    )))
+  }
+
+  function moveAdult(index, direction) {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    setEditingAdults(prev => {
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev
+      const next = [...prev]
+      const temp = next[index]
+      next[index] = next[targetIndex]
+      next[targetIndex] = temp
+      return next
+    })
   }
 
   function toggleLinkedParticipant(participantId) {
@@ -116,9 +172,20 @@ export default function Parents({ participants, onUpdateParticipants }) {
     ))
   }
 
+  function autoSelectLikelySiblings(participant) {
+    setEditingLinkedParticipantIds(
+      getLikelySiblingIdsFromContact(editingContact, participants, participant.id)
+    )
+  }
+
   function saveEdits(participant) {
     const normalizedAdults = editingAdults
-      .map(adult => adult.trim())
+      .map(adult => ({
+        name: String(adult?.name || '').trim(),
+        relationship: String(adult?.relationship || '').trim(),
+      }))
+      .filter(adult => adult.name)
+      .map(formatAdultEntry)
       .filter(Boolean)
 
     const parentName = editingContact.parentName.trim()
@@ -367,6 +434,22 @@ export default function Parents({ participants, onUpdateParticipants }) {
 
                             <div className="space-y-2">
                               <label className="label">Linked Participant(s)</label>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => autoSelectLikelySiblings(p)}
+                                  className="btn-secondary text-xs px-2.5 py-1"
+                                >
+                                  Auto-select by parent details
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingLinkedParticipantIds([p.id])}
+                                  className="btn-secondary text-xs px-2.5 py-1"
+                                >
+                                  Reset to current participant
+                                </button>
+                              </div>
                               <div className="max-h-40 overflow-y-auto rounded-xl border border-stone-200 p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {participants
                                   .slice()
@@ -396,10 +479,17 @@ export default function Parents({ participants, onUpdateParticipants }) {
                             <div className="flex gap-2 flex-col sm:flex-row items-stretch">
                               <input
                                 className="input flex-1"
-                                value={newAdult}
-                                onChange={e => setNewAdult(e.target.value)}
+                                value={newAdultName}
+                                onChange={e => setNewAdultName(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAdult() } }}
-                                placeholder="Name (Relationship)"
+                                placeholder="Adult name"
+                              />
+                              <input
+                                className="input flex-1"
+                                value={newAdultRelationship}
+                                onChange={e => setNewAdultRelationship(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAdult() } }}
+                                placeholder="Relationship to child"
                               />
                               <button type="button" onClick={addAdult} className="btn-secondary w-full sm:w-auto">Add</button>
                             </div>
@@ -408,17 +498,27 @@ export default function Parents({ participants, onUpdateParticipants }) {
                               {editingAdults.length === 0 ? (
                                 <span className="text-sm text-stone-500">No approved adults yet.</span>
                               ) : editingAdults.map((adult, i) => (
-                                <div key={`${adult}-${i}`} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2">
+                                <div key={`${adult.name}-${adult.relationship}-${i}`} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2 sm:flex-row sm:items-center">
                                   <span className="w-6 h-6 rounded-full bg-stone-200 flex items-center justify-center text-xs font-bold text-stone-700">
                                     {i + 1}
                                   </span>
                                   <input
-                                    className="input h-9 py-1.5"
-                                    value={adult}
-                                    onChange={e => updateAdult(i, e.target.value)}
-                                    placeholder="Adult name (relationship)"
+                                    className="input h-9 py-1.5 sm:w-56"
+                                    value={adult.name}
+                                    onChange={e => updateAdult(i, 'name', e.target.value)}
+                                    placeholder="Adult name"
                                   />
-                                  <button type="button" onClick={() => removeAdult(i)} className="btn-secondary text-xs px-2 py-1">Remove</button>
+                                  <input
+                                    className="input h-9 py-1.5 sm:w-52"
+                                    value={adult.relationship}
+                                    onChange={e => updateAdult(i, 'relationship', e.target.value)}
+                                    placeholder="Relationship"
+                                  />
+                                  <div className="flex items-center gap-1">
+                                    <button type="button" onClick={() => moveAdult(i, 'up')} className="btn-secondary text-xs px-2 py-1" disabled={i === 0}>↑</button>
+                                    <button type="button" onClick={() => moveAdult(i, 'down')} className="btn-secondary text-xs px-2 py-1" disabled={i === editingAdults.length - 1}>↓</button>
+                                    <button type="button" onClick={() => removeAdult(i)} className="btn-secondary text-xs px-2 py-1">Remove</button>
+                                  </div>
                                 </div>
                               ))}
                             </div>

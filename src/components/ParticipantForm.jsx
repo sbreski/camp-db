@@ -15,7 +15,50 @@ const EMPTY = {
   notes: '',
 }
 
-export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '')
+}
+
+function getDefaultLinkedParticipantIds(participant, allParticipants) {
+  const nameKey = normalizeText(participant.parentName)
+  const emailKey = normalizeText(participant.parentEmail)
+  const phoneKey = normalizePhone(participant.parentPhone)
+
+  const matches = allParticipants
+    .filter(p => {
+      if (participant.id === p.id) return true
+      const sameName = nameKey && normalizeText(p.parentName) === nameKey
+      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
+      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
+      return sameName || sameEmail || samePhone
+    })
+    .map(p => p.id)
+
+  return matches.length > 0 ? matches : [participant.id]
+}
+
+function getLikelySiblingIdsFromContact(contact, allParticipants, fallbackParticipantId) {
+  const nameKey = normalizeText(contact.parentName)
+  const emailKey = normalizeText(contact.parentEmail)
+  const phoneKey = normalizePhone(contact.parentPhone)
+
+  const matches = allParticipants
+    .filter(p => {
+      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
+      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
+      const sameName = nameKey && normalizeText(p.parentName) === nameKey
+      return sameEmail || samePhone || sameName
+    })
+    .map(p => p.id)
+
+  return matches.length > 0 ? matches : [fallbackParticipantId]
+}
+
+export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, participants = [] }) {
   const [form, setForm] = useState({
     ...EMPTY,
     ...initial,
@@ -33,6 +76,9 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     initial.approvedAdults?.split(',').map(a => a.trim()).filter(Boolean) || []
   ))
   const [newApprovedAdult, setNewApprovedAdult] = useState('')
+  const [linkedParticipantIds, setLinkedParticipantIds] = useState(() => (
+    initial.id ? getDefaultLinkedParticipantIds(initial, participants) : []
+  ))
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -72,6 +118,19 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
     )
   }
 
+  function toggleLinkedParticipant(participantId) {
+    setLinkedParticipantIds(prev => (
+      prev.includes(participantId)
+        ? prev.filter(id => id !== participantId)
+        : [...prev, participantId]
+    ))
+  }
+
+  function autoSelectLikelySiblings() {
+    if (!initial.id) return
+    setLinkedParticipantIds(getLikelySiblingIdsFromContact(form, participants, initial.id))
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
     if (!form.name.trim()) return
@@ -85,10 +144,15 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
       }
     }
 
+    const linkedIds = initial.id
+      ? (linkedParticipantIds.length > 0 ? linkedParticipantIds : [initial.id])
+      : []
+
     onSave({
       ...form,
       approvedAdults: normalizedAdults.join(', '),
       otcAllowedItems: otcAllowedItemsInput.split(',').map(item => item.trim()).filter(Boolean),
+      ...(initial.id ? { _linkedParticipantIds: linkedIds } : {}),
     })
   }
 
@@ -166,6 +230,41 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY }) {
               <label className="label">Email</label>
               <input className="input" type="email" value={form.parentEmail} onChange={e => set('parentEmail', e.target.value)} placeholder="parent@email.com" />
             </div>
+            {initial.id && participants.length > 0 && (
+              <div className="col-span-2 space-y-2">
+                <label className="label">Linked Participant(s) for Parent Info Updates</label>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={autoSelectLikelySiblings} className="btn-secondary text-xs px-2.5 py-1">
+                    Auto-select likely siblings
+                  </button>
+                  <button type="button" onClick={() => setLinkedParticipantIds([initial.id])} className="btn-secondary text-xs px-2.5 py-1">
+                    Reset to this participant
+                  </button>
+                </div>
+                <div className="max-h-40 overflow-y-auto rounded-xl border border-stone-200 p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {participants
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(p => {
+                      const checked = linkedParticipantIds.includes(p.id)
+                      return (
+                        <label key={p.id} className="inline-flex items-center gap-2 text-sm text-stone-700">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleLinkedParticipant(p.id)}
+                            className="rounded border-stone-300 text-forest-600 focus:ring-forest-500"
+                          />
+                          <span>{p.name}</span>
+                        </label>
+                      )
+                    })}
+                </div>
+                <p className="text-xs text-stone-500">
+                  Parent details and approved adults will update for {linkedParticipantIds.length || 1} selected participant(s).
+                </p>
+              </div>
+            )}
             <div className="col-span-2">
               <label className="label">Approved Adults for Collection</label>
               <div className="flex items-center gap-2">

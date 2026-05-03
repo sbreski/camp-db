@@ -109,7 +109,11 @@ export default function ParticipantDetail({
   }
 
   function saveEdit(data) {
-    setParticipants(prev => prev.map(p => p.id === participant.id ? { ...p, ...data } : p))
+    const targetIds = Array.isArray(data?._linkedParticipantIds) && data._linkedParticipantIds.length > 0
+      ? data._linkedParticipantIds
+      : [participant.id]
+    const { _linkedParticipantIds, ...updates } = data || {}
+    setParticipants(prev => prev.map(p => (targetIds.includes(p.id) ? { ...p, ...updates } : p)))
     setEditing(false)
   }
 
@@ -1079,7 +1083,7 @@ export default function ParticipantDetail({
         <button onClick={() => setEditing(false)} className="btn-secondary flex items-center gap-2">
           <ArrowLeft size={15} /> Cancel Edit
         </button>
-        <ParticipantForm initial={participant} onSave={saveEdit} onCancel={() => setEditing(false)} />
+        <ParticipantForm initial={participant} participants={participants} onSave={saveEdit} onCancel={() => setEditing(false)} />
       </div>
     )
   }

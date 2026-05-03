@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar, CameraOff, Camera, FileText, Edit2, Trash2, Check } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
@@ -35,6 +35,39 @@ function hasSameAdult(adults, parentName) {
   return adults.some(a => a.toLowerCase() === formatted.toLowerCase())
 }
 
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '')
+}
+
+function canLeaveAlone(participant) {
+  return Boolean(participant?.canLeaveAlone ?? participant?.can_leave_alone) && Number(participant?.age) >= 11
+}
+
+function getSiblingLeaveOptions(participant, participants) {
+  const parentNameKey = normalizeText(participant?.parentName)
+  const parentEmailKey = normalizeText(participant?.parentEmail)
+  const parentPhoneKey = normalizePhone(participant?.parentPhone)
+
+  return (participants || [])
+    .filter(candidate => {
+      if (!candidate || candidate.id === participant?.id) return false
+      if (!canLeaveAlone(candidate)) return false
+      const sameName = parentNameKey && normalizeText(candidate.parentName) === parentNameKey
+      const sameEmail = parentEmailKey && normalizeText(candidate.parentEmail) === parentEmailKey
+      const samePhone = parentPhoneKey && normalizePhone(candidate.parentPhone) === parentPhoneKey
+      return sameName || sameEmail || samePhone
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(candidate => ({
+      id: candidate.id,
+      label: `Leave with sibling, ${candidate.name}`,
+    }))
+}
+
 function collectorDisplayLabel(collectedBy) {
   if (!collectedBy) return null
   const otherMatch = collectedBy.match(/^Other \(not approved\):\s*(.+?)\s*-\s*Reason:\s*(.+)$/i)
@@ -67,14 +100,61 @@ function photoConsentMode(value) {
   return 'ok'
 }
 
-function CollectionModal({ participant, onConfirm, onCancel }) {
+function CollectionModal({ participant, participants, onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
   const [otherFullName, setOtherFullName] = useState('')
   const [otherReason, setOtherReason] = useState('')
   const [validationError, setValidationError] = useState('')
+  const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
+  const numberedCollectors = [...siblingLeaveOptions.map(option => option.label), ...adults]
 
-  const can_leave_alone = (participant.canLeaveAlone ?? participant.can_leave_alone) && Number(participant.age) >= 11
+  const can_leave_alone = canLeaveAlone(participant)
+  const hasSelectableOptions = can_leave_alone || siblingLeaveOptions.length > 0 || adults.length > 0
+
+  useEffect(() => {
+    function isTypingField(target) {
+      if (!target) return false
+      const tag = String(target.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
+      return Boolean(target.isContentEditable)
+    }
+
+    function handleKeyDown(event) {
+      if (isTypingField(event.target)) return
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+
+      if (/^[1-9]$/.test(event.key)) {
+        const optionIndex = Number(event.key) - 1
+        const option = numberedCollectors[optionIndex]
+        if (option) {
+          event.preventDefault()
+          selectCollector(option)
+        }
+        return
+      }
+
+      if (event.key === '0' && can_leave_alone) {
+        event.preventDefault()
+        selectCollector('LeaveAlone')
+        return
+      }
+
+      if (event.key === 'Enter') {
+        if (hasSelectableOptions && !selected) return
+        event.preventDefault()
+        handleConfirm()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel])
 
   function handleConfirm() {
     if (can_leave_alone && selected === 'LeaveAlone') {
@@ -134,10 +214,21 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
               </span>
             </button>
           )}
-          {adults.length > 0 ? (
+          {adults.length > 0 || siblingLeaveOptions.length > 0 ? (
             <>
               <p className="text-sm font-medium text-stone-700">Who is collecting?</p>
               <div className="space-y-2 max-h-64 overflow-y-auto">
+                {siblingLeaveOptions.map((option, i) => (
+                  <button key={option.id} onClick={() => selectCollector(option.label)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                      selected === option.label ? 'border-indigo-600 bg-indigo-50' : 'border-stone-200 hover:border-stone-300'
+                    }`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-display flex-shrink-0 ${
+                      selected === option.label ? 'bg-indigo-900 text-white' : 'bg-stone-100 text-stone-600'
+                    }`}>{i + 1}</div>
+                    <span className="text-sm font-medium text-stone-800">{option.label}</span>
+                  </button>
+                ))}
                 {adults.map((adult, i) => (
                   <button key={i} onClick={() => selectCollector(adult)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
@@ -145,7 +236,7 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
                     }`}>
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-display flex-shrink-0 ${
                       selected === adult ? 'bg-forest-900 text-white' : 'bg-stone-100 text-stone-600'
-                    }`}>{i + 1}</div>
+                    }`}>{siblingLeaveOptions.length + i + 1}</div>
                     <span className="text-sm font-medium text-stone-800">{adult}</span>
                   </button>
                 ))}
@@ -201,8 +292,8 @@ function CollectionModal({ participant, onConfirm, onCancel }) {
         </div>
         <div className="p-5 pt-0 flex gap-2">
           <button onClick={handleConfirm}
-            disabled={adults.length > 0 && !selected && !(can_leave_alone && selected === 'LeaveAlone')}
-            className={`flex-1 btn-primary py-3 ${adults.length > 0 && !selected && !(can_leave_alone && selected === 'LeaveAlone') ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            disabled={hasSelectableOptions && !selected}
+            className={`flex-1 btn-primary py-3 ${hasSelectableOptions && !selected ? 'opacity-40 cursor-not-allowed' : ''}`}>
             Confirm Sign Out
           </button>
           <button onClick={onCancel} className="btn-secondary px-4">Cancel</button>
@@ -716,7 +807,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   return (
     <div className="fade-in space-y-4">
       {collectingFor && (
-        <CollectionModal participant={collectingFor} onConfirm={confirmSignOut} onCancel={() => setCollectingFor(null)} />
+        <CollectionModal participant={collectingFor} participants={participants} onConfirm={confirmSignOut} onCancel={() => setCollectingFor(null)} />
       )}
       {noteEditor && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
