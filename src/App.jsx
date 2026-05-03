@@ -874,7 +874,6 @@ export default function App() {
     const remaining = Math.max(0, INACTIVITY_TIMEOUT_MS - elapsed)
 
     inactivityTimeoutRef.current = setTimeout(() => {
-      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
     }, remaining)
@@ -902,7 +901,6 @@ export default function App() {
 
     const elapsed = Date.now() - lastActivity
     if (elapsed >= INACTIVITY_TIMEOUT_MS) {
-      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
       return
@@ -1343,10 +1341,9 @@ export default function App() {
       return
     }
 
-    if (!sessionWarningDeadlineRef.current) {
-      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
-      setWarningCountdown(SESSION_WARNING_SECONDS)
-    }
+    // Always start a fresh warning window when the modal is shown.
+    sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
+    setWarningCountdown(SESSION_WARNING_SECONDS)
 
     if (warningIntervalRef.current) clearInterval(warningIntervalRef.current)
     warningIntervalRef.current = setInterval(() => {
