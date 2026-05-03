@@ -86,7 +86,7 @@ export default function IncidentForm({
     const nextStaff = initial?.staffMember || defaultStaff
     setForm({
       ...(initial || {}),
-      followUpTiming: initial?.followUpTiming || (initial?.followUpRequired ? 'tomorrow' : 'today'),
+      followUpTiming: initial?.followUpTiming || 'today',
       pdfName: initial?.pdfName || null,
       pdfData: initial?.pdfData || null,
       id: initial?.id,

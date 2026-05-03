@@ -430,6 +430,7 @@
 
     // Force reflow so measurements reflect the expanded-input layout.
     formRoot.getBoundingClientRect()
+    const rootRect = formRoot.getBoundingClientRect()
 
     // Collect "atom" bounding rects — elements that must not be split across pages.
     // Page breaks are allowed between atoms (e.g. between fields in a section)
@@ -450,8 +451,8 @@
     }).map(el => {
       const r = el.getBoundingClientRect()
       return {
-        top_px: (r.top + window.scrollY) * SCALE,
-        bottom_px: (r.bottom + window.scrollY) * SCALE,
+        top_px: (r.top - rootRect.top) * SCALE,
+        bottom_px: (r.bottom - rootRect.top) * SCALE,
       }
     })
 

@@ -89,7 +89,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       await setIncidents(prev => prev.map(inc => {
         if (inc.id !== editingIncident.id) return inc
 
-        const timing = data.followUpTiming || (data.followUpRequired ? 'tomorrow' : 'none')
+        const timing = data.followUpTiming || (data.followUpRequired ? 'today' : 'none')
         const followUpRequired = timing !== 'none'
         const followUpDueDate = timing === 'tomorrow'
           ? (inc.followUpDueDate || getNextDateKey(inc.createdAt))
@@ -116,7 +116,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     }
 
     const createdAt = new Date().toISOString()
-    const timing = data.followUpTiming || (data.followUpRequired ? 'tomorrow' : 'none')
+  const timing = data.followUpTiming || (data.followUpRequired ? 'today' : 'none')
     const followUpRequired = timing !== 'none'
     const followUpDueDate = timing === 'tomorrow' ? getNextDateKey(createdAt) : timing === 'today' ? getTodayKey() : null
 
@@ -944,7 +944,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                 onClick={() => openIncidentReport(inc)}>
                 <div className="flex items-start gap-3">
                   <div className="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 bg-amber-400" />
-                  <div className="flex-1 min-w-0 min-w-0 overflow-hidden">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-display font-semibold text-forest-950 group-hover:text-forest-700">
                         {p?.name || 'Unknown Participant'}
