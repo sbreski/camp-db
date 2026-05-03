@@ -138,7 +138,7 @@ function DailyOverview({ participants, attendance, startEditTime, openCollection
       </div>
 
       {/* Table */}
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden" data-daily-attendance-grid>
         <div className="hidden sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-2 px-4 py-2.5 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
           <span>Participant</span>
           <span className="w-20 text-right">Sign In</span>
@@ -346,7 +346,7 @@ function WeeklyOverview({ participants, attendance, startEditTime, markPresent, 
       </div>
 
       {/* Grid: participant × day */}
-      <div className="card p-0 overflow-x-auto">
+      <div className="card p-0 overflow-x-auto" data-weekly-attendance-grid>
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-stone-50 border-b border-stone-100">
@@ -542,7 +542,7 @@ function ParticipantOverview({ participants, attendance, startEditTime, openColl
           )}
 
           {/* Full history table */}
-          <div className="card p-0 overflow-hidden">
+          <div className="card p-0 overflow-hidden" data-participant-attendance-grid>
             <div className="hidden sm:grid sm:grid-cols-[auto_1fr_1fr_1fr_1fr] gap-2 px-4 py-2.5 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
               <span className="w-28">Date</span>
               <span>In</span><span>Out</span><span>Duration</span><span>Collected by</span>
@@ -694,6 +694,116 @@ export default function AttendanceOverview({ participants, attendance, setAttend
 
   // ── Print handler ──────────────────────────────────────────────────────────
   function printAttendanceView() {
+    const printTargetSelectorByTab = {
+      Daily: '[data-daily-attendance-grid]',
+      Weekly: '[data-weekly-attendance-grid]',
+      Participant: '[data-participant-attendance-grid]',
+    }
+    const printTitleByTab = {
+      Daily: 'Daily Attendance Grid',
+      Weekly: 'Weekly Attendance Grid',
+      Participant: 'Participant Attendance Grid',
+    }
+
+    const targetSelector = printTargetSelectorByTab[tab]
+    if (targetSelector) {
+      const targetNode = document.querySelector(targetSelector)
+      if (targetNode) {
+        const printableNode = targetNode.cloneNode(true)
+        printableNode.querySelectorAll('button').forEach((button) => {
+          const replacement = document.createElement('span')
+          replacement.textContent = (button.textContent || '').trim() || '—'
+          replacement.style.display = 'inline-block'
+          replacement.style.minWidth = '1.25rem'
+          replacement.style.textAlign = 'center'
+          replacement.style.fontWeight = '600'
+          button.replaceWith(replacement)
+        })
+
+        const title = printTitleByTab[tab] || 'Attendance Grid'
+        const html = `<!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <title>${title}</title>
+            <style>
+              body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+              h1 { font-size: 20px; margin: 0 0 6px; }
+              .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
+              table { width: 100%; border-collapse: collapse; font-size: 12px; }
+              th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: middle; text-align: center; }
+              th:first-child, td:first-child { text-align: left; }
+            </style>
+          </head>
+          <body>
+            <h1>${title}</h1>
+            <div class="meta">Generated: ${new Date().toLocaleString('en-GB')}</div>
+            ${printableNode.outerHTML}
+            <script>window.print();</script>
+          </body>
+        </html>`
+
+        const win = window.open('', '_blank', 'width=1100,height=800')
+        if (!win) {
+          alert('Allow pop-ups to print this report.')
+          return
+        }
+        win.document.write(html)
+        win.document.close()
+        return
+      }
+    }
+
+    if (tab === 'Weekly') {
+      const weeklyGridNode = document.querySelector('[data-weekly-attendance-grid] table')
+      if (!weeklyGridNode) {
+        window.print()
+        return
+      }
+
+      const printableTable = weeklyGridNode.cloneNode(true)
+      printableTable.querySelectorAll('button').forEach((button) => {
+        const replacement = document.createElement('span')
+        replacement.textContent = (button.textContent || '').trim() || '—'
+        replacement.style.display = 'inline-block'
+        replacement.style.minWidth = '1.25rem'
+        replacement.style.textAlign = 'center'
+        replacement.style.fontWeight = '600'
+        button.replaceWith(replacement)
+      })
+
+      const html = `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>Weekly Attendance Grid</title>
+          <style>
+            body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 6px; vertical-align: middle; text-align: center; }
+            th:first-child, td:first-child { text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h1>Weekly Attendance Grid</h1>
+          <div class="meta">Generated: ${new Date().toLocaleString('en-GB')}</div>
+          ${printableTable.outerHTML}
+          <script>window.print();</script>
+        </body>
+      </html>`
+
+      const win = window.open('', '_blank', 'width=1100,height=800')
+      if (!win) {
+        alert('Allow pop-ups to print this report.')
+        return
+      }
+      win.document.write(html)
+      win.document.close()
+      return
+    }
+
     const attendanceNode = document.querySelector('.fade-in.space-y-5')
         if (!attendanceNode) {
           window.print()
