@@ -903,7 +903,11 @@ export default function App() {
       sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
+      return
     }
+
+    // Keep the timeout aligned with the latest known activity timestamp.
+    startInactivityTimer()
   }
 
   function sanitizeAllowedTabs(tabIds) {
@@ -1267,10 +1271,11 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!authed) {
+    if (!authed || !isAdminUser) {
       clearSessionTimers()
       clearStoredLastActivity()
       setShowSessionWarning(false)
+      setWarningCountdown(SESSION_WARNING_SECONDS)
       return
     }
 
@@ -1319,7 +1324,8 @@ export default function App() {
     }
 
     if (!sessionWarningDeadlineRef.current) {
-      sessionWarningDeadlineRef.current = Date.now() + (warningCountdown * 1000)
+      sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
+      setWarningCountdown(SESSION_WARNING_SECONDS)
     }
 
     if (warningIntervalRef.current) clearInterval(warningIntervalRef.current)
