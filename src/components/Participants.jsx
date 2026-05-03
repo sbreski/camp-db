@@ -593,7 +593,7 @@ export default function Participants({ participants, setParticipants, onView }) 
                     </span>
                   </div>
                 </div>
-                {/* Badges on the right — desktop only */
+                {/* Badges on the right — desktop only */}
                 <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold border ${gc.bg} ${gc.text} ${gc.border}`}>
                     {g === 'm' ? 'M' : g === 'f' ? 'F' : 'NB'}

@@ -222,21 +222,42 @@ export default function DressingRooms({ participants }) {
       setCollapsedGroups(new Set(groupedParticipants.map(group => group.key)))
     }
 
+    function highlightClassesForGroupKey(groupKey, mode = highlightBy) {
+      if (mode === 'none') return ''
+      if (mode === 'gender') {
+        if (groupKey === 'm') return 'bg-blue-200/70 border-l-4 border-l-blue-500'
+        if (groupKey === 'f') return 'bg-pink-200/70 border-l-4 border-l-pink-500'
+        return 'bg-violet-200/70 border-l-4 border-l-violet-500'
+      }
+
+      if (groupKey === 'under-10') return 'bg-emerald-200/70 border-l-4 border-l-emerald-500'
+      if (groupKey === '10-12') return 'bg-cyan-200/70 border-l-4 border-l-cyan-500'
+      if (groupKey === '13-15') return 'bg-amber-200/75 border-l-4 border-l-amber-500'
+      if (groupKey === '16-plus') return 'bg-rose-200/70 border-l-4 border-l-rose-500'
+      return 'bg-stone-200/70 border-l-4 border-l-stone-400'
+    }
+
+    function groupHeaderClasses(groupKey) {
+      if (groupBy === 'gender') {
+        if (groupKey === 'm') return 'bg-blue-300 text-blue-950 border-b border-blue-400'
+        if (groupKey === 'f') return 'bg-pink-300 text-pink-950 border-b border-pink-400'
+        return 'bg-violet-300 text-violet-950 border-b border-violet-400'
+      }
+
+      if (groupKey === 'under-10') return 'bg-emerald-300 text-emerald-950 border-b border-emerald-400'
+      if (groupKey === '10-12') return 'bg-cyan-300 text-cyan-950 border-b border-cyan-400'
+      if (groupKey === '13-15') return 'bg-amber-300 text-amber-950 border-b border-amber-400'
+      if (groupKey === '16-plus') return 'bg-rose-300 text-rose-950 border-b border-rose-400'
+      return 'bg-stone-300 text-stone-900 border-b border-stone-400'
+    }
+
     function rowGroupClass(participant) {
       if (highlightBy === 'none') return ''
       if (highlightBy === 'gender') {
-        const g = genderOf(participant)
-        if (g === 'm') return 'bg-blue-50/40'
-        if (g === 'f') return 'bg-pink-50/40'
-        return 'bg-violet-50/40'
+        return highlightClassesForGroupKey(genderOf(participant), 'gender')
       }
 
-      const group = ageGroupOf(getAge(participant))
-      if (group === 'under-10') return 'bg-emerald-50/50'
-      if (group === '10-12') return 'bg-cyan-50/50'
-      if (group === '13-15') return 'bg-amber-50/50'
-      if (group === '16-plus') return 'bg-rose-50/50'
-      return 'bg-stone-50/60'
+      return highlightClassesForGroupKey(ageGroupOf(getAge(participant)), 'age')
     }
 
     function SortHeader({ label, columnKey }) {
@@ -514,13 +535,13 @@ export default function DressingRooms({ participants }) {
                   <button
                     type="button"
                     onClick={() => toggleGroup(group.key)}
-                    className="w-full px-3 py-2.5 bg-stone-50 border-b border-stone-200 flex items-center justify-between text-left"
+                    className={`w-full px-3 py-2.5 flex items-center justify-between text-left ${groupHeaderClasses(group.key)}`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-forest-900">{groupLabel(group.key)}</span>
-                      <span className="text-xs text-stone-500">{group.participants.length} participant{group.participants.length === 1 ? '' : 's'}</span>
+                      <span className="text-sm font-semibold">{groupLabel(group.key)}</span>
+                      <span className="text-xs opacity-80">{group.participants.length} participant{group.participants.length === 1 ? '' : 's'}</span>
                     </div>
-                    {collapsed ? <ChevronDown size={16} className="text-stone-500" /> : <ChevronUp size={16} className="text-stone-500" />}
+                    {collapsed ? <ChevronDown size={16} className="opacity-80" /> : <ChevronUp size={16} className="opacity-80" />}
                   </button>
 
                   {!collapsed && (
