@@ -939,6 +939,19 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     })) || [])
   }, [campPeriods])
 
+  // Keep selected/editing snapshots fresh when staffList changes (e.g. after save/reload).
+  useEffect(() => {
+    if (!selected?.id) return
+    const fresh = staffList.find(s => s.id === selected.id)
+    if (fresh) setSelected(fresh)
+  }, [staffList, selected?.id])
+
+  useEffect(() => {
+    if (!editingMember?.id) return
+    const fresh = staffList.find(s => s.id === editingMember.id)
+    if (fresh) setEditingMember(prev => (prev ? { ...fresh, tempPassword: prev.tempPassword || '' } : fresh))
+  }, [staffList, editingMember?.id])
+
   async function withAccessToken() {
     const { data, error } = await supabase.auth.getSession()
     if (error || !data.session?.access_token) throw new Error('No active auth session')

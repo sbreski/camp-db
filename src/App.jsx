@@ -677,7 +677,7 @@ export default function App() {
     }
     // Keep UI in sync immediately; realtime reload still runs to confirm server state.
     setRawStaffState(next.map(item => toSnake(item)))
-    reloadS()
+    await reloadS()
 
     // Surface any silently-dropped required columns as a real error.
     const missingRequired = [...droppedColumns].filter(c => STAFF_REQUIRED_COLUMNS.has(c))
