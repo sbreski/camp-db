@@ -1127,7 +1127,7 @@ export default function ParticipantDetail({
           )}
           {participant.medicalType?.includes('Dietary') && <span className="badge-dietary">🍽 Dietary</span>}
           {participant.medicalType?.includes('Medical') && <span className="badge-medical">+ Medical</span>}
-          {participant.sendNeeds && <span className="badge-send">★ SEND / Support</span>}
+          {(participant.sendDiagnosed || participant.sendNeeds) && <span className={participant.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>★ SEND / Support</span>}
           {participant.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={12} />}
         </div>
       </div>

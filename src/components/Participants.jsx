@@ -586,14 +586,14 @@ export default function Participants({ participants, setParticipants, onView }) 
                     {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
                     {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
                     {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
-                    {p.sendNeeds && <span className="badge-send">S</span>}
+                    {(p.sendDiagnosed || p.sendNeeds) && <span className={p.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>S</span>}
                     {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
                       {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                 </div>
-                {/* Badges on the right — desktop only */}
+                {/* Badges on the right — desktop only */
                 <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold border ${gc.bg} ${gc.text} ${gc.border}`}>
                     {g === 'm' ? 'M' : g === 'f' ? 'F' : 'NB'}
@@ -601,7 +601,7 @@ export default function Participants({ participants, setParticipants, onView }) 
                   {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
                   {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
                   {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
-                  {p.sendNeeds && <span className="badge-send">S</span>}
+                  {(p.sendDiagnosed || p.sendNeeds) && <span className={p.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>S</span>}
                   {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
                     {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}

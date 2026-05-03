@@ -1108,7 +1108,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const hasAllergy = p.medicalType?.includes('Allergy') || Boolean(String(p.allergyDetails || '').trim())
               const hasDietary = p.medicalType?.includes('Dietary') || Boolean(String(p.dietaryType || '').trim()) || Boolean(String(p.mealAdjustments || '').trim())
               const hasMedical = p.medicalType?.includes('Medical')
-              const hasSend = !!p.sendNeeds
+              const hasSend = !!p.sendNeeds || !!p.sendDiagnosed
               const hasSafeguarding = !!p.safeguardingFlag
               const pendingFollowUps = getPendingFollowUps(p.id)
               const pendingMarFollowUps = getPendingMarFollowUps(p.id)
@@ -1170,8 +1170,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       )}
                       {hasSend && (
                         <span
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200 cursor-help"
-                          title={String(p.sendNeeds || '').trim() || 'No SEND/support details recorded'}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-help ${p.sendDiagnosed ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-purple-100 text-purple-700 border-purple-200'}`}
+                          title={p.sendDiagnosed ? `Formally diagnosed SEND${p.sendNeeds ? ': ' + p.sendNeeds : ''}` : (String(p.sendNeeds || '').trim() || 'No SEND/support details recorded')}
                         >
                           S
                         </span>
@@ -1377,7 +1377,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-red-100 text-red-700 border border-red-200">A</span> Allergy</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-green-100 text-green-800 border border-green-200">D</span> Dietary</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-blue-100 text-blue-700 border border-blue-200">M</span> Medical</span>
-        <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span> SEND / Support</span>
+        <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span> Support Needs</span>
+        <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-orange-100 text-orange-700 border border-orange-200">S</span> Formally Diagnosed SEND</span>
         <span className="flex items-center gap-1"><SafeguardingFlagIcon size={11} /> Safeguarding flag</span>
       </div>
     </div>

@@ -1101,7 +1101,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
                       t === 'Allergy' ? 'badge-allergy' : t === 'Dietary' ? 'badge-dietary' : t === 'Medical' ? 'badge-medical' : 'badge-dietary'
                     }>{t}</span>
                   ))}
-                  {p.sendNeeds && <span className="badge-send">SEND</span>}
+                  {(p.sendDiagnosed || p.sendNeeds) && <span className={p.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>SEND</span>}
                 </div>
               </div>
               {(() => {
