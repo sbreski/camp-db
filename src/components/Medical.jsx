@@ -579,25 +579,51 @@ export default function Medical({ participants, setParticipants, actorInitials =
       ? medParticipants
       : medParticipants.filter(p => filters.some(filter => matchesMedicalFilter(p, filter)))
 
+    const showAll = filters.length === 0
+    const includeAllergy = showAll || filters.includes('Allergy')
+    const includeDietary = showAll || filters.includes('Dietary')
+    const includeMedical = showAll || filters.includes('Medical')
+    const includeSend = showAll || filters.includes('SEND')
+
     const title = filters.length === 0
       ? 'Medical and Support Record (All flagged participants)'
       : `Medical and Support Record (${filters.join(', ')})`
 
+    const detailColumns = [
+      includeAllergy ? { key: 'allergy', label: 'Allergy Details' } : null,
+      includeDietary ? { key: 'dietary', label: 'Dietary Details' } : null,
+      includeMedical ? { key: 'medical', label: 'Medical Notes' } : null,
+      includeSend ? { key: 'send', label: 'SEND Notes' } : null,
+    ].filter(Boolean)
+
     const rows = list.map(p => {
-      const badges = [
-        ...(p.medicalType || []),
-        ...(p.sendNeeds ? ['SEND'] : []),
-      ].join(', ')
+      const details = {
+        allergy: p.allergyDetails || '—',
+        dietary: [p.dietaryType, p.mealAdjustments].filter(Boolean).join(' - ') || '—',
+        medical: p.medicalDetails || '—',
+        send: p.sendNeeds || '—',
+      }
+
+      const detailCells = detailColumns
+        .map(col => `<td>${esc(details[col.key])}</td>`)
+        .join('')
+
       return `
         <tr>
-          <td>${esc(p.sendDiagnosed ? `${p.name} *` : p.name)}</td>
+          <td>${esc(p.name)}</td>
           <td>${esc([p.pronouns, p.age ? `Age ${p.age}` : ''].filter(Boolean).join(' · '))}</td>
-          <td>${esc(badges || '—')}</td>
-          <td>${esc(p.medicalDetails || '—')}</td>
-          <td>${esc(p.sendNeeds || '—')}</td>
+          ${detailCells}
         </tr>
       `
     }).join('')
+
+    const headers = [
+      '<th>Participant</th>',
+      '<th>Details</th>',
+      ...detailColumns.map(col => `<th>${esc(col.label)}</th>`),
+    ].join('')
+
+    const noResultsColspan = 2 + detailColumns.length
 
     const html = `
       <!DOCTYPE html>
@@ -620,15 +646,11 @@ export default function Medical({ participants, setParticipants, actorInitials =
           <table>
             <thead>
               <tr>
-                <th>Participant</th>
-                <th>Details</th>
-                <th>Flags</th>
-                <th>Medical Notes</th>
-                <th>SEND Notes</th>
+                ${headers}
               </tr>
             </thead>
             <tbody>
-              ${rows || '<tr><td colspan="5">No participants in this filter.</td></tr>'}
+              ${rows || `<tr><td colspan="${noResultsColspan}">No participants in this filter.</td></tr>`}
             </tbody>
           </table>
           <script>window.print();</script>

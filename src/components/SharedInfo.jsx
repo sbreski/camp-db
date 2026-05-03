@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { isIncludedThisSeason } from './AttendanceOverview'
-import { AlertCircle, ClipboardList, RefreshCw } from 'lucide-react'
+import { AlertCircle, ClipboardList, Printer, RefreshCw } from 'lucide-react'
 import { supabase } from '../supabase'
 
 const CATEGORY_STYLES = {
@@ -81,6 +81,100 @@ export default function SharedInfo({ currentUser, participants }) {
     loadSharedItems()
   }, [currentUser?.id])
 
+  function esc(value) {
+    return String(value || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;')
+  }
+
+  function printSharedInfo(mode = 'current') {
+    const categoryForPrint = mode === 'all' ? 'all' : activeCategory
+    const blocks = []
+
+    for (const [participantId, participantItems] of grouped.entries()) {
+      const participant = participantMap.get(participantId)
+      if (!participant) continue
+
+      const filteredItems = categoryForPrint === 'all'
+        ? participantItems
+        : participantItems.filter(item => String(item.category || '').toLowerCase() === categoryForPrint)
+
+      if (filteredItems.length === 0) continue
+
+      const rows = filteredItems.map(item => {
+        const categoryKey = String(item.category || '').toLowerCase()
+        const categoryLabel = CATEGORY_LABELS[categoryKey] || 'Shared'
+        const updatedAt = new Date(item.updated_at || item.created_at).toLocaleString('en-GB')
+        return `
+          <tr>
+            <td>${esc(categoryLabel)}</td>
+            <td>${esc(item.summary || '—')}</td>
+            <td>${esc(updatedAt)}</td>
+          </tr>
+        `
+      }).join('')
+
+      blocks.push(`
+        <section class="participant-block">
+          <h2>${esc(participant.name || 'Participant not found')}</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Summary</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </section>
+      `)
+    }
+
+    const title = categoryForPrint === 'all'
+      ? 'Shared Info (All Categories)'
+      : `Shared Info (${CATEGORY_LABELS[categoryForPrint] || categoryForPrint})`
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>${esc(title)}</title>
+          <style>
+            body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            h2 { font-size: 14px; margin: 0 0 8px; }
+            .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
+            .participant-block { margin-bottom: 16px; page-break-inside: avoid; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
+            th { background: #f3f4f6; }
+          </style>
+        </head>
+        <body>
+          <h1>${esc(title)}</h1>
+          <div class="meta">Generated: ${new Date().toLocaleString('en-GB')}</div>
+          ${blocks.join('') || '<p>No shared items in this filter.</p>'}
+          <script>window.print();</script>
+        </body>
+      </html>
+    `
+
+    const win = window.open('', '_blank', 'width=1100,height=800')
+    if (!win) {
+      alert('Allow pop-ups to print this report.')
+      return
+    }
+    win.document.write(html)
+    win.document.close()
+  }
+
   return (
     <div className="fade-in space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -90,9 +184,21 @@ export default function SharedInfo({ currentUser, participants }) {
           </h2>
           <p className="text-sm text-stone-500">All admin-shared support and safety information for your role, grouped by participant.</p>
         </div>
-        <button className="btn-secondary text-sm flex items-center gap-2" onClick={loadSharedItems} disabled={loading}>
-          <RefreshCw size={14} /> Refresh
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className="btn-secondary text-sm flex items-center gap-2" onClick={() => printSharedInfo('current')} disabled={loading}>
+            <Printer size={14} />
+            <span className="sm:hidden">Print Current</span>
+            <span className="hidden sm:inline">Print Current Category</span>
+          </button>
+          <button className="btn-secondary text-sm flex items-center gap-2" onClick={() => printSharedInfo('all')} disabled={loading}>
+            <Printer size={14} />
+            <span className="sm:hidden">Print All</span>
+            <span className="hidden sm:inline">Print All Categories</span>
+          </button>
+          <button className="btn-secondary text-sm flex items-center gap-2" onClick={loadSharedItems} disabled={loading}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filter buttons */}
