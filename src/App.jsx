@@ -44,8 +44,8 @@ export const STAFF_PASSWORD = import.meta.env.VITE_STAFF_PASSWORD || ''
 const OWNER_EMAIL = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 const BASIC_TABS = ['dashboard', 'signin', 'shared-info']
 const ALL_TABS = NAV_ITEMS.map(item => item.id)
-const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000
-const SESSION_WARNING_SECONDS = 60
+const INACTIVITY_TIMEOUT_MS = 15 * 1000 // TEST: 15s — restore to 10 * 60 * 1000
+const SESSION_WARNING_SECONDS = 10 // TEST: 10s — restore to 60
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
 const LAST_ACTIVITY_STORAGE_KEY = 'camp_db_last_activity_at'
@@ -329,7 +329,6 @@ export default function App() {
   const inactivityTimeoutRef = useRef(null)
   const warningIntervalRef = useRef(null)
   const sessionWarningDeadlineRef = useRef(null)
-  const warningCycleRef = useRef(0)
   const prefetchedRoutesRef = useRef(new Set())
   const routeState = getRouteState(location.pathname)
   const page = routeState.page
@@ -875,7 +874,6 @@ export default function App() {
     const remaining = Math.max(0, INACTIVITY_TIMEOUT_MS - elapsed)
 
     inactivityTimeoutRef.current = setTimeout(() => {
-      warningCycleRef.current += 1
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
     }, remaining)
@@ -903,7 +901,6 @@ export default function App() {
 
     const elapsed = Date.now() - lastActivity
     if (elapsed >= INACTIVITY_TIMEOUT_MS) {
-      warningCycleRef.current += 1
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
       return
@@ -1213,15 +1210,15 @@ export default function App() {
   }
 
   function staySignedIn() {
-    // Cancel warning countdown immediately so stale interval ticks cannot log out the user.
+    // Null the deadline first so any concurrent interval tick sees it and stops
+    // without setting warningCountdown to 0 (which would trigger the logout effect).
+    sessionWarningDeadlineRef.current = null
     if (warningIntervalRef.current) {
       clearInterval(warningIntervalRef.current)
       warningIntervalRef.current = null
     }
-    warningCycleRef.current += 1
     setShowSessionWarning(false)
     setWarningCountdown(SESSION_WARNING_SECONDS)
-    sessionWarningDeadlineRef.current = null
     setStoredLastActivity()
     startInactivityTimer()
   }
@@ -1350,24 +1347,26 @@ export default function App() {
       return
     }
 
-    // Always start a fresh warning window when the modal is shown.
-    const warningCycle = warningCycleRef.current
+    // Set a fresh deadline whenever the warning modal opens.
     sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
     setWarningCountdown(SESSION_WARNING_SECONDS)
 
     if (warningIntervalRef.current) clearInterval(warningIntervalRef.current)
     warningIntervalRef.current = setInterval(() => {
-      if (warningCycle !== warningCycleRef.current) return
-
+      // If staySignedIn() cleared the deadline, stop without triggering logout.
       const deadline = sessionWarningDeadlineRef.current
-      const remainingMs = (deadline || 0) - Date.now()
+      if (deadline === null) {
+        clearInterval(warningIntervalRef.current)
+        warningIntervalRef.current = null
+        return
+      }
 
+      const remainingMs = deadline - Date.now()
       if (remainingMs <= 0) {
-        if (warningIntervalRef.current) {
-          clearInterval(warningIntervalRef.current)
-          warningIntervalRef.current = null
-        }
-        logout()
+        clearInterval(warningIntervalRef.current)
+        warningIntervalRef.current = null
+        // Signal logout via state — the effect below reads fresh React state.
+        setWarningCountdown(0)
         return
       }
 
@@ -1381,6 +1380,15 @@ export default function App() {
       }
     }
   }, [authed, showSessionWarning])
+
+  // Logout trigger — runs with fresh React state, so showSessionWarning is
+  // guaranteed to be true only when the user has NOT clicked "Stay signed in".
+  useEffect(() => {
+    if (authed && showSessionWarning && warningCountdown === 0) {
+      logout()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, showSessionWarning, warningCountdown])
 
   useEffect(() => {
     if (!authed || permissionsLoading) return
