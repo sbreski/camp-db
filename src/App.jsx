@@ -329,6 +329,7 @@ export default function App() {
   const inactivityTimeoutRef = useRef(null)
   const warningIntervalRef = useRef(null)
   const sessionWarningDeadlineRef = useRef(null)
+  const warningCycleRef = useRef(0)
   const prefetchedRoutesRef = useRef(new Set())
   const routeState = getRouteState(location.pathname)
   const page = routeState.page
@@ -874,6 +875,7 @@ export default function App() {
     const remaining = Math.max(0, INACTIVITY_TIMEOUT_MS - elapsed)
 
     inactivityTimeoutRef.current = setTimeout(() => {
+      warningCycleRef.current += 1
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
     }, remaining)
@@ -901,6 +903,7 @@ export default function App() {
 
     const elapsed = Date.now() - lastActivity
     if (elapsed >= INACTIVITY_TIMEOUT_MS) {
+      warningCycleRef.current += 1
       setShowSessionWarning(true)
       setWarningCountdown(SESSION_WARNING_SECONDS)
       return
@@ -1210,6 +1213,12 @@ export default function App() {
   }
 
   function staySignedIn() {
+    // Cancel warning countdown immediately so stale interval ticks cannot log out the user.
+    if (warningIntervalRef.current) {
+      clearInterval(warningIntervalRef.current)
+      warningIntervalRef.current = null
+    }
+    warningCycleRef.current += 1
     setShowSessionWarning(false)
     setWarningCountdown(SESSION_WARNING_SECONDS)
     sessionWarningDeadlineRef.current = null
@@ -1342,11 +1351,14 @@ export default function App() {
     }
 
     // Always start a fresh warning window when the modal is shown.
+    const warningCycle = warningCycleRef.current
     sessionWarningDeadlineRef.current = Date.now() + (SESSION_WARNING_SECONDS * 1000)
     setWarningCountdown(SESSION_WARNING_SECONDS)
 
     if (warningIntervalRef.current) clearInterval(warningIntervalRef.current)
     warningIntervalRef.current = setInterval(() => {
+      if (warningCycle !== warningCycleRef.current) return
+
       const deadline = sessionWarningDeadlineRef.current
       const remainingMs = (deadline || 0) - Date.now()
 
