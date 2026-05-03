@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import {
   AlertCircle, Check, Edit2, Plus, RefreshCw, Save,
   Shield, Trash2, User, X, FileText, Upload, Download, Eye, EyeOff,
-  Key, Lock, Unlock, Star, Heart, Award, ChevronDown, ChevronUp,
+  Key, Lock, Unlock, Star, Heart, Award, ChevronDown, ChevronUp, SquareCheckBig,
   Paperclip, Calendar, Phone, Mail, AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '../supabase'
@@ -737,7 +737,7 @@ function StaffDetailPanel({
                 </div>
                 <div className={`rounded-xl border p-3 ${dbsMeta.issueDate ? 'border-indigo-200 bg-indigo-50' : 'border-stone-200 bg-stone-50'}`}>
                   <div className="flex items-center gap-2 text-sm font-medium">
-                    <Shield size={14} className={dbsMeta.issueDate ? 'text-indigo-500' : 'text-stone-300'} />
+                    <SquareCheckBig size={14} className={dbsMeta.issueDate ? 'text-indigo-500' : 'text-stone-300'} />
                     <span className={dbsMeta.issueDate ? 'text-indigo-900' : 'text-stone-400'}>
                       {dbsMeta.issueDate ? 'DBS Logged' : 'No DBS details'}
                     </span>

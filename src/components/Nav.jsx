@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText, ClipboardList, Star } from 'lucide-react'
+import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText, ClipboardList, Star, Notebook, BookAlert } from 'lucide-react'
 import { CAMP_NAME } from '../App'
 
 export const NAV_ITEMS = [
@@ -12,10 +12,10 @@ export const NAV_ITEMS = [
   { id: 'parents', label: 'Parents', icon: UserCheck },
   { id: 'dressing-rooms', label: 'Dressing Rooms', icon: Shirt },
   { id: 'medical', label: 'Medical', icon: Stethoscope },
-  { id: 'behaviour', label: 'Behaviour Log', icon: FileText },
+  { id: 'behaviour', label: 'Behaviour Log', icon: Notebook },
   // { id: 'timetable', label: 'Timetable', icon: CalendarDays },
   { id: 'log-incidents', label: 'Log Incidents', icon: AlertTriangle },
-  { id: 'incidents', label: 'Reports', icon: AlertTriangle },
+  { id: 'incidents', label: 'Reports', icon: BookAlert },
   { id: 'staff', label: 'Staff', icon: UserCog },
   { id: 'documents', label: 'Documents', icon: FileText },
 ]
