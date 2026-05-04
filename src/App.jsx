@@ -72,6 +72,7 @@ const ALL_TABS = NAV_ITEMS.map(item => item.id)
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
 const SESSION_MAX_DURATION_MS = 12 * 60 * 60 * 1000
+const SESSION_EXPIRY_KEY_PREFIX = 'camp_db_session_expiry_'
 const tableCache = new Map()
 const ROUTE_PREFETCHERS = {
   dashboard: loadDashboard,
@@ -932,67 +933,51 @@ export default function App() {
     }
   }
 
-  // Load the server-side expiry for this user. Returns the expiry as a ms timestamp,
-  // or null if no record exists or the request fails.
-  async function loadServerSessionExpiry(userId) {
+  function sessionExpiryKey(userId) {
+    return `${SESSION_EXPIRY_KEY_PREFIX}${userId}`
+  }
+
+  function readLocalSessionExpiry(userId) {
     if (!userId) return null
     try {
-      const { data, error } = await supabase
-        .from('user_sessions')
-        .select('expires_at')
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (error) return null
-      if (!data?.expires_at) return null
-      const ms = new Date(data.expires_at).getTime()
+      const raw = localStorage.getItem(sessionExpiryKey(userId))
+      if (!raw) return null
+      const ms = Number(raw)
       return Number.isFinite(ms) ? ms : null
     } catch {
       return null
     }
   }
 
-  // Write (or overwrite) the expiry for this user in the server table.
-  async function upsertServerSessionExpiry(userId, expiresAtMs) {
+  function writeLocalSessionExpiry(userId, expiresAtMs) {
     if (!userId || !Number.isFinite(expiresAtMs)) return
     try {
-      await supabase.from('user_sessions').upsert({
-        user_id: userId,
-        expires_at: new Date(expiresAtMs).toISOString(),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' })
+      localStorage.setItem(sessionExpiryKey(userId), String(expiresAtMs))
     } catch {
-      // Ignore write failures — timer was already set in state.
+      // Ignore storage failures.
     }
   }
 
-  // Delete the server record when the user logs out.
-  async function deleteServerSessionExpiry(userId) {
+  function removeLocalSessionExpiry(userId) {
     if (!userId) return
     try {
-      await supabase.from('user_sessions').delete().eq('user_id', userId)
+      localStorage.removeItem(sessionExpiryKey(userId))
     } catch {
-      // Ignore failures.
+      // Ignore storage failures.
     }
   }
 
-  // Called on app load when there is an existing Supabase session.
-  // Reads the server expiry; creates a fresh 12-hour window if missing or already expired.
-  async function initServerSessionExpiry(userId) {
+  // Reads the stored expiry for this device. If missing or already expired, creates a
+  // fresh 12-hour window from now. Call on page load and on SIGNED_IN events.
+  // A fresh login always creates a new entry because logout() removes it first.
+  function initLocalSessionExpiry(userId) {
     if (!userId) return
     const now = Date.now()
-    let expiresAt = await loadServerSessionExpiry(userId)
+    let expiresAt = readLocalSessionExpiry(userId)
     if (!Number.isFinite(expiresAt) || expiresAt <= now) {
       expiresAt = now + SESSION_MAX_DURATION_MS
-      upsertServerSessionExpiry(userId, expiresAt)
+      writeLocalSessionExpiry(userId, expiresAt)
     }
-    setSessionExpiryAt(expiresAt)
-  }
-
-  // Called on a fresh SIGNED_IN event — always resets to a new 12-hour window.
-  async function resetServerSessionExpiry(userId) {
-    if (!userId) return
-    const expiresAt = Date.now() + SESSION_MAX_DURATION_MS
-    upsertServerSessionExpiry(userId, expiresAt)
     setSessionExpiryAt(expiresAt)
   }
 
@@ -1117,7 +1102,7 @@ export default function App() {
         setCurrentUser(data.session?.user || null)
         setAuthLoading(false)
         if (hasSession) {
-          initServerSessionExpiry(data.session.user.id)
+          initLocalSessionExpiry(data.session.user.id)
           setPermissionsLoading(true)
           loadPermissionsForUser(data.session.user)
         } else {
@@ -1166,7 +1151,7 @@ export default function App() {
         setPermissionsLoading(hasSession)
         if (hasSession) {
           if (event === 'SIGNED_IN') {
-            resetServerSessionExpiry(session.user.id)
+            initLocalSessionExpiry(session.user.id)
           }
           loadPermissionsForUser(session.user)
         } else {
@@ -1272,8 +1257,8 @@ export default function App() {
     clearSessionExpiryTimer()
     const userId = currentUser?.id
     setSessionExpiryAt(null)
+    if (userId) removeLocalSessionExpiry(userId)
     await supabase.auth.signOut()
-    if (userId) deleteServerSessionExpiry(userId)
     routerNavigate(pathForPage('dashboard'), { replace: true })
     setCurrentUser(null)
     setIsAdminUser(false)
@@ -1282,7 +1267,23 @@ export default function App() {
     setCanViewSafeguardingPerm(false)
   }
 
-  // Schedule the hard logout when the server-side expiry is known.
+  // When the device wakes from sleep, the setTimeout may have fired late or not at all.
+  // Check the stored expiry on visibility change and force logout if it has passed.
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== 'visible') return
+      if (!authed || !currentUser?.id) return
+      const stored = readLocalSessionExpiry(currentUser.id)
+      if (Number.isFinite(stored) && stored <= Date.now()) {
+        logout()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, currentUser?.id])
+
+  // Schedule the hard logout when the local expiry is known.
   useEffect(() => {
     if (!authed || !Number.isFinite(sessionExpiryAt)) {
       clearSessionExpiryTimer()
