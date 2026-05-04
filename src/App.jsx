@@ -71,7 +71,7 @@ const BASIC_TABS = ['dashboard', 'signin', 'shared-info']
 const ALL_TABS = NAV_ITEMS.map(item => item.id)
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
-const SESSION_MAX_DURATION_MS = 12 * 60 * 60 * 1000
+const SESSION_MAX_DURATION_MS = 8 * 60 * 60 * 1000
 const SESSION_EXPIRY_KEY_PREFIX = 'camp_db_session_expiry_'
 const tableCache = new Map()
 const ROUTE_PREFETCHERS = {
