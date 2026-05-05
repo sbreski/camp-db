@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2, Mail, Edit2, MessageSquare, Paperclip, Check, X } from 'lucide-react'
 import IncidentForm from './IncidentForm'
 import { supabase } from '../supabase'
 
 const REPORT_TYPE_ORDER = ['Incident/Accident', 'Safeguarding', 'Mid-Camp Assessment', 'SEND Assessment']
+const BLANK_INCIDENT_FORMS = [
+  { key: 'incident-accident', label: 'Incident/Accident Form', path: '/forms/incident-accident-reporting-form.html' },
+  { key: 'mid-camp', label: 'Mid-Camp Assessment Form', path: '/forms/mid-camp-assessment-form.html' },
+  { key: 'send', label: 'SEND Assessment Form', path: '/forms/send-assessment-form.html' },
+  { key: 'safeguarding', label: 'Safeguarding Assessment Form', path: '/forms/safeguarding-assessment-form.html' },
+]
 
 function getNextDateKey(isoString) {
   const date = new Date(isoString)
@@ -69,6 +75,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   const [loadingStaffVisitorForms, setLoadingStaffVisitorForms] = useState(false)
   const [editingStaffVisitorId, setEditingStaffVisitorId] = useState(null)
   const [editingStaffVisitorName, setEditingStaffVisitorName] = useState('')
+  const staffVisitorFormRef = useRef(null)
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const actorInitialsNormalized = normalizeInitials(actorInitials)
@@ -716,6 +723,8 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
   useEffect(() => {
     async function handleStaffVisitorFormPdfMessage(event) {
+      const staffVisitorFrame = staffVisitorFormRef.current
+      if (!staffVisitorFrame || event.source !== staffVisitorFrame.contentWindow) return
       if (event.origin !== window.location.origin) return
       if (!event.data || typeof event.data !== 'object') return
       if (event.data.type !== 'campdb-form-pdf') return
@@ -950,26 +959,56 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       )}
 
       {logOnly && activeLogTab === 'log-incidents' && (
-        <div className="card space-y-3">
-          <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
-          <p className="text-xs text-stone-500">
-            Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
-          </p>
-          <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
-            <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
-              {isReceivingStaffVisitorPdf
-                ? 'Receiving PDF from staff/visitor form...'
-                : 'When submitted, the PDF is saved to your reports automatically.'}
-            </div>
-            <iframe
-              title="Staff and Visitor Incident Form"
-              src="/forms/staff-visitor-incident-reporting-form.html"
-              className="w-full h-[560px] border-0"
-            />
+        <div className="space-y-4">
+          <div className="card space-y-3">
+            <details className="group" open={false}>
+              <summary className="list-none cursor-pointer flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
+                  <p className="text-xs text-stone-500">
+                    Collapsed by default. Open only when you need to complete a staff or visitor incident.
+                  </p>
+                </div>
+                <span className="text-xs text-forest-700 underline">Open form</span>
+              </summary>
+              <div className="mt-3 border border-stone-200 rounded-xl overflow-hidden bg-white">
+                <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
+                  {isReceivingStaffVisitorPdf
+                    ? 'Receiving PDF from staff/visitor form...'
+                    : 'When submitted, the PDF is saved to your reports automatically.'}
+                </div>
+                <iframe
+                  ref={staffVisitorFormRef}
+                  title="Staff and Visitor Incident Form"
+                  src="/forms/staff-visitor-incident-reporting-form.html"
+                  className="w-full h-[560px] border-0"
+                />
+              </div>
+            </details>
           </div>
+
           {staffVisitorUploadNotice && (
             <p className="text-xs text-green-700">{staffVisitorUploadNotice}</p>
           )}
+          <div className="card space-y-3">
+            <h3 className="font-display font-semibold text-forest-950">Blank Form Copies (No Autofill)</h3>
+            <p className="text-xs text-stone-500">
+              Use these when you want to manually complete a form from scratch without participant autofill.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {BLANK_INCIDENT_FORMS.map(form => (
+                <a
+                  key={form.key}
+                  href={form.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-stone-200 rounded-lg px-3 py-2 text-sm text-forest-800 bg-white hover:border-forest-400"
+                >
+                  {form.label}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1871,22 +1910,30 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
       {!logOnly && activeMainTab === 'staff-visitor' && (
         <div className="space-y-5">
           <div className="card space-y-3">
-            <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
-            <p className="text-xs text-stone-500">
-              Complete this form for staff or visitor incidents and click Attach to Documents inside the form.
-            </p>
-            <div className="border border-stone-200 rounded-xl overflow-hidden bg-white">
-              <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
-                {isReceivingStaffVisitorPdf
-                  ? 'Receiving PDF from staff/visitor form...'
-                  : 'When submitted, PDFs are saved here in the Reporting tab.'}
+            <details className="group" open={false}>
+              <summary className="list-none cursor-pointer flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-display font-semibold text-forest-950">Staff & Visitor Incident Form</h3>
+                  <p className="text-xs text-stone-500">
+                    Collapsed by default. Open only when needed.
+                  </p>
+                </div>
+                <span className="text-xs text-forest-700 underline">Open form</span>
+              </summary>
+              <div className="mt-3 border border-stone-200 rounded-xl overflow-hidden bg-white">
+                <div className="px-3 py-2 bg-stone-50 border-b border-stone-200 text-xs text-stone-600">
+                  {isReceivingStaffVisitorPdf
+                    ? 'Receiving PDF from staff/visitor form...'
+                    : 'When submitted, PDFs are saved here in the Reporting tab.'}
+                </div>
+                <iframe
+                  ref={staffVisitorFormRef}
+                  title="Staff and Visitor Incident Form"
+                  src="/forms/staff-visitor-incident-reporting-form.html"
+                  className="w-full h-[560px] border-0"
+                />
               </div>
-              <iframe
-                title="Staff and Visitor Incident Form"
-                src="/forms/staff-visitor-incident-reporting-form.html"
-                className="w-full h-[560px] border-0"
-              />
-            </div>
+            </details>
             {staffVisitorUploadNotice && (
               <p className="text-xs text-green-700">{staffVisitorUploadNotice}</p>
             )}
