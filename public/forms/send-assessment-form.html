@@ -639,11 +639,11 @@
   async function sendPdfToCampDb() {
     try {
       saveForm()
+      const { pdf, fileName } = await generateFormPdf('body', 'send-assessment', 'child_name')
       if (!window.parent || window.parent === window) {
-        alert('Open this form inside Camp DB to send PDF directly to the log.')
+        pdf.save(fileName)
         return
       }
-      const { pdf, fileName } = await generateFormPdf('body', 'send-assessment', 'child_name')
       window.parent.postMessage(
         { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
         window.location.origin,
