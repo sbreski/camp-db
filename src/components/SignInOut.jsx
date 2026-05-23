@@ -1897,11 +1897,11 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       ) : (
         <div className="card p-0 overflow-hidden">
           {/* Header row */}
-          <div className="hidden sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2.5 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
+          <div className="hidden md:grid md:grid-cols-[minmax(260px,1fr)_96px_96px_220px] gap-3 px-4 py-3 bg-stone-50 border-b border-stone-100 text-xs font-semibold text-stone-500 uppercase tracking-wide">
             <span>Participant</span>
-            <span className="text-right w-24">Sign In</span>
-            <span className="text-right w-24">Sign Out</span>
-            <span className="text-right w-28">Action</span>
+            <span className="text-right">Sign In</span>
+            <span className="text-right">Sign Out</span>
+            <span className="text-right">Action</span>
           </div>
 
           <div className="divide-y divide-stone-50">
@@ -1950,7 +1950,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   onClick={() => setActiveParticipantId(p.id)}
                   onFocus={() => setActiveParticipantId(p.id)}
                   tabIndex={0}
-                  className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:gap-2 sm:items-center px-3 py-3 transition-all ${
+                  className={`md:grid md:grid-cols-[minmax(260px,1fr)_96px_96px_220px] md:gap-3 md:items-center px-3 md:px-4 py-3 transition-all hover:bg-stone-50/70 ${
                     isFlashing ? 'bg-amber-50' : isIn ? 'bg-amber-50/40' : isOut ? 'bg-stone-50/60 opacity-75' : ''
                   } ${enableKeyboardShortcuts && isActiveRow ? 'ring-2 ring-forest-400 ring-inset' : ''
                   } ${enableKeyboardShortcuts ? 'cursor-pointer focus:outline-none' : ''}`}>
@@ -2115,7 +2115,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   </div>
 
                   {/* Sign in/out times — inline on mobile, columns on desktop */}
-                  <div className="sm:hidden flex items-center gap-3 mt-1 mb-1">
+                  <div className="md:hidden flex items-center gap-3 mt-1 mb-1">
                     {rec?.signIn && (
                       <button onClick={() => startEditTime(p.id, 'signIn', rec.signIn)}
                         className="text-xs font-mono text-green-700 font-semibold hover:bg-green-50 px-1.5 py-0.5 rounded">
@@ -2131,7 +2131,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   </div>
 
                   {/* Sign in time — desktop only */}
-                  <div className="hidden sm:block text-right sm:w-24">
+                  <div className="hidden md:block text-right">
                     <div className="flex flex-col items-end gap-0.5">
                       {rec?.signIn ? (
                         <button
@@ -2149,7 +2149,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   </div>
 
                   {/* Sign out time — desktop only */}
-                  <div className="hidden sm:block text-right sm:w-24">
+                  <div className="hidden md:block text-right">
                     <div className="flex flex-col items-end gap-0.5">
                       {rec?.signOut ? (
                         <button
@@ -2167,17 +2167,17 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   </div>
 
                   {/* Buttons */}
-                  <div className="flex flex-row sm:flex-row items-center gap-1.5 justify-start sm:justify-end sm:w-40 mt-2 sm:mt-0 flex-wrap">
+                  <div className="flex items-center gap-1 justify-start md:justify-end md:mt-0 mt-2 flex-wrap md:flex-nowrap">
                     {!rec?.signIn && (
                       <button onClick={() => signIn(p)}
-                        className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-display font-semibold bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition-all">
+                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-display font-semibold bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition-all whitespace-nowrap">
                         <LogIn size={12} /> In
                       </button>
                     )}
                     {rec?.signIn && !rec?.signOut && (
                       <>
                         <button onClick={() => setCollectingFor(p)}
-                          className="flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-display font-semibold bg-forest-900 hover:bg-forest-800 text-white active:scale-95 transition-all">
+                          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-display font-semibold bg-forest-900 hover:bg-forest-800 text-white active:scale-95 transition-all whitespace-nowrap">
                           <LogOut size={12} /> Out
                         </button>
                         <button onClick={() => undoSignIn(p)} title="Undo sign-in"
@@ -2187,12 +2187,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       </>
                     )}
                     <button onClick={() => openNoteEditor(p)} title="Edit participant notes"
-                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all">
+                      className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all whitespace-nowrap">
                       <FileText size={12} /> Notes
                     </button>
                     {isIn && (
                       <button onClick={() => setVerifyingFor(p)} title="Pre-verify pickup code"
-                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 active:scale-95 transition-all">
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-display font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 active:scale-95 transition-all whitespace-nowrap">
                         <Check size={12} /> Verify Code
                       </button>
                     )}
@@ -2200,14 +2200,14 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       <button
                         onClick={() => openReasonEditor(p)}
                         title="Add absence reason"
-                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold active:scale-95 transition-all bg-amber-50 hover:bg-amber-100 text-amber-800"
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-display font-semibold active:scale-95 transition-all bg-amber-50 hover:bg-amber-100 text-amber-800 whitespace-nowrap"
                       >
-                        <Calendar size={12} /> <span className="sm:inline hidden">Absence Reason</span><span className="sm:hidden">Absent</span>
+                        <Calendar size={12} /> <span className="md:inline hidden">Absence Reason</span><span className="md:hidden">Absent</span>
                       </button>
                     )}
                     {rec?.signOut && (
                       <button onClick={() => undoSignOut(p)} title="Undo sign-out"
-                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-medium bg-stone-100 hover:bg-red-100 hover:text-red-700 text-stone-500 active:scale-95 transition-all">
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-display font-medium bg-stone-100 hover:bg-red-100 hover:text-red-700 text-stone-500 active:scale-95 transition-all whitespace-nowrap">
                         <RotateCcw size={12} /> Undo
                       </button>
                     )}
