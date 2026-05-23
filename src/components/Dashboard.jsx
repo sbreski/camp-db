@@ -212,12 +212,6 @@ export default function Dashboard({
         </div>
       </div>
 
-      <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Pickup Security</p>
-        <p className="text-sm text-amber-900 mt-1">Pickup codes are generated per family each day</p>
-        <p className="text-xs text-amber-800 mt-2">Siblings share the same code. View and edit family codes from the Sign In / Out register.</p>
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[

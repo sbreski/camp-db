@@ -122,13 +122,15 @@ function photoConsentMode(value) {
   return 'ok'
 }
 
-function CollectionModal({ participant, participants, selectedDate, signedInSiblingOptions = [], onConfirm, onCancel }) {
+function CollectionModal({ participant, participants, selectedDate, signedInSiblingOptions = [], enableKeyboardShortcuts = true, actorInitials = 'ST', onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
   const [otherFullName, setOtherFullName] = useState('')
   const [otherReason, setOtherReason] = useState('')
   const [pickupCodeInput, setPickupCodeInput] = useState('')
   const [pickupCodeConfirmed, setPickupCodeConfirmed] = useState(false)
+  const [codeBypassEnabled, setCodeBypassEnabled] = useState(false)
+  const [codeBypassReason, setCodeBypassReason] = useState('')
   const [pickupCodeFieldArmed, setPickupCodeFieldArmed] = useState(false)
   const [signOutSiblingsTogether, setSignOutSiblingsTogether] = useState(false)
   const [validationError, setValidationError] = useState('')
@@ -139,7 +141,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   const can_leave_alone = canLeaveAlone(participant)
   const hasSelectableOptions = can_leave_alone || siblingLeaveOptions.length > 0 || adults.length > 0
   const hasValidPickupCode = isValidParticipantPickupCode(pickupCodeInput, participant, selectedDate)
-  const isAdultStepUnlocked = hasValidPickupCode && pickupCodeConfirmed
+  const isAdultStepUnlocked = (hasValidPickupCode && pickupCodeConfirmed) || codeBypassEnabled
 
   function isCodeExemptCollector(value) {
     if (value === 'LeaveAlone') return true
@@ -151,7 +153,15 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
     return isCodeExemptCollector(value) || isAdultStepUnlocked
   }
 
+  function withBypassAudit(baseValue, selectedValue) {
+    if (!codeBypassEnabled || isCodeExemptCollector(selectedValue)) return baseValue
+    const reason = String(codeBypassReason || '').trim()
+    return `Code bypass by ${actorInitials} (${reason}) | ${baseValue}`
+  }
+
   useEffect(() => {
+    if (!enableKeyboardShortcuts) return
+
     function isTypingField(target) {
       if (!target) return false
       const tag = String(target.tagName || '').toLowerCase()
@@ -191,6 +201,13 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
         return
       }
 
+      if (/^b$/i.test(event.key)) {
+        event.preventDefault()
+        setCodeBypassEnabled(prev => !prev)
+        setValidationError('')
+        return
+      }
+
       if (event.key === '0' && can_leave_alone) {
         event.preventDefault()
         selectCollector('LeaveAlone')
@@ -225,7 +242,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, isAdultStepUnlocked])
+  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, isAdultStepUnlocked, enableKeyboardShortcuts])
 
   useEffect(() => {
     setPickupCodeFieldArmed(true)
@@ -251,9 +268,14 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
       return
     }
 
+    if (codeBypassEnabled && !isCodeExemptCollector(selected) && String(codeBypassReason || '').trim().length < 5) {
+      setValidationError('Enter a short reason (at least 5 characters) for code bypass.')
+      return
+    }
+
     if (can_leave_alone && selected === 'LeaveAlone') {
       onConfirm({
-        collectedBy: 'Left by themselves',
+        collectedBy: withBypassAudit('Left by themselves', selected),
         siblingIds: buildSiblingIdsForSubmission(selected),
       })
       return
@@ -266,7 +288,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     if (selected !== 'Other / not on approved list') {
       onConfirm({
-        collectedBy: selected || 'Not recorded',
+        collectedBy: withBypassAudit(selected || 'Not recorded', selected),
         siblingIds: buildSiblingIdsForSubmission(selected),
       })
       return
@@ -285,7 +307,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
     }
 
     onConfirm({
-      collectedBy: `Other (not approved): ${fullName} - Reason: ${reason}`,
+      collectedBy: withBypassAudit(`Other (not approved): ${fullName} - Reason: ${reason}`, selected),
       siblingIds: buildSiblingIdsForSubmission(selected),
     })
   }
@@ -340,6 +362,30 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
               placeholder="Enter 3-digit code"
             />
             <p className="text-[11px] text-stone-500">Press Enter to unlock adult collection options.</p>
+            <label className="flex items-start gap-2 mt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={codeBypassEnabled}
+                onChange={e => {
+                  setCodeBypassEnabled(e.target.checked)
+                  if (!e.target.checked) setCodeBypassReason('')
+                  if (validationError) setValidationError('')
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-rose-700 cursor-pointer"
+              />
+              <span className="text-xs text-stone-600">Bypass code (staff override)</span>
+            </label>
+            {codeBypassEnabled && (
+              <textarea
+                className="input min-h-[70px]"
+                value={codeBypassReason}
+                onChange={e => {
+                  setCodeBypassReason(e.target.value)
+                  if (validationError) setValidationError('')
+                }}
+                placeholder="Reason for bypass (required)"
+              />
+            )}
           </div>
           {!isAdultStepUnlocked && (adults.length > 0) && (
             <p className="text-xs text-stone-500">Step 2 unlocks once a valid code is entered.</p>
@@ -477,6 +523,10 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
 export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
   const searchInputRef = useRef(null)
+  const [enableKeyboardShortcuts, setEnableKeyboardShortcuts] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.innerWidth >= 1024
+  })
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // all | in | not-in | follow-up
   const [flash, setFlash] = useState(null)
@@ -1002,6 +1052,16 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   }).length
 
   useEffect(() => {
+    function updateKeyboardMode() {
+      setEnableKeyboardShortcuts(window.innerWidth >= 1024)
+    }
+
+    updateKeyboardMode()
+    window.addEventListener('resize', updateKeyboardMode)
+    return () => window.removeEventListener('resize', updateKeyboardMode)
+  }, [])
+
+  useEffect(() => {
     if (!visibleParticipants.length) {
       setActiveParticipantId(null)
       return
@@ -1012,6 +1072,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   }, [visibleParticipants, activeParticipantId])
 
   useEffect(() => {
+    if (!enableKeyboardShortcuts) return
+
     const modalOpen = Boolean(collectingFor || noteEditor || editingTime || reasonEditor || editingCodeParticipant)
 
     function isTypingField(target) {
@@ -1154,6 +1216,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
+    enableKeyboardShortcuts,
     collectingFor,
     noteEditor,
     editingTime,
@@ -1250,6 +1313,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
           participants={participants}
           selectedDate={selectedDate}
           signedInSiblingOptions={getSignedInSiblingOptions(collectingFor)}
+          enableKeyboardShortcuts={enableKeyboardShortcuts}
+          actorInitials={actorInitials}
           onConfirm={confirmSignOut}
           onCancel={() => setCollectingFor(null)}
         />
@@ -1505,13 +1570,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       </div>
 
       {/* Date selector */}
-      <div className="card border border-forest-200 bg-forest-50/40 space-y-2">
+      <div className={`card border border-forest-200 bg-forest-50/40 space-y-2 ${enableKeyboardShortcuts ? '' : 'hidden'}`}>
         <h3 className="text-sm font-display font-bold text-forest-900">Keyboard Key (No Mouse Workflow)</h3>
         <div className="text-xs text-stone-700 grid grid-cols-1 md:grid-cols-2 gap-2">
           <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
           <p><span className="font-semibold">Move rows:</span> <span className="font-mono">↑</span>/<span className="font-mono">↓</span> change active participant.</p>
           <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
-          <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
+          <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">B</span> toggle code bypass (reason required); <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
         </div>
       </div>
 
@@ -1533,7 +1598,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
 
       <div className="relative">
         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-        <input ref={searchInputRef} type="text" placeholder="Search participants... (Press / to focus)" value={search}
+        <input ref={searchInputRef} type="text" placeholder={enableKeyboardShortcuts ? 'Search participants... (Press / to focus)' : 'Search participants...'} value={search}
           onChange={e => setSearch(e.target.value)} className="input pl-9" />
       </div>
 
@@ -1626,7 +1691,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                 <div key={p.id} id={`participant-row-${p.id}`}
                   className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:gap-2 sm:items-center px-3 py-3 transition-all ${
                     isFlashing ? 'bg-amber-50' : isIn ? 'bg-amber-50/40' : isOut ? 'bg-stone-50/60 opacity-75' : ''
-                  } ${isActiveRow ? 'ring-2 ring-forest-400 ring-inset' : ''
+                  } ${enableKeyboardShortcuts && isActiveRow ? 'ring-2 ring-forest-400 ring-inset' : ''
                   }`}>
 
                   {/* Name + flags */}
