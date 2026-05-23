@@ -495,6 +495,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
 export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
   const searchInputRef = useRef(null)
+  const dateInputRef = useRef(null)
   const [enableKeyboardShortcuts, setEnableKeyboardShortcuts] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.innerWidth >= 1024
@@ -1024,6 +1025,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
   }).length
 
+  function shiftSelectedDate(days) {
+    const base = new Date(`${selectedDate}T12:00:00`)
+    base.setDate(base.getDate() + days)
+    setSelectedDate(base.toISOString().slice(0, 10))
+  }
+
   useEffect(() => {
     function updateKeyboardMode() {
       setEnableKeyboardShortcuts(window.innerWidth >= 1024)
@@ -1085,6 +1092,30 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       }
 
       if (isTypingField(event.target)) return
+
+      if (/^d$/i.test(event.key)) {
+        event.preventDefault()
+        dateInputRef.current?.focus()
+        return
+      }
+
+      if (/^t$/i.test(event.key)) {
+        event.preventDefault()
+        setSelectedDate(today)
+        return
+      }
+
+      if (event.key === '[') {
+        event.preventDefault()
+        shiftSelectedDate(-1)
+        return
+      }
+
+      if (event.key === ']') {
+        event.preventDefault()
+        shiftSelectedDate(1)
+        return
+      }
 
       if (event.key === '1') {
         event.preventDefault()
@@ -1546,6 +1577,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-stone-700">Select Date:</label>
         <input
+          ref={dateInputRef}
           type="date"
           value={selectedDate}
           onChange={e => setSelectedDate(e.target.value)}
@@ -1932,7 +1964,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         {showKeyboardKey && (
           <div className="card border border-forest-200 bg-forest-50/40 mt-2">
             <div className="text-xs text-stone-700 grid grid-cols-1 md:grid-cols-2 gap-2">
-              <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
+              <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">D</span> focus date, <span className="font-mono">[</span>/<span className="font-mono">]</span> previous/next day, <span className="font-mono">T</span> today, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
               <p><span className="font-semibold">Move rows:</span> <span className="font-mono">↑</span>/<span className="font-mono">↓</span> change active participant.</p>
               <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
               <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
