@@ -122,7 +122,7 @@ function photoConsentMode(value) {
   return 'ok'
 }
 
-function CollectionModal({ participant, participants, selectedDate, expectedPickupCode, onConfirm, onCancel }) {
+function CollectionModal({ participant, participants, selectedDate, onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
   const [otherFullName, setOtherFullName] = useState('')
@@ -131,10 +131,21 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
   const [pickupCodeFieldArmed, setPickupCodeFieldArmed] = useState(false)
   const [validationError, setValidationError] = useState('')
   const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
-  const numberedCollectors = [...siblingLeaveOptions.map(option => option.label), ...adults]
+  const numberedCollectors = [...adults]
 
   const can_leave_alone = canLeaveAlone(participant)
   const hasSelectableOptions = can_leave_alone || siblingLeaveOptions.length > 0 || adults.length > 0
+  const hasValidPickupCode = isValidParticipantPickupCode(pickupCodeInput, participant, selectedDate)
+
+  function isCodeExemptCollector(value) {
+    if (value === 'LeaveAlone') return true
+    if (typeof value !== 'string') return false
+    return /^leave with sibling,/i.test(value)
+  }
+
+  function canSelectCollector(value) {
+    return hasValidPickupCode || isCodeExemptCollector(value)
+  }
 
   useEffect(() => {
     function isTypingField(target) {
@@ -156,7 +167,7 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
       if (/^[1-9]$/.test(event.key)) {
         const optionIndex = Number(event.key) - 1
         const option = numberedCollectors[optionIndex]
-        if (option) {
+        if (option && canSelectCollector(option)) {
           event.preventDefault()
           selectCollector(option)
         }
@@ -171,6 +182,7 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
 
       if (event.key === 'Enter') {
         if (hasSelectableOptions && !selected) return
+        if (selected && !canSelectCollector(selected)) return
         event.preventDefault()
         handleConfirm()
       }
@@ -178,18 +190,19 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel])
+  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode])
 
   function handleConfirm() {
-    if (!isValidParticipantPickupCode(pickupCodeInput, participant, selectedDate)) {
-      setValidationError('Pickup code does not match this family\'s code for the selected date.')
-      return
-    }
-
     if (can_leave_alone && selected === 'LeaveAlone') {
       onConfirm('Left by themselves')
       return
     }
+
+    if (!canSelectCollector(selected)) {
+      setValidationError('Enter the pickup code first, then choose the sign-out adult.')
+      return
+    }
+
     if (selected !== 'Other / not on approved list') {
       onConfirm(selected || 'Not recorded')
       return
@@ -227,7 +240,7 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
         </div>
         <div className="p-5 space-y-3">
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-            <p className="text-sm font-semibold text-amber-900">Daily Pickup Security Code</p>
+            <p className="text-sm font-semibold text-amber-900">Step 1: Enter Pickup Security Code</p>
             <p className="text-xs text-amber-800">Ask the parent/carer for this family\'s 3-digit code before sign out.</p>
             <div className="sr-only" aria-hidden="true">
               <input type="text" name="cc-name" autoComplete="cc-name" tabIndex={-1} />
@@ -256,8 +269,28 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
               }}
               placeholder="Enter 3-digit code"
             />
-            <p className="text-[11px] text-amber-700">Expected for this family: <span className="font-mono font-semibold">{expectedPickupCode}</span></p>
           </div>
+          {!hasValidPickupCode && (adults.length > 0) && (
+            <p className="text-xs text-stone-500">Step 2 unlocks once a valid code is entered.</p>
+          )}
+          {(can_leave_alone || siblingLeaveOptions.length > 0) && (
+            <>
+              <p className="text-sm font-medium text-stone-700">No-code independent leave options</p>
+              <div className="space-y-2">
+                {siblingLeaveOptions.map((option) => (
+                  <button key={option.id} onClick={() => selectCollector(option.label)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                      selected === option.label ? 'border-indigo-600 bg-indigo-50' : 'border-stone-200 hover:border-stone-300'
+                    }`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-display flex-shrink-0 ${
+                      selected === option.label ? 'bg-indigo-900 text-white' : 'bg-stone-100 text-stone-600'
+                    }`}>↗</div>
+                    <span className="text-sm font-medium text-stone-800">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           {can_leave_alone && (
             <button
               onClick={() => selectCollector('LeaveAlone')}
@@ -275,36 +308,29 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
               </span>
             </button>
           )}
-          {adults.length > 0 || siblingLeaveOptions.length > 0 ? (
+          {hasValidPickupCode && adults.length > 0 ? (
             <>
-              <p className="text-sm font-medium text-stone-700">Who is collecting?</p>
+              <p className="text-sm font-medium text-stone-700">Step 2: Who is collecting?</p>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {siblingLeaveOptions.map((option, i) => (
-                  <button key={option.id} onClick={() => selectCollector(option.label)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                      selected === option.label ? 'border-indigo-600 bg-indigo-50' : 'border-stone-200 hover:border-stone-300'
-                    }`}>
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-display flex-shrink-0 ${
-                      selected === option.label ? 'bg-indigo-900 text-white' : 'bg-stone-100 text-stone-600'
-                    }`}>{i + 1}</div>
-                    <span className="text-sm font-medium text-stone-800">{option.label}</span>
-                  </button>
-                ))}
                 {adults.map((adult, i) => (
-                  <button key={i} onClick={() => selectCollector(adult)}
+                  <button key={i} onClick={() => selectCollector(adult)} disabled={!canSelectCollector(adult)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                       selected === adult ? 'border-forest-600 bg-forest-50' : 'border-stone-200 hover:border-stone-300'
-                    }`}>
+                    } ${!canSelectCollector(adult) ? 'opacity-45 cursor-not-allowed hover:border-stone-200' : ''}`}
+                    title={!canSelectCollector(adult) ? 'Enter valid pickup code first' : undefined}
+                  >
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-display flex-shrink-0 ${
                       selected === adult ? 'bg-forest-900 text-white' : 'bg-stone-100 text-stone-600'
-                    }`}>{siblingLeaveOptions.length + i + 1}</div>
+                    }`}>{i + 1}</div>
                     <span className="text-sm font-medium text-stone-800">{adult}</span>
                   </button>
                 ))}
-                <button onClick={() => selectCollector('Other / not on approved list')}
+                <button onClick={() => selectCollector('Other / not on approved list')} disabled={!canSelectCollector('Other / not on approved list')}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                     selected === 'Other / not on approved list' ? 'border-amber-500 bg-amber-50' : 'border-dashed border-stone-200 hover:border-stone-300'
-                  }`}>
+                  } ${!canSelectCollector('Other / not on approved list') ? 'opacity-45 cursor-not-allowed hover:border-stone-200' : ''}`}
+                  title={!canSelectCollector('Other / not on approved list') ? 'Enter valid pickup code first' : undefined}
+                >
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                     selected === 'Other / not on approved list' ? 'bg-amber-500 text-white' : 'bg-stone-100 text-stone-400'
                   }`}><User size={13} /></div>
@@ -344,17 +370,17 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
                 )}
               </div>
             </>
-          ) : (
+          ) : (!can_leave_alone && siblingLeaveOptions.length === 0) ? (
             <div className="text-center py-2">
               <p className="text-sm text-stone-500">No approved adults recorded for this participant.</p>
               <p className="text-xs text-stone-400 mt-1">Add them via the Participants page.</p>
             </div>
-          )}
+          ) : null}
         </div>
         <div className="p-5 pt-0 flex gap-2">
           <button onClick={handleConfirm}
-            disabled={hasSelectableOptions && !selected}
-            className={`flex-1 btn-primary py-3 ${hasSelectableOptions && !selected ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            disabled={(hasSelectableOptions && !selected) || (selected && !canSelectCollector(selected))}
+            className={`flex-1 btn-primary py-3 ${(hasSelectableOptions && !selected) || (selected && !canSelectCollector(selected)) ? 'opacity-40 cursor-not-allowed' : ''}`}>
             Confirm Sign Out
           </button>
           <button onClick={onCancel} className="btn-secondary px-4">Cancel</button>
@@ -937,7 +963,6 @@ export default function SignInOut({ participants, setParticipants, attendance, s
           participant={collectingFor}
           participants={participants}
           selectedDate={selectedDate}
-          expectedPickupCode={getPickupCodeForParticipant(collectingFor)}
           onConfirm={confirmSignOut}
           onCancel={() => setCollectingFor(null)}
         />
@@ -1378,7 +1403,15 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                     </p>
                     <p className={`text-xs mt-1 font-semibold ${statusClass}`}>{statusLabel}</p>
                     <p className="text-[11px] mt-1 text-amber-800">
-                      Family pickup code: <span className="font-mono font-semibold">{participantPickupCode}</span>
+                      Family pickup code:{' '}
+                      <button
+                        type="button"
+                        onClick={() => openPickupCodeEditor(p)}
+                        title="Edit family pickup code"
+                        className="font-mono font-semibold underline decoration-dotted underline-offset-2 hover:text-amber-900"
+                      >
+                        {participantPickupCode}
+                      </button>
                     </p>
                     {reasonLabel && !isIn && (
                       <p className="text-xs mt-1 text-amber-700">
@@ -1539,13 +1572,6 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                     <button onClick={() => openNoteEditor(p)} title="Edit participant notes"
                       className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all">
                       <FileText size={12} /> Notes
-                    </button>
-                    <button
-                      onClick={() => openPickupCodeEditor(p)}
-                      title="Edit family pickup code"
-                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold active:scale-95 transition-all bg-amber-50 hover:bg-amber-100 text-amber-800"
-                    >
-                      <Edit2 size={12} /> Code
                     </button>
                     {!absenceReasonLocked && (
                       <button
