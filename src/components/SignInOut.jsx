@@ -476,9 +476,11 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 }
 
 export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
+  const searchInputRef = useRef(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // all | in | not-in | follow-up
   const [flash, setFlash] = useState(null)
+  const [activeParticipantId, setActiveParticipantId] = useState(null)
   const [collectingFor, setCollectingFor] = useState(null)
   const [noteEditor, setNoteEditor] = useState(null)
   const [noteInput, setNoteInput] = useState('')
@@ -971,6 +973,22 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const sorted = [...seasonParticipants].sort((a, b) => a.name.localeCompare(b.name))
   const filtered = sorted.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
 
+  function participantMatchesStatusFilter(participant) {
+    if (statusFilter === 'all') return true
+    if (statusFilter === 'follow-up') {
+      const hasIncidentFollowUp = getPendingFollowUps(participant.id).length > 0
+      const hasNoteFollowUp = canViewAdminFollowUps && hasParticipantNoteFollowUp(participant.id)
+      const hasMarFollowUp = getPendingMarFollowUps(participant.id).length > 0
+      return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
+    }
+    const rec = getRecord(participant.id)
+    const isInNow = !!(rec?.signIn && !rec?.signOut)
+    return statusFilter === 'in' ? isInNow : !isInNow
+  }
+
+  const visibleParticipants = filtered.filter(participantMatchesStatusFilter)
+  const activeParticipant = visibleParticipants.find(p => p.id === activeParticipantId) || visibleParticipants[0] || null
+
   const onSite = seasonParticipants.filter(p => { const r = getRecord(p.id); return r?.signIn && !r?.signOut })
   const notIn = seasonParticipants.filter(p => {
     const r = getRecord(p.id)
@@ -982,6 +1000,165 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     const hasMarFollowUp = getPendingMarFollowUps(p.id).length > 0
     return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
   }).length
+
+  useEffect(() => {
+    if (!visibleParticipants.length) {
+      setActiveParticipantId(null)
+      return
+    }
+    if (!activeParticipantId || !visibleParticipants.some(item => item.id === activeParticipantId)) {
+      setActiveParticipantId(visibleParticipants[0].id)
+    }
+  }, [visibleParticipants, activeParticipantId])
+
+  useEffect(() => {
+    const modalOpen = Boolean(collectingFor || noteEditor || editingTime || reasonEditor || editingCodeParticipant)
+
+    function isTypingField(target) {
+      if (!target) return false
+      const tag = String(target.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
+      return Boolean(target.isContentEditable)
+    }
+
+    function moveActive(delta) {
+      if (!visibleParticipants.length) return
+      const currentIndex = visibleParticipants.findIndex(item => item.id === (activeParticipant?.id || ''))
+      const safeIndex = currentIndex >= 0 ? currentIndex : 0
+      const nextIndex = (safeIndex + delta + visibleParticipants.length) % visibleParticipants.length
+      const next = visibleParticipants[nextIndex]
+      setActiveParticipantId(next.id)
+      requestAnimationFrame(() => {
+        document.getElementById(`participant-row-${next.id}`)?.scrollIntoView({ block: 'nearest' })
+      })
+    }
+
+    function handleKeyDown(event) {
+      if (modalOpen) return
+
+      if (event.key === '/') {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+        return
+      }
+
+      if (isTypingField(event.target)) return
+      if (!activeParticipant) return
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        moveActive(1)
+        return
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        moveActive(-1)
+        return
+      }
+
+      if (event.key === '1') {
+        event.preventDefault()
+        setStatusFilter('all')
+        return
+      }
+
+      if (event.key === '2') {
+        event.preventDefault()
+        setStatusFilter('in')
+        return
+      }
+
+      if (event.key === '3') {
+        event.preventDefault()
+        setStatusFilter('not-in')
+        return
+      }
+
+      if (event.key === '4') {
+        event.preventDefault()
+        setStatusFilter('follow-up')
+        return
+      }
+
+      if (/^i$/i.test(event.key)) {
+        const rec = getRecord(activeParticipant.id)
+        if (!rec?.signIn) {
+          event.preventDefault()
+          signIn(activeParticipant)
+        }
+        return
+      }
+
+      if (/^o$/i.test(event.key)) {
+        const rec = getRecord(activeParticipant.id)
+        if (rec?.signIn && !rec?.signOut) {
+          event.preventDefault()
+          setCollectingFor(activeParticipant)
+        }
+        return
+      }
+
+      if (/^n$/i.test(event.key)) {
+        event.preventDefault()
+        openNoteEditor(activeParticipant)
+        return
+      }
+
+      if (/^a$/i.test(event.key)) {
+        const rec = getRecord(activeParticipant.id)
+        if (!(rec?.signIn || rec?.signOut)) {
+          event.preventDefault()
+          openReasonEditor(activeParticipant)
+        }
+        return
+      }
+
+      if (/^u$/i.test(event.key)) {
+        const rec = getRecord(activeParticipant.id)
+        if (rec?.signOut) {
+          event.preventDefault()
+          undoSignOut(activeParticipant)
+          return
+        }
+        if (rec?.signIn && !rec?.signOut) {
+          event.preventDefault()
+          undoSignIn(activeParticipant)
+        }
+        return
+      }
+
+      if (event.key === 'Enter') {
+        const rec = getRecord(activeParticipant.id)
+        event.preventDefault()
+        if (!rec?.signIn) {
+          signIn(activeParticipant)
+          return
+        }
+        if (rec?.signIn && !rec?.signOut) {
+          setCollectingFor(activeParticipant)
+          return
+        }
+        openNoteEditor(activeParticipant)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [
+    collectingFor,
+    noteEditor,
+    editingTime,
+    reasonEditor,
+    editingCodeParticipant,
+    visibleParticipants,
+    activeParticipant,
+    statusFilter,
+    selectedDate,
+    attendance,
+    search,
+  ])
 
   function printFireRecord() {
     const onSiteList = [...seasonParticipants]
@@ -1339,7 +1516,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
 
       <div className="relative">
         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-        <input type="text" placeholder="Search participants..." value={search}
+        <input ref={searchInputRef} type="text" placeholder="Search participants... (Press / to focus)" value={search}
           onChange={e => setSearch(e.target.value)} className="input pl-9" />
       </div>
 
@@ -1388,24 +1565,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
           </div>
 
           <div className="divide-y divide-stone-50">
-            {filtered
-              .filter(p => {
-                if (statusFilter === 'all') return true
-                if (statusFilter === 'follow-up') {
-                  const hasIncidentFollowUp = getPendingFollowUps(p.id).length > 0
-                  const hasNoteFollowUp = canViewAdminFollowUps && hasParticipantNoteFollowUp(p.id)
-                  const hasMarFollowUp = getPendingMarFollowUps(p.id).length > 0
-                  return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
-                }
-                const rec = getRecord(p.id)
-                const isInNow = !!(rec?.signIn && !rec?.signOut)
-                return statusFilter === 'in' ? isInNow : !isInNow
-              })
-              .map(p => {
+            {visibleParticipants.map(p => {
               const rec = getRecord(p.id)
               const isIn = rec?.signIn && !rec?.signOut
               const isOut = !!rec?.signOut
               const isFlashing = flash?.id === p.id
+              const isActiveRow = activeParticipant?.id === p.id
               const statusLabel = isIn ? 'Present' : isOut ? 'Signed out' : 'Absent'
               const statusClass = isIn
                 ? 'text-emerald-700'
@@ -1441,9 +1606,10 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const absenceReasonLocked = Boolean(rec?.signIn || rec?.signOut)
 
               return (
-                <div key={p.id}
+                <div key={p.id} id={`participant-row-${p.id}`}
                   className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:gap-2 sm:items-center px-3 py-3 transition-all ${
                     isFlashing ? 'bg-amber-50' : isIn ? 'bg-amber-50/40' : isOut ? 'bg-stone-50/60 opacity-75' : ''
+                  } ${isActiveRow ? 'ring-2 ring-forest-400 ring-inset' : ''
                   }`}>
 
                   {/* Name + flags */}
