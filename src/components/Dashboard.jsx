@@ -3,6 +3,7 @@ import { Users, LogIn, LogOut, AlertTriangle, Clock, Stethoscope, RefreshCw } fr
 import ParticipantNameText from './ParticipantNameText'
 import { getFollowUpsDue } from '../utils/workflow'
 import { supabase } from '../supabase'
+import { buildDailyPickupCode } from '../utils/pickupCode'
 
 const TIMETABLE_URL = 'https://docs.google.com/spreadsheets/d/1Ts4Z2fneVbuid-KLp8AjJzUlgEB2vUOIfs1aaLTSVGI/edit?usp=sharing'
 
@@ -33,6 +34,7 @@ export default function Dashboard({
   canManageUserResets = false,
 }) {
   const today = todayKey()
+  const dailyPickupCode = buildDailyPickupCode(today)
   const todayAttendance = attendance.filter(a => a.date === today)
   const signedInIds = new Set(todayAttendance.filter(a => a.signIn && !a.signOut).map(a => a.participantId))
   const signedOutToday = todayAttendance.filter(a => a.signOut).length
@@ -210,6 +212,13 @@ export default function Dashboard({
             {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
+      </div>
+
+      <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Pickup Security</p>
+        <p className="text-sm text-amber-900 mt-1">Today's parent/carer pickup code</p>
+        <p className="font-mono text-3xl font-bold tracking-[0.3em] text-amber-900 mt-1">{dailyPickupCode}</p>
+        <p className="text-xs text-amber-800 mt-2">Code changes automatically each day. Confirm this code before signing a participant out.</p>
       </div>
 
       {/* Stats */}

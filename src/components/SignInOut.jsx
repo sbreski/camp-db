@@ -3,6 +3,7 @@ import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { getPendingFollowUpsForParticipant } from '../utils/workflow'
+import { buildDailyPickupCode, isValidPickupCode, normalizePickupCodeInput } from '../utils/pickupCode'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -113,12 +114,14 @@ function photoConsentMode(value) {
   return 'ok'
 }
 
-function CollectionModal({ participant, participants, onConfirm, onCancel }) {
+function CollectionModal({ participant, participants, selectedDate, onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
   const [otherFullName, setOtherFullName] = useState('')
   const [otherReason, setOtherReason] = useState('')
+  const [pickupCodeInput, setPickupCodeInput] = useState('')
   const [validationError, setValidationError] = useState('')
+  const expectedPickupCode = buildDailyPickupCode(selectedDate)
   const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
   const numberedCollectors = [...siblingLeaveOptions.map(option => option.label), ...adults]
 
@@ -170,6 +173,11 @@ function CollectionModal({ participant, participants, onConfirm, onCancel }) {
   }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel])
 
   function handleConfirm() {
+    if (!isValidPickupCode(pickupCodeInput, selectedDate)) {
+      setValidationError('Pickup code does not match today\'s daily code.')
+      return
+    }
+
     if (can_leave_alone && selected === 'LeaveAlone') {
       onConfirm('Left by themselves')
       return
@@ -210,6 +218,24 @@ function CollectionModal({ participant, participants, onConfirm, onCancel }) {
           <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
         </div>
         <div className="p-5 space-y-3">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+            <p className="text-sm font-semibold text-amber-900">Daily Pickup Security Code</p>
+            <p className="text-xs text-amber-800">Ask the parent/carer for today\'s 3-digit code before sign out.</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={3}
+              className="input"
+              value={pickupCodeInput}
+              onChange={e => {
+                setPickupCodeInput(normalizePickupCodeInput(e.target.value))
+                if (validationError) setValidationError('')
+              }}
+              placeholder="Enter 3-digit code"
+            />
+            <p className="text-[11px] text-amber-700">Expected today: <span className="font-mono font-semibold">{expectedPickupCode}</span></p>
+          </div>
           {can_leave_alone && (
             <button
               onClick={() => selectCollector('LeaveAlone')}
@@ -331,6 +357,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [reasonEditor, setReasonEditor] = useState(null)
   const [reasonInput, setReasonInput] = useState('')
   const [reasonNotesInput, setReasonNotesInput] = useState('')
+  const selectedDatePickupCode = buildDailyPickupCode(selectedDate)
   const today = todayKey()
   const seasonParticipants = participants.filter(p => {
     const seasonFlag = p.isActiveThisSeason ?? p.is_active_this_season
@@ -820,7 +847,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   return (
     <div className="fade-in space-y-4">
       {collectingFor && (
-        <CollectionModal participant={collectingFor} participants={participants} onConfirm={confirmSignOut} onCancel={() => setCollectingFor(null)} />
+        <CollectionModal participant={collectingFor} participants={participants} selectedDate={selectedDate} onConfirm={confirmSignOut} onCancel={() => setCollectingFor(null)} />
       )}
       {noteEditor && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -1005,6 +1032,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
           <p className="text-stone-500 text-sm">
             {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             {selectedDate === today && ' (Today)'}
+          </p>
+          <p className="text-xs font-semibold text-amber-800 mt-1">
+            Daily pickup code: <span className="font-mono">{selectedDatePickupCode}</span>
           </p>
         </div>
         <div className="flex gap-2 text-center">
