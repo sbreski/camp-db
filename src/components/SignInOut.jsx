@@ -464,7 +464,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
                 )}
               </div>
             </>
-          ) : (!can_leave_alone && siblingLeaveOptions.length === 0) ? (
+          ) : (isAdultStepUnlocked && !can_leave_alone && siblingLeaveOptions.length === 0) ? (
             <div className="text-center py-2">
               <p className="text-sm text-stone-500">No approved adults recorded for this participant.</p>
               <p className="text-xs text-stone-400 mt-1">Add them via the Participants page.</p>
@@ -509,6 +509,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [codeEditInput, setCodeEditInput] = useState('')
   const [codeEditFieldArmed, setCodeEditFieldArmed] = useState(false)
   const [codeEditMessage, setCodeEditMessage] = useState('')
+  const [showKeyboardKey, setShowKeyboardKey] = useState(false)
   const today = todayKey()
   const seasonParticipants = participants.filter(p => {
     const seasonFlag = p.isActiveThisSeason ?? p.is_active_this_season
@@ -1533,16 +1534,6 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       </div>
 
       {/* Date selector */}
-      <div className={`card border border-forest-200 bg-forest-50/40 space-y-2 ${enableKeyboardShortcuts ? '' : 'hidden'}`}>
-        <h3 className="text-sm font-display font-bold text-forest-900">Keyboard Key (No Mouse Workflow)</h3>
-        <div className="text-xs text-stone-700 grid grid-cols-1 md:grid-cols-2 gap-2">
-          <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
-          <p><span className="font-semibold">Move rows:</span> <span className="font-mono">↑</span>/<span className="font-mono">↓</span> change active participant.</p>
-          <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
-          <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
-        </div>
-      </div>
-
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-stone-700">Select Date:</label>
         <input
@@ -1918,6 +1909,27 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span> Support Needs</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-orange-100 text-orange-700 border border-orange-200">S</span> Formally Diagnosed SEND</span>
         <span className="flex items-center gap-1"><SafeguardingFlagIcon size={11} /> Safeguarding flag</span>
+      </div>
+
+      <div className={`${enableKeyboardShortcuts ? '' : 'hidden'}`}>
+        <button
+          type="button"
+          onClick={() => setShowKeyboardKey(prev => !prev)}
+          className="w-full card border border-forest-200 bg-forest-50/40 px-4 py-2 text-left flex items-center justify-between"
+        >
+          <span className="text-sm font-display font-bold text-forest-900">Keyboard Key (No Mouse Workflow)</span>
+          <span className="text-xs text-forest-800 font-semibold">{showKeyboardKey ? 'Hide' : 'Show'}</span>
+        </button>
+        {showKeyboardKey && (
+          <div className="card border border-forest-200 bg-forest-50/40 mt-2">
+            <div className="text-xs text-stone-700 grid grid-cols-1 md:grid-cols-2 gap-2">
+              <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
+              <p><span className="font-semibold">Move rows:</span> <span className="font-mono">↑</span>/<span className="font-mono">↓</span> change active participant.</p>
+              <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
+              <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
