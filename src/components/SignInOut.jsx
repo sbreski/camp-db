@@ -120,6 +120,113 @@ const ATTENDANCE_REASON_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 const PICKUP_MASTER_BYPASS_CODE = '137'
+const PICKUP_PREVERIFY_WINDOW_MINUTES = 15
+
+function getPickupCodeVerificationEntry(participant, dateKey) {
+  const raw = participant?.pickupCodeVerifications ?? participant?.pickup_code_verifications
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const entry = raw?.[dateKey]
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null
+  return entry
+}
+
+function pickupCodePreverifyStatus(participant, dateKey, nowTs = Date.now()) {
+  const entry = getPickupCodeVerificationEntry(participant, dateKey)
+  if (!entry?.verifiedAt) return { valid: false, entry: null, minutesRemaining: 0 }
+
+  const verifiedAtTs = Date.parse(entry.verifiedAt)
+  if (Number.isNaN(verifiedAtTs)) return { valid: false, entry: null, minutesRemaining: 0 }
+
+  const expiresAtTs = verifiedAtTs + (PICKUP_PREVERIFY_WINDOW_MINUTES * 60 * 1000)
+  const remainingMs = expiresAtTs - nowTs
+  if (remainingMs <= 0) return { valid: false, entry, minutesRemaining: 0 }
+
+  return {
+    valid: true,
+    entry,
+    minutesRemaining: Math.ceil(remainingMs / 60000),
+  }
+}
+
+function formatPreverifyTime(ts) {
+  if (!ts) return '—'
+  return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+}
+
+function CodeVerifyModal({ participant, selectedDate, actorInitials = 'ST', onVerify, onCancel }) {
+  const [codeInput, setCodeInput] = useState('')
+  const [error, setError] = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => inputRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  function submitVerify() {
+    if (!isValidParticipantPickupCode(codeInput, participant, selectedDate) && normalizePickupCodeInput(codeInput) !== PICKUP_MASTER_BYPASS_CODE) {
+      setError('Code is not valid for this family.')
+      return
+    }
+    onVerify({
+      verifiedAt: new Date().toISOString(),
+      verifiedBy: actorInitials,
+      method: normalizePickupCodeInput(codeInput) === PICKUP_MASTER_BYPASS_CODE ? 'master' : 'family',
+    })
+  }
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        submitVerify()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
+        <div className="flex items-center justify-between p-5 border-b border-stone-100">
+          <div>
+            <h3 className="font-display font-bold text-forest-950">Pre-verify Pickup Code</h3>
+            <ParticipantNameText participant={participant} className="text-sm text-stone-500 mt-0.5" showDiagnosedHighlight={false} />
+          </div>
+          <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-stone-600">Valid for {PICKUP_PREVERIFY_WINDOW_MINUTES} minutes for this family.</p>
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={3}
+            className="input"
+            value={codeInput}
+            onChange={e => {
+              setCodeInput(normalizePickupCodeInput(e.target.value))
+              if (error) setError('')
+            }}
+            placeholder="Enter 3-digit code"
+          />
+          {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+        </div>
+        <div className="p-5 pt-0 flex gap-2">
+          <button onClick={submitVerify} className="btn-primary flex-1">Verify</button>
+          <button onClick={onCancel} className="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function attendanceReasonLabel(value) {
   return ATTENDANCE_REASON_OPTIONS.find(option => option.value === value)?.label || null
@@ -132,7 +239,7 @@ function photoConsentMode(value) {
   return 'ok'
 }
 
-function CollectionModal({ participant, participants, selectedDate, signedInSiblingOptions = [], enableKeyboardShortcuts = true, actorInitials = 'ST', onConfirm, onCancel }) {
+function CollectionModal({ participant, participants, selectedDate, signedInSiblingOptions = [], preverifiedStatus = null, enableKeyboardShortcuts = true, actorInitials = 'ST', onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
   const [otherFullName, setOtherFullName] = useState('')
@@ -150,7 +257,8 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   const hasSelectableOptions = can_leave_alone || siblingLeaveOptions.length > 0 || adults.length > 0
   const hasValidPickupCode = isValidParticipantPickupCode(pickupCodeInput, participant, selectedDate)
   const hasMasterBypassCode = normalizePickupCodeInput(pickupCodeInput) === PICKUP_MASTER_BYPASS_CODE
-  const isAdultStepUnlocked = pickupCodeConfirmed && (hasValidPickupCode || hasMasterBypassCode)
+  const hasActivePreverify = Boolean(preverifiedStatus?.valid)
+  const isAdultStepUnlocked = hasActivePreverify || (pickupCodeConfirmed && (hasValidPickupCode || hasMasterBypassCode))
 
   function isCodeExemptCollector(value) {
     if (value === 'LeaveAlone') return true
@@ -163,6 +271,11 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   }
 
   function withBypassAudit(baseValue, selectedValue) {
+    if (hasActivePreverify && !isCodeExemptCollector(selectedValue)) {
+      const by = preverifiedStatus?.entry?.verifiedBy || 'ST'
+      const at = formatPreverifyTime(preverifiedStatus?.entry?.verifiedAt)
+      return `Code pre-verified by ${by} at ${at} | ${baseValue}`
+    }
     if (!hasMasterBypassCode || isCodeExemptCollector(selectedValue)) return baseValue
     return `Master code used by ${actorInitials} | ${baseValue}`
   }
@@ -224,7 +337,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
             return
           }
 
-          if (hasValidPickupCode || hasMasterBypassCode) {
+          if (hasValidPickupCode || hasMasterBypassCode || hasActivePreverify) {
             setPickupCodeConfirmed(true)
             setValidationError('')
           } else {
@@ -243,7 +356,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, hasMasterBypassCode, isAdultStepUnlocked, enableKeyboardShortcuts])
+  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, hasMasterBypassCode, hasActivePreverify, isAdultStepUnlocked, enableKeyboardShortcuts])
 
   useEffect(() => {
     setPickupCodeFieldArmed(true)
@@ -327,6 +440,12 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-amber-900">Step 1: Enter Pickup Security Code</p>
             <p className="text-xs text-amber-800">Ask the parent/carer for this family's 3-digit code before sign out.</p>
+            {hasActivePreverify && (
+              <p className="text-xs text-emerald-700 font-medium">
+                Code pre-verified by {preverifiedStatus?.entry?.verifiedBy || 'ST'} at {formatPreverifyTime(preverifiedStatus?.entry?.verifiedAt)}
+                {' '}({preverifiedStatus?.minutesRemaining} min left)
+              </p>
+            )}
             <div className="sr-only" aria-hidden="true">
               <input type="text" name="cc-name" autoComplete="cc-name" tabIndex={-1} />
               <input type="text" name="cc-number" autoComplete="cc-number" inputMode="numeric" tabIndex={-1} />
@@ -505,6 +624,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [flash, setFlash] = useState(null)
   const [activeParticipantId, setActiveParticipantId] = useState(null)
   const [collectingFor, setCollectingFor] = useState(null)
+  const [verifyingFor, setVerifyingFor] = useState(null)
   const [noteEditor, setNoteEditor] = useState(null)
   const [noteInput, setNoteInput] = useState('')
   const [keepOnRecord, setKeepOnRecord] = useState(false)
@@ -994,6 +1114,27 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     return getParticipantPickupCode(participant, selectedDate)
   }
 
+  function getPreverifyStatusForParticipant(participant) {
+    return pickupCodePreverifyStatus(participant, selectedDate)
+  }
+
+  function savePreverifyForFamily(participant, verificationPayload) {
+    if (typeof setParticipants !== 'function') return
+    const familyIds = getFamilyParticipants(participant, participants).map(item => item.id)
+    setParticipants(prev => prev.map(person => {
+      if (!familyIds.includes(person.id)) return person
+      const raw = person.pickupCodeVerifications ?? person.pickup_code_verifications
+      const existing = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {}
+      return {
+        ...person,
+        pickupCodeVerifications: {
+          ...existing,
+          [selectedDate]: verificationPayload,
+        },
+      }
+    }))
+  }
+
   function openPickupCodeEditor(participant) {
     setEditingCodeParticipant(participant)
     setCodeEditInput(getPickupCodeForParticipant(participant))
@@ -1237,6 +1378,15 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         return
       }
 
+      if (/^v$/i.test(event.key)) {
+        const rec = getRecord(activeParticipant.id)
+        if (rec?.signIn && !rec?.signOut) {
+          event.preventDefault()
+          setVerifyingFor(activeParticipant)
+        }
+        return
+      }
+
       if (/^n$/i.test(event.key)) {
         event.preventDefault()
         openNoteEditor(activeParticipant)
@@ -1286,6 +1436,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   }, [
     enableKeyboardShortcuts,
     collectingFor,
+    verifyingFor,
     noteEditor,
     editingTime,
     reasonEditor,
@@ -1375,12 +1526,25 @@ export default function SignInOut({ participants, setParticipants, attendance, s
 
   return (
     <div className="fade-in space-y-4">
+      {verifyingFor && (
+        <CodeVerifyModal
+          participant={verifyingFor}
+          selectedDate={selectedDate}
+          actorInitials={actorInitials}
+          onVerify={(payload) => {
+            savePreverifyForFamily(verifyingFor, payload)
+            setVerifyingFor(null)
+          }}
+          onCancel={() => setVerifyingFor(null)}
+        />
+      )}
       {collectingFor && (
         <CollectionModal
           participant={collectingFor}
           participants={participants}
           selectedDate={selectedDate}
           signedInSiblingOptions={getSignedInSiblingOptions(collectingFor)}
+          preverifiedStatus={getPreverifyStatusForParticipant(collectingFor)}
           enableKeyboardShortcuts={enableKeyboardShortcuts}
           actorInitials={actorInitials}
           onConfirm={confirmSignOut}
@@ -1821,6 +1985,11 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                         {participantPickupCode}
                       </button>
                     </p>
+                    {getPreverifyStatusForParticipant(p).valid && (
+                      <p className="text-[11px] mt-1 text-emerald-700">
+                        Code verified {formatPreverifyTime(getPreverifyStatusForParticipant(p).entry?.verifiedAt)} by {getPreverifyStatusForParticipant(p).entry?.verifiedBy || 'ST'} ({getPreverifyStatusForParticipant(p).minutesRemaining}m left)
+                      </p>
+                    )}
                     {reasonLabel && !isIn && (
                       <p className="text-xs mt-1 text-amber-700">
                         Absence Reason: <span className="font-medium">{reasonLabel}</span>{reasonNotes ? ` - ${reasonNotes}` : ''}
@@ -1981,6 +2150,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all">
                       <FileText size={12} /> Notes
                     </button>
+                    {isIn && (
+                      <button onClick={() => setVerifyingFor(p)} title="Pre-verify pickup code"
+                        className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 active:scale-95 transition-all">
+                        <Check size={12} /> Verify Code
+                      </button>
+                    )}
                     {!absenceReasonLocked && (
                       <button
                         onClick={() => openReasonEditor(p)}
@@ -2028,7 +2203,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
             <div className="text-xs text-stone-700 grid grid-cols-1 md:grid-cols-2 gap-2">
               <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">D</span> focus date, <span className="font-mono">[</span>/<span className="font-mono">]</span> previous/next day, <span className="font-mono">T</span> today, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
               <p><span className="font-semibold">Move rows:</span> <span className="font-mono">↑</span>/<span className="font-mono">↓</span> change active participant.</p>
-              <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
+              <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">V</span> pre-verify code, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
               <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
             </div>
           </div>
