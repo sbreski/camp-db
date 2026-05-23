@@ -1084,6 +1084,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         return
       }
 
+      if (event.key === 'Escape' && event.target === dateInputRef.current) {
+        event.preventDefault()
+        dateInputRef.current?.blur()
+        return
+      }
+
       if (event.key === '/') {
         event.preventDefault()
         searchInputRef.current?.focus()
@@ -1557,8 +1563,6 @@ export default function SignInOut({ participants, setParticipants, attendance, s
             {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             {selectedDate === today && ' (Today)'}
           </p>
-          <p className="text-xs font-semibold text-amber-800 mt-1">Pickup codes are unique per family and shared by siblings.</p>
-          <p className="text-xs text-stone-500">Use each participant's row to view or edit the family code for this date.</p>
           {codeEditMessage && <p className="text-xs text-emerald-700 mt-1">{codeEditMessage}</p>}
         </div>
         <div className="flex gap-2 text-center">
