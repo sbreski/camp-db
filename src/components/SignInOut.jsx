@@ -615,6 +615,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
   const searchInputRef = useRef(null)
   const dateInputRef = useRef(null)
+  const noteInputRef = useRef(null)
   const reasonNotesRef = useRef(null)
   const [enableKeyboardShortcuts, setEnableKeyboardShortcuts] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -1063,10 +1064,32 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   useEffect(() => {
     if (!noteEditor) return
 
+    requestAnimationFrame(() => {
+      noteInputRef.current?.focus()
+    })
+
     function handleNoteModalKeys(event) {
       if (event.key === 'Escape') {
         event.preventDefault()
         cancelNoteEditor()
+        return
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault()
+        saveNoteEditor()
+        return
+      }
+
+      if (event.altKey && /^p$/i.test(event.key)) {
+        event.preventDefault()
+        setKeepOnRecord(prev => !prev)
+        return
+      }
+
+      if (event.altKey && /^l$/i.test(event.key)) {
+        event.preventDefault()
+        clearNoteEditor()
         return
       }
 
@@ -1623,11 +1646,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               <div>
                 <label className="label">Today's Note</label>
                 <textarea
+                  ref={noteInputRef}
                   className="input min-h-[100px]"
                   value={noteInput}
                   onChange={e => setNoteInput(e.target.value)}
                   placeholder="Add handover notes, follow-up reminders, or important context for this participant."
                 />
+                <p className="text-xs text-stone-500 mt-1">Keyboard: Ctrl/Cmd+Enter save, Alt+P toggle pin, Alt+L clear, Esc cancel.</p>
               </div>
               {/* Register follow-up checkbox */}
               <label className="flex items-start gap-3 cursor-pointer group">
