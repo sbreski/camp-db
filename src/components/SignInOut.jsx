@@ -110,6 +110,7 @@ const ATTENDANCE_REASON_OPTIONS = [
   { value: 'early_leave', label: 'Early leave' },
   { value: 'other', label: 'Other' },
 ]
+const PICKUP_MASTER_BYPASS_CODE = '137'
 
 function attendanceReasonLabel(value) {
   return ATTENDANCE_REASON_OPTIONS.find(option => option.value === value)?.label || null
@@ -129,8 +130,6 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   const [otherReason, setOtherReason] = useState('')
   const [pickupCodeInput, setPickupCodeInput] = useState('')
   const [pickupCodeConfirmed, setPickupCodeConfirmed] = useState(false)
-  const [codeBypassEnabled, setCodeBypassEnabled] = useState(false)
-  const [codeBypassReason, setCodeBypassReason] = useState('')
   const [pickupCodeFieldArmed, setPickupCodeFieldArmed] = useState(false)
   const [signOutSiblingsTogether, setSignOutSiblingsTogether] = useState(false)
   const [validationError, setValidationError] = useState('')
@@ -141,7 +140,8 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   const can_leave_alone = canLeaveAlone(participant)
   const hasSelectableOptions = can_leave_alone || siblingLeaveOptions.length > 0 || adults.length > 0
   const hasValidPickupCode = isValidParticipantPickupCode(pickupCodeInput, participant, selectedDate)
-  const isAdultStepUnlocked = (hasValidPickupCode && pickupCodeConfirmed) || codeBypassEnabled
+  const hasMasterBypassCode = normalizePickupCodeInput(pickupCodeInput) === PICKUP_MASTER_BYPASS_CODE
+  const isAdultStepUnlocked = pickupCodeConfirmed && (hasValidPickupCode || hasMasterBypassCode)
 
   function isCodeExemptCollector(value) {
     if (value === 'LeaveAlone') return true
@@ -154,9 +154,8 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   }
 
   function withBypassAudit(baseValue, selectedValue) {
-    if (!codeBypassEnabled || isCodeExemptCollector(selectedValue)) return baseValue
-    const reason = String(codeBypassReason || '').trim()
-    return `Code bypass by ${actorInitials} (${reason}) | ${baseValue}`
+    if (!hasMasterBypassCode || isCodeExemptCollector(selectedValue)) return baseValue
+    return `Master code used by ${actorInitials} | ${baseValue}`
   }
 
   useEffect(() => {
@@ -201,13 +200,6 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
         return
       }
 
-      if (/^b$/i.test(event.key)) {
-        event.preventDefault()
-        setCodeBypassEnabled(prev => !prev)
-        setValidationError('')
-        return
-      }
-
       if (event.key === '0' && can_leave_alone) {
         event.preventDefault()
         selectCollector('LeaveAlone')
@@ -223,12 +215,12 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
             return
           }
 
-          if (hasValidPickupCode) {
+          if (hasValidPickupCode || hasMasterBypassCode) {
             setPickupCodeConfirmed(true)
             setValidationError('')
           } else {
             setPickupCodeConfirmed(false)
-            setValidationError('Enter a valid 3-digit pickup code, then press Enter.')
+            setValidationError('Enter a valid family pickup code (or master code), then press Enter.')
           }
           return
         }
@@ -242,7 +234,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, isAdultStepUnlocked, enableKeyboardShortcuts])
+  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, hasMasterBypassCode, isAdultStepUnlocked, enableKeyboardShortcuts])
 
   useEffect(() => {
     setPickupCodeFieldArmed(true)
@@ -265,11 +257,6 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     if (!selected) {
       setValidationError('Choose who is collecting to complete sign out.')
-      return
-    }
-
-    if (codeBypassEnabled && !isCodeExemptCollector(selected) && String(codeBypassReason || '').trim().length < 5) {
-      setValidationError('Enter a short reason (at least 5 characters) for code bypass.')
       return
     }
 
@@ -362,30 +349,6 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
               placeholder="Enter 3-digit code"
             />
             <p className="text-[11px] text-stone-500">Press Enter to unlock adult collection options.</p>
-            <label className="flex items-start gap-2 mt-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={codeBypassEnabled}
-                onChange={e => {
-                  setCodeBypassEnabled(e.target.checked)
-                  if (!e.target.checked) setCodeBypassReason('')
-                  if (validationError) setValidationError('')
-                }}
-                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-rose-700 cursor-pointer"
-              />
-              <span className="text-xs text-stone-600">Bypass code (staff override)</span>
-            </label>
-            {codeBypassEnabled && (
-              <textarea
-                className="input min-h-[70px]"
-                value={codeBypassReason}
-                onChange={e => {
-                  setCodeBypassReason(e.target.value)
-                  if (validationError) setValidationError('')
-                }}
-                placeholder="Reason for bypass (required)"
-              />
-            )}
           </div>
           {!isAdultStepUnlocked && (adults.length > 0) && (
             <p className="text-xs text-stone-500">Step 2 unlocks once a valid code is entered.</p>
@@ -1576,7 +1539,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
           <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
           <p><span className="font-semibold">Move rows:</span> <span className="font-mono">↑</span>/<span className="font-mono">↓</span> change active participant.</p>
           <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
-          <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">B</span> toggle code bypass (reason required); <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
+          <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
         </div>
       </div>
 
