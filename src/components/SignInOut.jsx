@@ -128,6 +128,7 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
   const [otherFullName, setOtherFullName] = useState('')
   const [otherReason, setOtherReason] = useState('')
   const [pickupCodeInput, setPickupCodeInput] = useState('')
+  const [pickupCodeFieldArmed, setPickupCodeFieldArmed] = useState(false)
   const [validationError, setValidationError] = useState('')
   const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
   const numberedCollectors = [...siblingLeaveOptions.map(option => option.label), ...adults]
@@ -233,8 +234,15 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={3}
-              autoComplete="off"
-              name="pickup-security-code"
+              autoComplete="one-time-code"
+              name="camp-pickup-otp"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              data-lpignore="true"
+              readOnly={!pickupCodeFieldArmed}
+              onFocus={() => setPickupCodeFieldArmed(true)}
+              onMouseDown={() => setPickupCodeFieldArmed(true)}
               className="input"
               value={pickupCodeInput}
               onChange={e => {
@@ -368,6 +376,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [reasonNotesInput, setReasonNotesInput] = useState('')
   const [editingCodeParticipant, setEditingCodeParticipant] = useState(null)
   const [codeEditInput, setCodeEditInput] = useState('')
+  const [codeEditFieldArmed, setCodeEditFieldArmed] = useState(false)
   const [codeEditMessage, setCodeEditMessage] = useState('')
   const today = todayKey()
   const seasonParticipants = participants.filter(p => {
@@ -771,12 +780,14 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   function openPickupCodeEditor(participant) {
     setEditingCodeParticipant(participant)
     setCodeEditInput(getPickupCodeForParticipant(participant))
+    setCodeEditFieldArmed(false)
     setCodeEditMessage('')
   }
 
   function cancelPickupCodeEditor() {
     setEditingCodeParticipant(null)
     setCodeEditInput('')
+    setCodeEditFieldArmed(false)
   }
 
   function savePickupCodeOverride() {
@@ -945,8 +956,15 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={3}
-                  autoComplete="off"
-                  name="pickup-security-code-edit"
+                  autoComplete="one-time-code"
+                  name="camp-pickup-otp-edit"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  readOnly={!codeEditFieldArmed}
+                  onFocus={() => setCodeEditFieldArmed(true)}
+                  onMouseDown={() => setCodeEditFieldArmed(true)}
                   className="input"
                   value={codeEditInput}
                   onChange={e => setCodeEditInput(normalizePickupCodeInput(e.target.value))}
