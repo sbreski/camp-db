@@ -932,6 +932,64 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     cancelReasonEditor()
   }
 
+  useEffect(() => {
+    if (!noteEditor) return
+
+    function handleNoteModalKeys(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        cancelNoteEditor()
+        return
+      }
+
+      if (event.key !== 'Enter') return
+
+      const target = event.target
+      const tag = String(target?.tagName || '').toLowerCase()
+      // Allow Shift+Enter for newline in notes textarea.
+      if (tag === 'textarea' && event.shiftKey) return
+
+      event.preventDefault()
+      saveNoteEditor()
+    }
+
+    window.addEventListener('keydown', handleNoteModalKeys)
+    return () => window.removeEventListener('keydown', handleNoteModalKeys)
+  }, [noteEditor, noteInput, keepOnRecord])
+
+  useEffect(() => {
+    if (!reasonEditor) return
+
+    function handleReasonModalKeys(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        cancelReasonEditor()
+        return
+      }
+
+      if (event.key === 'Enter') {
+        const target = event.target
+        const tag = String(target?.tagName || '').toLowerCase()
+        // Allow Shift+Enter for newline in reason notes textarea.
+        if (tag === 'textarea' && event.shiftKey) return
+
+        event.preventDefault()
+        saveReasonEditor()
+        return
+      }
+
+      if (/^[1-6]$/.test(event.key)) {
+        const option = ATTENDANCE_REASON_OPTIONS[Number(event.key) - 1]
+        if (!option) return
+        event.preventDefault()
+        setReasonInput(option.value)
+      }
+    }
+
+    window.addEventListener('keydown', handleReasonModalKeys)
+    return () => window.removeEventListener('keydown', handleReasonModalKeys)
+  }, [reasonEditor, reasonInput, reasonNotesInput])
+
   function getPickupCodeForParticipant(participant) {
     return getParticipantPickupCode(participant, selectedDate)
   }
@@ -1522,7 +1580,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
-                <h3 className="font-display font-bold text-forest-950">Attendance Reason</h3>
+                <h3 className="font-display font-bold text-forest-950">Absence Reason</h3>
                 <ParticipantNameText participant={reasonEditor} className="text-sm text-stone-500 mt-0.5" showDiagnosedHighlight={false} />
               </div>
               <button onClick={cancelReasonEditor} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
