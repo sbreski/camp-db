@@ -315,6 +315,26 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
         return
       }
 
+      if (event.altKey && /^[1-9]$/.test(event.key)) {
+        const siblingIndex = Number(event.key) - 1
+        const siblingOption = siblingLeaveOptions[siblingIndex]
+        if (siblingOption && canSelectCollector(siblingOption.label)) {
+          event.preventDefault()
+          selectCollector(siblingOption.label)
+        }
+        return
+      }
+
+      if (/^s$/i.test(event.key) && siblingLeaveOptions.length > 0) {
+        event.preventDefault()
+        const currentlySelectedIndex = siblingLeaveOptions.findIndex(option => option.label === selected)
+        const nextIndex = currentlySelectedIndex >= 0
+          ? (currentlySelectedIndex + 1) % siblingLeaveOptions.length
+          : 0
+        selectCollector(siblingLeaveOptions[nextIndex].label)
+        return
+      }
+
       if (/^o$/i.test(event.key)) {
         if (canSelectCollector('Other / not on approved list')) {
           event.preventDefault()
@@ -357,7 +377,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, hasMasterBypassCode, hasActivePreverify, isAdultStepUnlocked, enableKeyboardShortcuts])
+  }, [numberedCollectors, siblingLeaveOptions, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, hasMasterBypassCode, hasActivePreverify, isAdultStepUnlocked, enableKeyboardShortcuts])
 
   useEffect(() => {
     setPickupCodeFieldArmed(true)
@@ -438,47 +458,49 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
           <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
         </div>
         <div className="p-5 space-y-3">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-            <p className="text-sm font-semibold text-amber-900">Step 1: Enter Pickup Security Code</p>
-            <p className="text-xs text-amber-800">Ask the parent/carer for this family's 3-digit code before sign out.</p>
-            {hasActivePreverify && (
-              <p className="text-xs text-emerald-700 font-medium">
-                Code pre-verified by {preverifiedStatus?.entry?.verifiedBy || 'ST'} at {formatPreverifyTime(preverifiedStatus?.entry?.verifiedAt)}
-                {' '}({preverifiedStatus?.minutesRemaining} min left)
-              </p>
-            )}
-            <div className="sr-only" aria-hidden="true">
-              <input type="text" name="cc-name" autoComplete="cc-name" tabIndex={-1} />
-              <input type="text" name="cc-number" autoComplete="cc-number" inputMode="numeric" tabIndex={-1} />
+          {!isAdultStepUnlocked && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-sm font-semibold text-amber-900">Step 1: Enter Pickup Security Code</p>
+              <p className="text-xs text-amber-800">Ask the parent/carer for this family's 3-digit code before sign out.</p>
+              {hasActivePreverify && (
+                <p className="text-xs text-emerald-700 font-medium">
+                  Code pre-verified by {preverifiedStatus?.entry?.verifiedBy || 'ST'} at {formatPreverifyTime(preverifiedStatus?.entry?.verifiedAt)}
+                  {' '}({preverifiedStatus?.minutesRemaining} min left)
+                </p>
+              )}
+              <div className="sr-only" aria-hidden="true">
+                <input type="text" name="cc-name" autoComplete="cc-name" tabIndex={-1} />
+                <input type="text" name="cc-number" autoComplete="cc-number" inputMode="numeric" tabIndex={-1} />
+              </div>
+              <input
+                ref={pickupCodeInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={3}
+                autoComplete="new-password"
+                name={`camp-pickup-security-${participant?.id || 'unknown'}-${selectedDate}`}
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                data-lpignore="true"
+                data-form-type="other"
+                data-allow-collector-hotkeys="true"
+                readOnly={!pickupCodeFieldArmed}
+                onFocus={() => setPickupCodeFieldArmed(true)}
+                onMouseDown={() => setPickupCodeFieldArmed(true)}
+                className="input"
+                value={pickupCodeInput}
+                onChange={e => {
+                  setPickupCodeInput(normalizePickupCodeInput(e.target.value))
+                  setPickupCodeConfirmed(false)
+                  if (validationError) setValidationError('')
+                }}
+                placeholder="Enter 3-digit code"
+              />
+              <p className="text-[11px] text-stone-500">Press Enter to unlock adult collection options.</p>
             </div>
-            <input
-              ref={pickupCodeInputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={3}
-              autoComplete="new-password"
-              name={`camp-pickup-security-${participant?.id || 'unknown'}-${selectedDate}`}
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              data-lpignore="true"
-              data-form-type="other"
-              data-allow-collector-hotkeys="true"
-              readOnly={!pickupCodeFieldArmed}
-              onFocus={() => setPickupCodeFieldArmed(true)}
-              onMouseDown={() => setPickupCodeFieldArmed(true)}
-              className="input"
-              value={pickupCodeInput}
-              onChange={e => {
-                setPickupCodeInput(normalizePickupCodeInput(e.target.value))
-                setPickupCodeConfirmed(false)
-                if (validationError) setValidationError('')
-              }}
-              placeholder="Enter 3-digit code"
-            />
-            <p className="text-[11px] text-stone-500">Press Enter to unlock adult collection options.</p>
-          </div>
+          )}
           {!isAdultStepUnlocked && (adults.length > 0) && (
             <p className="text-xs text-stone-500">Step 2 unlocks once a valid code is entered.</p>
           )}
@@ -491,12 +513,15 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                       selected === option.label ? 'border-indigo-600 bg-indigo-50' : 'border-stone-200 hover:border-stone-300'
                     }`}>
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-display flex-shrink-0 ${
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold font-display flex-shrink-0 ${
                       selected === option.label ? 'bg-indigo-900 text-white' : 'bg-stone-100 text-stone-600'
-                    }`}>↗</div>
+                    }`}>{enableKeyboardShortcuts ? `S${siblingLeaveOptions.findIndex(item => item.id === option.id) + 1}` : '↗'}</div>
                     <span className="text-sm font-medium text-stone-800">{option.label}</span>
                   </button>
                 ))}
+                {enableKeyboardShortcuts && (
+                  <p className="text-[11px] text-stone-500">Shortcuts: <span className="font-mono">S</span> cycle sibling options, <span className="font-mono">Alt+1..9</span> pick sibling directly.</p>
+                )}
               </div>
             </>
           )}
