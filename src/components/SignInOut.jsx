@@ -1942,6 +1942,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const reasonLabel = attendanceReasonLabel(rec?.exceptionReason || rec?.exception_reason)
               const reasonNotes = rec?.exceptionNotes || rec?.exception_notes || ''
               const participantPickupCode = getPickupCodeForParticipant(p)
+              const preverifyStatus = getPreverifyStatusForParticipant(p)
               const noteFollowUp = String(p.register_note || p.registerNote || '').trim()
               const absenceReasonLocked = Boolean(rec?.signIn || rec?.signOut)
 
@@ -2025,9 +2026,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                         {participantPickupCode}
                       </button>
                     </p>
-                    {getPreverifyStatusForParticipant(p).valid && (
+                    {preverifyStatus.valid && (
                       <p className="text-[11px] mt-1 text-emerald-700">
-                        Code verified {formatPreverifyTime(getPreverifyStatusForParticipant(p).entry?.verifiedAt)} by {getPreverifyStatusForParticipant(p).entry?.verifiedBy || 'ST'} ({getPreverifyStatusForParticipant(p).minutesRemaining}m left)
+                        Code verified {formatPreverifyTime(preverifyStatus.entry?.verifiedAt)} by {preverifyStatus.entry?.verifiedBy || 'ST'} ({preverifyStatus.minutesRemaining}m left)
                       </p>
                     )}
                     {reasonLabel && !isIn && (
@@ -2191,9 +2192,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       <FileText size={12} /> Notes
                     </button>
                     {isIn && (
-                      <button onClick={() => setVerifyingFor(p)} title="Pre-verify pickup code"
-                        className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-display font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 active:scale-95 transition-all whitespace-nowrap">
-                        <Check size={12} /> Verify Code
+                      <button onClick={() => setVerifyingFor(p)} title={preverifyStatus.valid ? 'Pickup code already pre-verified (click to re-verify)' : 'Pre-verify pickup code'}
+                        className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-display font-semibold active:scale-95 transition-all whitespace-nowrap ${
+                          preverifyStatus.valid
+                            ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+                        }`}>
+                        <Check size={12} /> {preverifyStatus.valid ? 'Verified' : 'Verify Code'}
                       </button>
                     )}
                     {!absenceReasonLocked && (
