@@ -122,7 +122,7 @@ function photoConsentMode(value) {
   return 'ok'
 }
 
-function CollectionModal({ participant, participants, selectedDate, onConfirm, onCancel }) {
+function CollectionModal({ participant, participants, selectedDate, signedInSiblingOptions = [], onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
   const [otherFullName, setOtherFullName] = useState('')
@@ -130,6 +130,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
   const [pickupCodeInput, setPickupCodeInput] = useState('')
   const [pickupCodeConfirmed, setPickupCodeConfirmed] = useState(false)
   const [pickupCodeFieldArmed, setPickupCodeFieldArmed] = useState(false)
+  const [signOutSiblingsTogether, setSignOutSiblingsTogether] = useState(false)
   const [validationError, setValidationError] = useState('')
   const pickupCodeInputRef = useRef(null)
   const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
@@ -182,6 +183,14 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
         return
       }
 
+      if (/^o$/i.test(event.key)) {
+        if (canSelectCollector('Other / not on approved list')) {
+          event.preventDefault()
+          selectCollector('Other / not on approved list')
+        }
+        return
+      }
+
       if (event.key === '0' && can_leave_alone) {
         event.preventDefault()
         selectCollector('LeaveAlone')
@@ -191,6 +200,12 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
       if (event.key === 'Enter') {
         if (typing && allowsShortcutWhileTyping(event.target)) {
           event.preventDefault()
+
+          if (selected && canSelectCollector(selected)) {
+            handleConfirm()
+            return
+          }
+
           if (hasValidPickupCode) {
             setPickupCodeConfirmed(true)
             setValidationError('')
@@ -227,7 +242,10 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
     }
 
     if (can_leave_alone && selected === 'LeaveAlone') {
-      onConfirm('Left by themselves')
+      onConfirm({
+        collectedBy: 'Left by themselves',
+        siblingIds: signOutSiblingsTogether ? signedInSiblingOptions.map(item => item.id) : [],
+      })
       return
     }
 
@@ -237,7 +255,10 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
     }
 
     if (selected !== 'Other / not on approved list') {
-      onConfirm(selected || 'Not recorded')
+      onConfirm({
+        collectedBy: selected || 'Not recorded',
+        siblingIds: signOutSiblingsTogether ? signedInSiblingOptions.map(item => item.id) : [],
+      })
       return
     }
 
@@ -253,7 +274,10 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
       return
     }
 
-    onConfirm(`Other (not approved): ${fullName} - Reason: ${reason}`)
+    onConfirm({
+      collectedBy: `Other (not approved): ${fullName} - Reason: ${reason}`,
+      siblingIds: signOutSiblingsTogether ? signedInSiblingOptions.map(item => item.id) : [],
+    })
   }
 
   function selectCollector(value) {
@@ -274,7 +298,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
         <div className="p-5 space-y-3">
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-amber-900">Step 1: Enter Pickup Security Code</p>
-            <p className="text-xs text-amber-800">Ask the parent/carer for this family\'s 3-digit code before sign out.</p>
+            <p className="text-xs text-amber-800">Ask the parent/carer for this family's 3-digit code before sign out.</p>
             <div className="sr-only" aria-hidden="true">
               <input type="text" name="cc-name" autoComplete="cc-name" tabIndex={-1} />
               <input type="text" name="cc-number" autoComplete="cc-number" inputMode="numeric" tabIndex={-1} />
@@ -344,6 +368,20 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
                 <span className="block text-xs text-stone-500 font-normal">(parental permission, age 11+)</span>
               </span>
             </button>
+          )}
+          {signedInSiblingOptions.length > 0 && (
+            <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+              <input
+                type="checkbox"
+                checked={signOutSiblingsTogether}
+                onChange={e => setSignOutSiblingsTogether(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
+              />
+              <div>
+                <span className="text-sm font-medium text-stone-800">Sign out siblings together</span>
+                <p className="text-xs text-stone-500 mt-0.5">Also sign out: {signedInSiblingOptions.map(item => item.name).join(', ')}</p>
+              </div>
+            </label>
           )}
           {isAdultStepUnlocked && adults.length > 0 ? (
             <>
@@ -540,17 +578,34 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     setAttendance(prev => prev.map(r => r.id === existing.id ? { ...r, signOut: null, signOutBy: null, collectedBy: null } : r))
   }
 
-  function confirmSignOut(collectedBy) {
+  function getSignedInSiblingOptions(participant) {
+    return getFamilyParticipants(participant, seasonParticipants)
+      .filter(candidate => candidate.id !== participant.id)
+      .filter(candidate => {
+        const record = getRecord(candidate.id)
+        return Boolean(record?.signIn && !record?.signOut)
+      })
+      .map(candidate => ({ id: candidate.id, name: candidate.name }))
+  }
+
+  function confirmSignOut(payload) {
     const participant = collectingFor
     setCollectingFor(null)
     const existing = getRecord(participant.id)
     if (!existing) return
+    const collectedBy = typeof payload === 'string' ? payload : payload?.collectedBy
+    const siblingIds = Array.isArray(payload?.siblingIds) ? payload.siblingIds : []
     
     const now = new Date()
     // For non-today dates, use a predictable default sign-out time on that selected day.
     const signOutTime = selectedDate === today ? now : new Date(`${selectedDate}T16:00:00`)
+    const targetIds = [participant.id, ...siblingIds.filter(id => id !== participant.id)]
     
-    setAttendance(prev => prev.map(r => r.id === existing.id ? { ...r, signOut: signOutTime.toISOString(), signOutBy: actorInitials, collectedBy } : r))
+    setAttendance(prev => prev.map(r => (
+      r.date === selectedDate && targetIds.includes(r.participantId) && r.signIn && !r.signOut
+        ? { ...r, signOut: signOutTime.toISOString(), signOutBy: actorInitials, collectedBy }
+        : r
+    )))
     setFlash({ id: participant.id, type: 'out' })
     setTimeout(() => setFlash(null), 2000)
   }
@@ -1000,6 +1055,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
           participant={collectingFor}
           participants={participants}
           selectedDate={selectedDate}
+          signedInSiblingOptions={getSignedInSiblingOptions(collectingFor)}
           onConfirm={confirmSignOut}
           onCancel={() => setCollectingFor(null)}
         />
