@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar, CameraOff, Camera, FileText, Edit2, Trash2, Check } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
@@ -128,14 +128,17 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
   const [otherFullName, setOtherFullName] = useState('')
   const [otherReason, setOtherReason] = useState('')
   const [pickupCodeInput, setPickupCodeInput] = useState('')
+  const [pickupCodeConfirmed, setPickupCodeConfirmed] = useState(false)
   const [pickupCodeFieldArmed, setPickupCodeFieldArmed] = useState(false)
   const [validationError, setValidationError] = useState('')
+  const pickupCodeInputRef = useRef(null)
   const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
   const numberedCollectors = [...adults]
 
   const can_leave_alone = canLeaveAlone(participant)
   const hasSelectableOptions = can_leave_alone || siblingLeaveOptions.length > 0 || adults.length > 0
   const hasValidPickupCode = isValidParticipantPickupCode(pickupCodeInput, participant, selectedDate)
+  const isAdultStepUnlocked = hasValidPickupCode && pickupCodeConfirmed
 
   function isCodeExemptCollector(value) {
     if (value === 'LeaveAlone') return true
@@ -144,7 +147,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
   }
 
   function canSelectCollector(value) {
-    return hasValidPickupCode || isCodeExemptCollector(value)
+    return isCodeExemptCollector(value) || isAdultStepUnlocked
   }
 
   useEffect(() => {
@@ -155,8 +158,13 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
       return Boolean(target.isContentEditable)
     }
 
+    function allowsShortcutWhileTyping(target) {
+      return Boolean(target?.dataset?.allowCollectorHotkeys === 'true')
+    }
+
     function handleKeyDown(event) {
-      if (isTypingField(event.target)) return
+      const typing = isTypingField(event.target)
+      if (typing && !allowsShortcutWhileTyping(event.target)) return
 
       if (event.key === 'Escape') {
         event.preventDefault()
@@ -181,6 +189,18 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
       }
 
       if (event.key === 'Enter') {
+        if (typing && allowsShortcutWhileTyping(event.target)) {
+          event.preventDefault()
+          if (hasValidPickupCode) {
+            setPickupCodeConfirmed(true)
+            setValidationError('')
+          } else {
+            setPickupCodeConfirmed(false)
+            setValidationError('Enter a valid 3-digit pickup code, then press Enter.')
+          }
+          return
+        }
+
         if (hasSelectableOptions && !selected) return
         if (selected && !canSelectCollector(selected)) return
         event.preventDefault()
@@ -190,9 +210,22 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode])
+  }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, isAdultStepUnlocked])
+
+  useEffect(() => {
+    setPickupCodeFieldArmed(true)
+    const frame = requestAnimationFrame(() => {
+      pickupCodeInputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   function handleConfirm() {
+    if (!selected) {
+      setValidationError('Choose who is collecting to complete sign out.')
+      return
+    }
+
     if (can_leave_alone && selected === 'LeaveAlone') {
       onConfirm('Left by themselves')
       return
@@ -247,6 +280,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
               <input type="text" name="cc-number" autoComplete="cc-number" inputMode="numeric" tabIndex={-1} />
             </div>
             <input
+              ref={pickupCodeInputRef}
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -258,6 +292,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
               spellCheck={false}
               data-lpignore="true"
               data-form-type="other"
+              data-allow-collector-hotkeys="true"
               readOnly={!pickupCodeFieldArmed}
               onFocus={() => setPickupCodeFieldArmed(true)}
               onMouseDown={() => setPickupCodeFieldArmed(true)}
@@ -265,12 +300,14 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
               value={pickupCodeInput}
               onChange={e => {
                 setPickupCodeInput(normalizePickupCodeInput(e.target.value))
+                setPickupCodeConfirmed(false)
                 if (validationError) setValidationError('')
               }}
               placeholder="Enter 3-digit code"
             />
+            <p className="text-[11px] text-stone-500">Press Enter to unlock adult collection options.</p>
           </div>
-          {!hasValidPickupCode && (adults.length > 0) && (
+          {!isAdultStepUnlocked && (adults.length > 0) && (
             <p className="text-xs text-stone-500">Step 2 unlocks once a valid code is entered.</p>
           )}
           {(can_leave_alone || siblingLeaveOptions.length > 0) && (
@@ -308,7 +345,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
               </span>
             </button>
           )}
-          {hasValidPickupCode && adults.length > 0 ? (
+          {isAdultStepUnlocked && adults.length > 0 ? (
             <>
               <p className="text-sm font-medium text-stone-700">Step 2: Who is collecting?</p>
               <div className="space-y-2 max-h-64 overflow-y-auto">
