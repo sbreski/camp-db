@@ -319,8 +319,8 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
         return
       }
 
-      if (event.altKey && /^[1-9]$/.test(event.key)) {
-        const siblingIndex = Number(event.key) - 1
+      if (event.shiftKey && /^Digit[1-9]$/.test(event.code)) {
+        const siblingIndex = Number(event.code.replace('Digit', '')) - 1
         const siblingOption = siblingLeaveOptions[siblingIndex]
         if (siblingOption && canSelectCollector(siblingOption.label)) {
           event.preventDefault()
@@ -1111,13 +1111,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         return
       }
 
-      if (event.altKey && /^p$/i.test(event.key)) {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && /^p$/i.test(event.key)) {
         event.preventDefault()
         setKeepOnRecord(prev => !prev)
         return
       }
 
-      if (event.altKey && /^l$/i.test(event.key)) {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && /^x$/i.test(event.key)) {
         event.preventDefault()
         clearNoteEditor()
         return
@@ -1682,7 +1682,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   onChange={e => setNoteInput(e.target.value)}
                   placeholder="Add handover notes, follow-up reminders, or important context for this participant."
                 />
-                <p className="text-xs text-stone-500 mt-1">Keyboard: Ctrl/Cmd+Enter save, Alt+P toggle pin, Alt+L clear, Esc cancel.</p>
+                <p className="text-xs text-stone-500 mt-1">Keyboard: Ctrl/Cmd+Enter save, Ctrl/Cmd+Shift+P toggle pin, Ctrl/Cmd+Shift+X clear, Esc cancel.</p>
               </div>
               {/* Register follow-up checkbox */}
               <label className="flex items-start gap-3 cursor-pointer group">
