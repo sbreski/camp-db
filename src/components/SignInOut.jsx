@@ -233,6 +233,8 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={3}
+              autoComplete="off"
+              name="pickup-security-code"
               className="input"
               value={pickupCodeInput}
               onChange={e => {
@@ -943,6 +945,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={3}
+                  autoComplete="off"
+                  name="pickup-security-code-edit"
                   className="input"
                   value={codeEditInput}
                   onChange={e => setCodeEditInput(normalizePickupCodeInput(e.target.value))}
