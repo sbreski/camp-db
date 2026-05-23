@@ -3,7 +3,7 @@ import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { getPendingFollowUpsForParticipant } from '../utils/workflow'
-import { buildDailyPickupCode, isValidPickupCode, normalizePickupCodeInput } from '../utils/pickupCode'
+import { buildDailyFamilyPickupCode, getParticipantFamilyKey, getParticipantPickupCode, isValidParticipantPickupCode, normalizePickupCodeInput } from '../utils/pickupCode'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -69,6 +69,14 @@ function getSiblingLeaveOptions(participant, participants) {
     }))
 }
 
+function isSameFamily(participant, candidate) {
+  return getParticipantFamilyKey(participant) === getParticipantFamilyKey(candidate)
+}
+
+function getFamilyParticipants(participant, participants) {
+  return (participants || []).filter(candidate => candidate?.id && isSameFamily(participant, candidate))
+}
+
 function collectorDisplayLabel(collectedBy) {
   if (!collectedBy) return null
 
@@ -114,14 +122,13 @@ function photoConsentMode(value) {
   return 'ok'
 }
 
-function CollectionModal({ participant, participants, selectedDate, onConfirm, onCancel }) {
+function CollectionModal({ participant, participants, selectedDate, expectedPickupCode, onConfirm, onCancel }) {
   const adults = parseApprovedAdults(participant.approvedAdults)
   const [selected, setSelected] = useState(null)
   const [otherFullName, setOtherFullName] = useState('')
   const [otherReason, setOtherReason] = useState('')
   const [pickupCodeInput, setPickupCodeInput] = useState('')
   const [validationError, setValidationError] = useState('')
-  const expectedPickupCode = buildDailyPickupCode(selectedDate)
   const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
   const numberedCollectors = [...siblingLeaveOptions.map(option => option.label), ...adults]
 
@@ -173,8 +180,8 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
   }, [numberedCollectors, can_leave_alone, hasSelectableOptions, selected, onCancel])
 
   function handleConfirm() {
-    if (!isValidPickupCode(pickupCodeInput, selectedDate)) {
-      setValidationError('Pickup code does not match today\'s daily code.')
+    if (!isValidParticipantPickupCode(pickupCodeInput, participant, selectedDate)) {
+      setValidationError('Pickup code does not match this family\'s code for the selected date.')
       return
     }
 
@@ -220,7 +227,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
         <div className="p-5 space-y-3">
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-amber-900">Daily Pickup Security Code</p>
-            <p className="text-xs text-amber-800">Ask the parent/carer for today\'s 3-digit code before sign out.</p>
+            <p className="text-xs text-amber-800">Ask the parent/carer for this family\'s 3-digit code before sign out.</p>
             <input
               type="text"
               inputMode="numeric"
@@ -234,7 +241,7 @@ function CollectionModal({ participant, participants, selectedDate, onConfirm, o
               }}
               placeholder="Enter 3-digit code"
             />
-            <p className="text-[11px] text-amber-700">Expected today: <span className="font-mono font-semibold">{expectedPickupCode}</span></p>
+            <p className="text-[11px] text-amber-700">Expected for this family: <span className="font-mono font-semibold">{expectedPickupCode}</span></p>
           </div>
           {can_leave_alone && (
             <button
@@ -357,7 +364,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [reasonEditor, setReasonEditor] = useState(null)
   const [reasonInput, setReasonInput] = useState('')
   const [reasonNotesInput, setReasonNotesInput] = useState('')
-  const selectedDatePickupCode = buildDailyPickupCode(selectedDate)
+  const [editingCodeParticipant, setEditingCodeParticipant] = useState(null)
+  const [codeEditInput, setCodeEditInput] = useState('')
+  const [codeEditMessage, setCodeEditMessage] = useState('')
   const today = todayKey()
   const seasonParticipants = participants.filter(p => {
     const seasonFlag = p.isActiveThisSeason ?? p.is_active_this_season
@@ -753,6 +762,65 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     cancelReasonEditor()
   }
 
+  function getPickupCodeForParticipant(participant) {
+    return getParticipantPickupCode(participant, selectedDate)
+  }
+
+  function openPickupCodeEditor(participant) {
+    setEditingCodeParticipant(participant)
+    setCodeEditInput(getPickupCodeForParticipant(participant))
+    setCodeEditMessage('')
+  }
+
+  function cancelPickupCodeEditor() {
+    setEditingCodeParticipant(null)
+    setCodeEditInput('')
+  }
+
+  function savePickupCodeOverride() {
+    if (!editingCodeParticipant || typeof setParticipants !== 'function') return
+    const nextCode = normalizePickupCodeInput(codeEditInput)
+    if (nextCode.length !== 3) {
+      alert('Enter a valid 3-digit pickup code.')
+      return
+    }
+
+    const familyIds = getFamilyParticipants(editingCodeParticipant, participants).map(item => item.id)
+    setParticipants(prev => prev.map(person => {
+      if (!familyIds.includes(person.id)) return person
+      const existing = person.pickupCodeOverrides ?? person.pickup_code_overrides
+      const existingMap = (existing && typeof existing === 'object' && !Array.isArray(existing)) ? existing : {}
+      return {
+        ...person,
+        pickupCodeOverrides: {
+          ...existingMap,
+          [selectedDate]: nextCode,
+        },
+      }
+    }))
+
+    setCodeEditMessage(`Pickup code updated for ${familyIds.length} family record(s).`)
+    cancelPickupCodeEditor()
+  }
+
+  function resetPickupCodeOverride() {
+    if (!editingCodeParticipant || typeof setParticipants !== 'function') return
+    const familyIds = getFamilyParticipants(editingCodeParticipant, participants).map(item => item.id)
+    setParticipants(prev => prev.map(person => {
+      if (!familyIds.includes(person.id)) return person
+      const existing = person.pickupCodeOverrides ?? person.pickup_code_overrides
+      const existingMap = (existing && typeof existing === 'object' && !Array.isArray(existing)) ? existing : {}
+      const { [selectedDate]: _removed, ...rest } = existingMap
+      return {
+        ...person,
+        pickupCodeOverrides: rest,
+      }
+    }))
+
+    setCodeEditMessage(`Pickup code reset to automatic for ${familyIds.length} family record(s).`)
+    cancelPickupCodeEditor()
+  }
+
   // Alphabetical by first name
   const sorted = [...seasonParticipants].sort((a, b) => a.name.localeCompare(b.name))
   const filtered = sorted.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
@@ -847,7 +915,50 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   return (
     <div className="fade-in space-y-4">
       {collectingFor && (
-        <CollectionModal participant={collectingFor} participants={participants} selectedDate={selectedDate} onConfirm={confirmSignOut} onCancel={() => setCollectingFor(null)} />
+        <CollectionModal
+          participant={collectingFor}
+          participants={participants}
+          selectedDate={selectedDate}
+          expectedPickupCode={getPickupCodeForParticipant(collectingFor)}
+          onConfirm={confirmSignOut}
+          onCancel={() => setCollectingFor(null)}
+        />
+      )}
+      {editingCodeParticipant && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
+            <div className="flex items-center justify-between p-5 border-b border-stone-100">
+              <div>
+                <h3 className="font-display font-bold text-forest-950">Edit Family Pickup Code</h3>
+                <ParticipantNameText participant={editingCodeParticipant} className="text-sm text-stone-500 mt-0.5" showDiagnosedHighlight={false} />
+              </div>
+              <button onClick={cancelPickupCodeEditor} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-stone-600">Date: {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+              <div>
+                <label className="label">3-digit code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={3}
+                  className="input"
+                  value={codeEditInput}
+                  onChange={e => setCodeEditInput(normalizePickupCodeInput(e.target.value))}
+                  placeholder="Enter 3 digits"
+                />
+              </div>
+              <p className="text-xs text-stone-500">Auto-generated default: <span className="font-mono font-semibold">{buildDailyFamilyPickupCode(selectedDate, getParticipantFamilyKey(editingCodeParticipant))}</span></p>
+              <p className="text-xs text-stone-500">Saving applies this date's code to all siblings in the same family.</p>
+            </div>
+            <div className="p-5 pt-0 flex flex-wrap gap-2">
+              <button onClick={savePickupCodeOverride} className="btn-primary flex-1 min-w-[120px]">Save Code</button>
+              <button onClick={resetPickupCodeOverride} className="btn-secondary min-w-[120px]">Reset Auto</button>
+              <button onClick={cancelPickupCodeEditor} className="btn-secondary min-w-[120px]">Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
       {noteEditor && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -1033,9 +1144,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
             {new Date(selectedDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             {selectedDate === today && ' (Today)'}
           </p>
-          <p className="text-xs font-semibold text-amber-800 mt-1">
-            Daily pickup code: <span className="font-mono">{selectedDatePickupCode}</span>
-          </p>
+          <p className="text-xs font-semibold text-amber-800 mt-1">Pickup codes are unique per family and shared by siblings.</p>
+          <p className="text-xs text-stone-500">Use each participant's row to view or edit the family code for this date.</p>
+          {codeEditMessage && <p className="text-xs text-emerald-700 mt-1">{codeEditMessage}</p>}
         </div>
         <div className="flex gap-2 text-center">
           <div className="card px-3 py-2">
@@ -1165,6 +1276,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const signOutBy = rec?.signOutBy || rec?.sign_out_by || null
               const reasonLabel = attendanceReasonLabel(rec?.exceptionReason || rec?.exception_reason)
               const reasonNotes = rec?.exceptionNotes || rec?.exception_notes || ''
+              const participantPickupCode = getPickupCodeForParticipant(p)
               const noteFollowUp = String(p.register_note || p.registerNote || '').trim()
               const absenceReasonLocked = Boolean(rec?.signIn || rec?.signOut)
 
@@ -1233,6 +1345,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       )}
                     </p>
                     <p className={`text-xs mt-1 font-semibold ${statusClass}`}>{statusLabel}</p>
+                    <p className="text-[11px] mt-1 text-amber-800">
+                      Family pickup code: <span className="font-mono font-semibold">{participantPickupCode}</span>
+                    </p>
                     {reasonLabel && !isIn && (
                       <p className="text-xs mt-1 text-amber-700">
                         Absence Reason: <span className="font-medium">{reasonLabel}</span>{reasonNotes ? ` - ${reasonNotes}` : ''}
@@ -1392,6 +1507,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                     <button onClick={() => openNoteEditor(p)} title="Edit participant notes"
                       className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 active:scale-95 transition-all">
                       <FileText size={12} /> Notes
+                    </button>
+                    <button
+                      onClick={() => openPickupCodeEditor(p)}
+                      title="Edit family pickup code"
+                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-display font-semibold active:scale-95 transition-all bg-amber-50 hover:bg-amber-100 text-amber-800"
+                    >
+                      <Edit2 size={12} /> Code
                     </button>
                     {!absenceReasonLocked && (
                       <button
