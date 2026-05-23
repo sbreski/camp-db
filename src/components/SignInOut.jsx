@@ -236,6 +236,16 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   }, [])
 
   function handleConfirm() {
+    function buildSiblingIdsForSubmission(selectedValue) {
+      const idsFromCheckbox = signOutSiblingsTogether ? signedInSiblingOptions.map(item => item.id) : []
+      if (typeof selectedValue !== 'string') return idsFromCheckbox
+
+      const selectedSibling = siblingLeaveOptions.find(option => option.label === selectedValue)
+      if (!selectedSibling) return idsFromCheckbox
+
+      return [...new Set([...idsFromCheckbox, selectedSibling.id])]
+    }
+
     if (!selected) {
       setValidationError('Choose who is collecting to complete sign out.')
       return
@@ -244,7 +254,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
     if (can_leave_alone && selected === 'LeaveAlone') {
       onConfirm({
         collectedBy: 'Left by themselves',
-        siblingIds: signOutSiblingsTogether ? signedInSiblingOptions.map(item => item.id) : [],
+        siblingIds: buildSiblingIdsForSubmission(selected),
       })
       return
     }
@@ -257,7 +267,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
     if (selected !== 'Other / not on approved list') {
       onConfirm({
         collectedBy: selected || 'Not recorded',
-        siblingIds: signOutSiblingsTogether ? signedInSiblingOptions.map(item => item.id) : [],
+        siblingIds: buildSiblingIdsForSubmission(selected),
       })
       return
     }
@@ -276,7 +286,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     onConfirm({
       collectedBy: `Other (not approved): ${fullName} - Reason: ${reason}`,
-      siblingIds: signOutSiblingsTogether ? signedInSiblingOptions.map(item => item.id) : [],
+      siblingIds: buildSiblingIdsForSubmission(selected),
     })
   }
 
