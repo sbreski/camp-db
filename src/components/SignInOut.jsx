@@ -229,17 +229,22 @@ function CollectionModal({ participant, participants, selectedDate, expectedPick
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-amber-900">Daily Pickup Security Code</p>
             <p className="text-xs text-amber-800">Ask the parent/carer for this family\'s 3-digit code before sign out.</p>
+            <div className="sr-only" aria-hidden="true">
+              <input type="text" name="cc-name" autoComplete="cc-name" tabIndex={-1} />
+              <input type="text" name="cc-number" autoComplete="cc-number" inputMode="numeric" tabIndex={-1} />
+            </div>
             <input
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={3}
-              autoComplete="one-time-code"
-              name="camp-pickup-otp"
+              autoComplete="new-password"
+              name={`camp-pickup-security-${participant?.id || 'unknown'}-${selectedDate}`}
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
               data-lpignore="true"
+              data-form-type="other"
               readOnly={!pickupCodeFieldArmed}
               onFocus={() => setPickupCodeFieldArmed(true)}
               onMouseDown={() => setPickupCodeFieldArmed(true)}
@@ -951,17 +956,22 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               <p className="text-xs text-stone-600">Date: {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
               <div>
                 <label className="label">3-digit code</label>
+                <div className="sr-only" aria-hidden="true">
+                  <input type="text" name="cc-exp" autoComplete="cc-exp" tabIndex={-1} />
+                  <input type="text" name="cc-csc" autoComplete="cc-csc" inputMode="numeric" tabIndex={-1} />
+                </div>
                 <input
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={3}
-                  autoComplete="one-time-code"
-                  name="camp-pickup-otp-edit"
+                  autoComplete="new-password"
+                  name={`camp-pickup-security-edit-${editingCodeParticipant?.id || 'unknown'}-${selectedDate}`}
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck={false}
                   data-lpignore="true"
+                  data-form-type="other"
                   readOnly={!codeEditFieldArmed}
                   onFocus={() => setCodeEditFieldArmed(true)}
                   onMouseDown={() => setCodeEditFieldArmed(true)}
