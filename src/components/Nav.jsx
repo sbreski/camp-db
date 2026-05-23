@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LayoutDashboard, Users, LogIn, Stethoscope, AlertTriangle, LogOut, Menu, X, CalendarDays, UserCog, UserCheck, Shirt, FileText, ClipboardList, Star, Notebook, BookAlert } from 'lucide-react'
 import { CAMP_NAME } from '../App'
+import ViewportOverlay from './ViewportOverlay'
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -70,7 +71,7 @@ export default function Nav({ page, onNavigate, onLogout, visibleTabIds = [] }) 
       </nav>
 
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-20 bg-black/50" onClick={() => setMobileOpen(false)}>
+        <ViewportOverlay className="md:hidden z-20 bg-black/50" onClick={() => setMobileOpen(false)}>
           <div className="absolute top-14 left-0 right-0 bg-forest-950 p-3 space-y-1 shadow-xl"
             onClick={e => e.stopPropagation()}>
             {visibleItems.map(({ id, label, icon: Icon }) => (
@@ -86,7 +87,7 @@ export default function Nav({ page, onNavigate, onLogout, visibleTabIds = [] }) 
               <LogOut size={17} />Sign Out
             </button>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
     </>
   )

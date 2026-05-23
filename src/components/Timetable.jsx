@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Copy, Pencil, Plus, Printer, Trash2, X } from 'lucide-react'
+import ViewportOverlay from './ViewportOverlay'
 
 const DEFAULT_SPACE_OPTIONS = ['Drama Space', 'Art Space', 'bardepot', 'Studio Theatre']
 const DAY_START_MINUTES = 9 * 60 + 45
@@ -1077,7 +1078,7 @@ export default function Timetable({
         }
       `}</style>
       {editingEntry && (
-        <div className="fixed inset-0 bg-black/45 z-50 flex items-center justify-center p-4 timetable-no-print">
+        <ViewportOverlay className="bg-black/45 z-50 flex items-center justify-center p-4 timetable-no-print">
           <div className="bg-white rounded-2xl shadow-xl border border-stone-200 w-full max-w-3xl fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -1208,7 +1209,7 @@ export default function Timetable({
               </div>
             </form>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 timetable-no-print">

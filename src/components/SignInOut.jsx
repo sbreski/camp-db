@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LogIn, LogOut, Clock, CheckCircle, Search, RotateCcw, User, X, Calendar, CameraOff, Camera, FileText, Edit2, Trash2, Check } from 'lucide-react'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
+import ViewportOverlay from './ViewportOverlay'
 import { getPendingFollowUpsForParticipant } from '../utils/workflow'
 import { buildDailyFamilyPickupCode, getParticipantFamilyKey, getParticipantPickupCode, isValidParticipantPickupCode, normalizePickupCodeInput } from '../utils/pickupCode'
 
@@ -192,7 +193,7 @@ function CodeVerifyModal({ participant, selectedDate, actorInitials = 'ST', onVe
   })
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
         <div className="flex items-center justify-between p-5 border-b border-stone-100">
           <div>
@@ -224,7 +225,7 @@ function CodeVerifyModal({ participant, selectedDate, actorInitials = 'ST', onVe
           <button onClick={onCancel} className="btn-secondary">Cancel</button>
         </div>
       </div>
-    </div>
+    </ViewportOverlay>
   )
 }
 
@@ -427,7 +428,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
         <div className="flex items-center justify-between p-5 border-b border-stone-100">
           <div>
@@ -608,7 +609,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
           <button onClick={onCancel} className="btn-secondary px-4">Cancel</button>
         </div>
       </div>
-    </div>
+    </ViewportOverlay>
   )
 }
 
@@ -1583,7 +1584,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         />
       )}
       {editingCodeParticipant && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -1630,10 +1631,10 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               <button onClick={cancelPickupCodeEditor} className="btn-secondary min-w-[120px]">Cancel</button>
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
       {noteEditor && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -1734,10 +1735,10 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               <button onClick={cancelNoteEditor} className="btn-secondary">Cancel</button>
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
       {editingTime && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -1770,10 +1771,10 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               <button onClick={cancelEditTime} className="btn-secondary">Cancel</button>
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
       {reasonEditor && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -1812,7 +1813,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               <button onClick={cancelReasonEditor} className="btn-secondary min-w-[120px]">Cancel</button>
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
 
       <div className="flex items-center justify-between">

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Upload, X, CheckCircle, AlertCircle, FileText, Download } from 'lucide-react'
+import ViewportOverlay from './ViewportOverlay'
 
 // Map common header names to our field keys
 const FIELD_MAP = {
@@ -261,7 +262,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+    <ViewportOverlay className="bg-black/50 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4 fade-in max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b border-stone-100">
           <div>
@@ -411,6 +412,6 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           )}
         </div>
       </div>
-    </div>
+    </ViewportOverlay>
   )
 }

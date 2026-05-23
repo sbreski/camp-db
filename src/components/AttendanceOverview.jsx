@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, TrendingUp, AlertCircle, X, Printer } from 'lucide-react'
 import { buildDatesFromRanges } from '../utils/starOfDay'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
+import ViewportOverlay from './ViewportOverlay'
 
 export function isIncludedThisSeason(participant) {
   const flag = participant?.isActiveThisSeason ?? participant?.is_active_this_season
@@ -895,7 +896,7 @@ export default function AttendanceOverview({ participants, attendance, setAttend
   return (
     <div className="fade-in space-y-5">
       {editingTime && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -928,11 +929,11 @@ export default function AttendanceOverview({ participants, attendance, setAttend
               <button onClick={cancelEditTime} className="btn-secondary">Cancel</button>
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
 
       {collectionDetail && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
             <div className="flex items-center justify-between p-5 border-b border-stone-100">
               <div>
@@ -955,7 +956,7 @@ export default function AttendanceOverview({ participants, attendance, setAttend
               <button onClick={() => setCollectionDetail(null)} className="btn-primary w-full">Close</button>
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
 
       <div>
