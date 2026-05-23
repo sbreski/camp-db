@@ -1954,7 +1954,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   tabIndex={0}
                   className={`md:grid md:grid-cols-[minmax(260px,1fr)_96px_96px_220px] md:gap-3 md:items-center px-3 md:px-4 py-3 transition-all hover:bg-stone-50/70 ${
                     isFlashing ? 'bg-amber-50' : isIn ? 'bg-amber-50/40' : isOut ? 'bg-stone-50/60 opacity-75' : ''
-                  } ${enableKeyboardShortcuts && isActiveRow ? 'ring-2 ring-forest-400 ring-inset' : ''
+                  } ${enableKeyboardShortcuts && isActiveRow ? 'ring-2 ring-forest-400 ring-inset rounded-lg mx-1 my-0.5' : ''
                   } ${enableKeyboardShortcuts ? 'cursor-pointer focus:outline-none' : ''}`}>
 
                   {/* Name + flags */}
