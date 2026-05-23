@@ -1036,6 +1036,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     function handleKeyDown(event) {
       if (modalOpen) return
 
+      if (event.key === 'Escape' && event.target === searchInputRef.current) {
+        event.preventDefault()
+        searchInputRef.current?.blur()
+        return
+      }
+
       if (event.key === '/') {
         event.preventDefault()
         searchInputRef.current?.focus()
@@ -1044,19 +1050,6 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       }
 
       if (isTypingField(event.target)) return
-      if (!activeParticipant) return
-
-      if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        moveActive(1)
-        return
-      }
-
-      if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        moveActive(-1)
-        return
-      }
 
       if (event.key === '1') {
         event.preventDefault()
@@ -1079,6 +1072,20 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       if (event.key === '4') {
         event.preventDefault()
         setStatusFilter('follow-up')
+        return
+      }
+
+      if (!activeParticipant) return
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        moveActive(1)
+        return
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        moveActive(-1)
         return
       }
 
@@ -1498,6 +1505,16 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       </div>
 
       {/* Date selector */}
+      <div className="card border border-forest-200 bg-forest-50/40 space-y-2">
+        <h3 className="text-sm font-display font-bold text-forest-900">Keyboard Key (No Mouse Workflow)</h3>
+        <div className="text-xs text-stone-700 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <p><span className="font-semibold">General:</span> <span className="font-mono">/</span> focus search, <span className="font-mono">Esc</span> leave search, <span className="font-mono">1</span>/<span className="font-mono">2</span>/<span className="font-mono">3</span>/<span className="font-mono">4</span> filter tabs.</p>
+          <p><span className="font-semibold">Move rows:</span> <span className="font-mono">↑</span>/<span className="font-mono">↓</span> change active participant.</p>
+          <p><span className="font-semibold">Row actions:</span> <span className="font-mono">Enter</span> primary action, <span className="font-mono">I</span> sign in, <span className="font-mono">O</span> open sign out, <span className="font-mono">N</span> notes, <span className="font-mono">A</span> absence reason, <span className="font-mono">U</span> undo.</p>
+          <p><span className="font-semibold">Out modal:</span> type 3-digit code then <span className="font-mono">Enter</span> to unlock adults; <span className="font-mono">1-9</span> choose adult; <span className="font-mono">0</span> leave unaccompanied; <span className="font-mono">O</span> choose Other; <span className="font-mono">Enter</span> confirm; <span className="font-mono">Esc</span> cancel.</p>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-stone-700">Select Date:</label>
         <input
