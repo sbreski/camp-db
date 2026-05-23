@@ -2027,11 +2027,6 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                         {participantPickupCode}
                       </button>
                     </p>
-                    {preverifyStatus.valid && (
-                      <p className="text-[11px] mt-1 text-emerald-700">
-                        Code verified {formatPreverifyTime(preverifyStatus.entry?.verifiedAt)} by {preverifyStatus.entry?.verifiedBy || 'ST'} ({preverifyStatus.minutesRemaining}m left)
-                      </p>
-                    )}
                     {reasonLabel && !isIn && (
                       <p className="text-xs mt-1 text-amber-700">
                         Absence Reason: <span className="font-medium">{reasonLabel}</span>{reasonNotes ? ` - ${reasonNotes}` : ''}
