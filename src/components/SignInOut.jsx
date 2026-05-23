@@ -248,7 +248,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   const [pickupCodeInput, setPickupCodeInput] = useState('')
   const [pickupCodeConfirmed, setPickupCodeConfirmed] = useState(false)
   const [pickupCodeFieldArmed, setPickupCodeFieldArmed] = useState(false)
-  const [signOutSiblingsTogether, setSignOutSiblingsTogether] = useState(false)
+  const [signOutSiblingsTogether, setSignOutSiblingsTogether] = useState(signedInSiblingOptions.length > 0)
   const [validationError, setValidationError] = useState('')
   const pickupCodeInputRef = useRef(null)
   const siblingLeaveOptions = getSiblingLeaveOptions(participant, participants)
@@ -260,6 +260,10 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   const hasMasterBypassCode = normalizePickupCodeInput(pickupCodeInput) === PICKUP_MASTER_BYPASS_CODE
   const hasActivePreverify = Boolean(preverifiedStatus?.valid)
   const isAdultStepUnlocked = hasActivePreverify || (pickupCodeConfirmed && (hasValidPickupCode || hasMasterBypassCode))
+
+  useEffect(() => {
+    setSignOutSiblingsTogether(signedInSiblingOptions.length > 0)
+  }, [participant?.id, signedInSiblingOptions.length])
 
   function isCodeExemptCollector(value) {
     if (value === 'LeaveAlone') return true
@@ -325,13 +329,9 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
         return
       }
 
-      if (/^s$/i.test(event.key) && siblingLeaveOptions.length > 0) {
+      if (/^s$/i.test(event.key) && signedInSiblingOptions.length > 0) {
         event.preventDefault()
-        const currentlySelectedIndex = siblingLeaveOptions.findIndex(option => option.label === selected)
-        const nextIndex = currentlySelectedIndex >= 0
-          ? (currentlySelectedIndex + 1) % siblingLeaveOptions.length
-          : 0
-        selectCollector(siblingLeaveOptions[nextIndex].label)
+        setSignOutSiblingsTogether(prev => !prev)
         return
       }
 
@@ -377,7 +377,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [numberedCollectors, siblingLeaveOptions, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, hasMasterBypassCode, hasActivePreverify, isAdultStepUnlocked, enableKeyboardShortcuts])
+  }, [numberedCollectors, siblingLeaveOptions, signedInSiblingOptions.length, can_leave_alone, hasSelectableOptions, selected, onCancel, hasValidPickupCode, hasMasterBypassCode, hasActivePreverify, isAdultStepUnlocked, enableKeyboardShortcuts])
 
   useEffect(() => {
     setPickupCodeFieldArmed(true)
@@ -519,9 +519,6 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
                     <span className="text-sm font-medium text-stone-800">{option.label}</span>
                   </button>
                 ))}
-                {enableKeyboardShortcuts && (
-                  <p className="text-[11px] text-stone-500">Shortcuts: <span className="font-mono">S</span> cycle sibling options, <span className="font-mono">Alt+1..9</span> pick sibling directly.</p>
-                )}
               </div>
             </>
           )}
@@ -551,8 +548,15 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
                 className="mt-0.5 h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
               />
               <div>
-                <span className="text-sm font-medium text-stone-800">Sign out siblings together</span>
-                <p className="text-xs text-stone-500 mt-0.5">Also sign out: {signedInSiblingOptions.map(item => item.name).join(', ')}</p>
+                <span className="text-sm font-medium text-stone-800">Auto sign out siblings together</span>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  {signOutSiblingsTogether
+                    ? `Also signing out: ${signedInSiblingOptions.map(item => item.name).join(', ')}`
+                    : 'Only this child will be signed out.'}
+                </p>
+                {enableKeyboardShortcuts && (
+                  <p className="text-[11px] text-stone-500 mt-1">Press <span className="font-mono">S</span> to toggle this quickly.</p>
+                )}
               </div>
             </label>
           )}
