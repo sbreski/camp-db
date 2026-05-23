@@ -80,6 +80,15 @@ function getFamilyParticipants(participant, participants) {
 function collectorDisplayLabel(collectedBy) {
   if (!collectedBy) return null
 
+  const masterCodeMatch = collectedBy.match(/^Master code used by\s+(.+?)\s*\|\s*(.+)$/i)
+  if (masterCodeMatch) {
+    const actor = masterCodeMatch[1].trim()
+    const inner = masterCodeMatch[2].trim()
+    const innerDisplay = collectorDisplayLabel(inner)
+    const innerLabel = innerDisplay?.label || inner
+    return { label: `Master code used by ${actor}. Collected by ${innerLabel}`, withPrefix: false }
+  }
+
   if (/^left by themselves$/i.test(collectedBy)) {
     return { label: 'Left by themselves', withPrefix: false }
   }
