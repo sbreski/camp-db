@@ -615,6 +615,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
 export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
   const searchInputRef = useRef(null)
   const dateInputRef = useRef(null)
+  const reasonNotesRef = useRef(null)
   const [enableKeyboardShortcuts, setEnableKeyboardShortcuts] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.innerWidth >= 1024
@@ -998,6 +999,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     setReasonNotesInput(existing?.exceptionNotes || '')
   }
 
+  function selectReasonAndFocusNotes(value) {
+    setReasonInput(value)
+    requestAnimationFrame(() => {
+      reasonNotesRef.current?.focus()
+    })
+  }
+
   function cancelReasonEditor() {
     setReasonEditor(null)
     setReasonInput('')
@@ -1102,7 +1110,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         const option = ATTENDANCE_REASON_OPTIONS[Number(event.key) - 1]
         if (!option) return
         event.preventDefault()
-        setReasonInput(option.value)
+        selectReasonAndFocusNotes(option.value)
       }
     }
 
@@ -1752,16 +1760,20 @@ export default function SignInOut({ participants, setParticipants, attendance, s
             <div className="p-5 space-y-4">
               <div>
                 <label className="label">Reason</label>
-                <select className="input" value={reasonInput} onChange={e => setReasonInput(e.target.value)}>
+                <select className="input" value={reasonInput} onChange={e => selectReasonAndFocusNotes(e.target.value)}>
                   <option value="">Select reason...</option>
                   {ATTENDANCE_REASON_OPTIONS.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
+                <p className="text-xs text-stone-500 mt-1">
+                  Number keys: 1 Illness, 2 Holiday, 3 No-show, 4 Late arrival, 5 Early leave, 6 Other
+                </p>
               </div>
               <div>
                 <label className="label">Notes (optional)</label>
                 <textarea
+                  ref={reasonNotesRef}
                   className="input min-h-[92px]"
                   value={reasonNotesInput}
                   onChange={e => setReasonNotesInput(e.target.value)}
@@ -1910,10 +1922,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
 
               return (
                 <div key={p.id} id={`participant-row-${p.id}`}
+                  onClick={() => setActiveParticipantId(p.id)}
+                  onFocus={() => setActiveParticipantId(p.id)}
+                  tabIndex={0}
                   className={`sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:gap-2 sm:items-center px-3 py-3 transition-all ${
                     isFlashing ? 'bg-amber-50' : isIn ? 'bg-amber-50/40' : isOut ? 'bg-stone-50/60 opacity-75' : ''
                   } ${enableKeyboardShortcuts && isActiveRow ? 'ring-2 ring-forest-400 ring-inset' : ''
-                  }`}>
+                  } ${enableKeyboardShortcuts ? 'cursor-pointer focus:outline-none' : ''}`}>
 
                   {/* Name + flags */}
                   <div className="min-w-0">
