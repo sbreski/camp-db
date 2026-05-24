@@ -4,7 +4,10 @@ import ParticipantNameText from './ParticipantNameText'
 import { isIncludedThisSeason } from './AttendanceOverview'
 
 function genderOf(p) {
-  const pr = String(p.pronouns || '').trim().toLowerCase()
+  const pr = String(p.pronouns || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\/\s*/g, '/')
   if (pr === 'he/him') return 'm'
   if (pr === 'she/her') return 'f'
   return 'nb'

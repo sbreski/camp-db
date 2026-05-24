@@ -14,7 +14,10 @@ function photoConsentMode(value) {
 }
 
 function genderOf(p) {
-  const pr = String(p.pronouns || '').trim().toLowerCase()
+  const pr = String(p.pronouns || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\/\s*/g, '/')
   if (pr === 'he/him' || pr === 'he/they') return 'm'
   if (pr === 'she/her' || pr === 'she/they') return 'f'
   return 'nb'

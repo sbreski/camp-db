@@ -121,9 +121,29 @@ function normalizeMedicalTypeList(value) {
     .filter(Boolean)
 }
 
+function isExplicitNegativeText(value) {
+  const text = String(value || '').trim().toLowerCase()
+  if (!text) return false
+  return (
+    text === 'no'
+    || text === 'none'
+    || text === 'n/a'
+    || text === 'na'
+    || text === 'nil'
+    || text.startsWith('no ')
+    || text.startsWith('none ')
+    || text.includes('no allergies')
+    || text.includes('no allergy')
+    || text.includes('no dietary')
+    || text.includes('no medical')
+    || text.includes('nothing to declare')
+  )
+}
+
 function splitAllergyDietaryText(value) {
   const raw = String(value || '').trim()
   if (!raw) return { allergyDetails: '', dietaryType: '' }
+  if (isExplicitNegativeText(raw)) return { allergyDetails: '', dietaryType: '' }
 
   const parts = raw
     .split(/[,;\n]+/)
@@ -172,6 +192,21 @@ function parseBirthday(value) {
   }
 
   return null
+}
+
+function normalizePronounsValue(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+
+  const normalized = text
+    .toLowerCase()
+    .replace(/\s*\/\s*/g, '/')
+
+  if (normalized === 'she/her' || normalized === 'she/they') return normalized
+  if (normalized === 'he/him' || normalized === 'he/they') return normalized
+  if (normalized === 'they/them') return normalized
+
+  return text
 }
 
 function detectField(header) {
@@ -426,6 +461,10 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           p[field] = parseCsvList(raw)
           return
         }
+        if (field === 'medicalDetails' || field === 'allergyDetails' || field === 'dietaryType') {
+          p[field] = isExplicitNegativeText(raw) ? '' : (raw || '')
+          return
+        }
         if (field === 'photoConsent') {
           const normalized = String(raw || '').trim().toLowerCase()
           if (!normalized) {
@@ -461,18 +500,34 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
         p.pronouns = selfDescribedPronouns
       }
 
+      p.pronouns = normalizePronounsValue(p.pronouns)
+
       // Normalise medicalType from medicalDetails text
       if (p.medicalType.length === 0 && p.medicalDetails) {
         const types = []
         const d = p.medicalDetails.toLowerCase()
-        if (d.includes('allerg')) types.push('Allergy')
-        if (d.includes('medical') || d.includes('asthma') || d.includes('diabetes') || d.includes('inhaler')) types.push('Medical')
-        if (d.includes('vegetarian') || d.includes('vegan') || d.includes('gluten') || d.includes('dietary') || d.includes('halal') || d.includes('kosher')) types.push('Dietary')
+        if (!isExplicitNegativeText(d)) {
+          if (d.includes('allerg')) types.push('Allergy')
+          if (d.includes('medical') || d.includes('asthma') || d.includes('diabetes') || d.includes('inhaler')) types.push('Medical')
+          if (d.includes('vegetarian') || d.includes('vegan') || d.includes('gluten') || d.includes('dietary') || d.includes('halal') || d.includes('kosher')) types.push('Dietary')
+        }
         p.medicalType = types
       }
 
       if (!Array.isArray(p.medicalType)) p.medicalType = []
-      if (p.sendDiagnosis && p.sendDiagnosed !== true) p.sendDiagnosed = true
+      if (p.sendDiagnosis && p.sendDiagnosed !== true) {
+        const diagnosisText = String(p.sendDiagnosis || '').trim().toLowerCase()
+        const isExplicitNo = diagnosisText === 'no'
+          || diagnosisText === 'none'
+          || diagnosisText === 'n/a'
+          || diagnosisText === 'na'
+          || diagnosisText.startsWith('no ')
+          || diagnosisText.startsWith('none ')
+
+        if (!isExplicitNo) {
+          p.sendDiagnosed = true
+        }
+      }
 
       return p
     }).filter(p => p.name?.trim())
