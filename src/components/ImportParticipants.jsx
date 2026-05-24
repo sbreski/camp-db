@@ -76,6 +76,8 @@ function parseBoolean(value, defaultValue = false) {
   if (!raw) return defaultValue
   if (['true', '1', 'yes', 'y', 'on'].includes(raw)) return true
   if (['false', '0', 'no', 'n', 'off'].includes(raw)) return false
+  if (raw.includes('yes')) return true
+  if (raw.includes('no')) return false
   return defaultValue
 }
 
@@ -99,7 +101,7 @@ function parseSendDiagnosed(value) {
 function parseCsvList(value) {
   if (Array.isArray(value)) return value.filter(Boolean)
   return String(value || '')
-    .split(',')
+    .split(/[;,|/\n]+/)
     .map(item => item.trim())
     .filter(Boolean)
 }
@@ -107,10 +109,13 @@ function parseCsvList(value) {
 function normalizeMedicalTypeList(value) {
   return parseCsvList(value)
     .map((item) => {
-      const key = item.toLowerCase()
+      const key = item.toLowerCase().trim()
       if (key.startsWith('allerg')) return 'Allergy'
       if (key.startsWith('diet')) return 'Dietary'
       if (key.startsWith('med')) return 'Medical'
+      if (key === 'a') return 'Allergy'
+      if (key === 'd') return 'Dietary'
+      if (key === 'm') return 'Medical'
       return null
     })
     .filter(Boolean)
@@ -178,29 +183,64 @@ function detectField(header) {
 }
 
 function parseCSV(text) {
-  const lines = text.split('\n').filter(l => l.trim())
-  if (lines.length < 2) return { headers: [], rows: [] }
-  
-  function parseLine(line) {
-    const result = []
-    let inQuotes = false, current = ''
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i]
-      if (ch === '"') { inQuotes = !inQuotes }
-      else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = '' }
-      else { current += ch }
+  const source = String(text || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+
+  const matrix = []
+  let row = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]
+
+    if (ch === '"') {
+      if (inQuotes && source[i + 1] === '"') {
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
     }
-    result.push(current.trim())
-    return result
+
+    if (ch === ',' && !inQuotes) {
+      row.push(current.trim())
+      current = ''
+      continue
+    }
+
+    if (ch === '\n' && !inQuotes) {
+      row.push(current.trim())
+      if (row.some(cell => String(cell || '').trim() !== '')) {
+        matrix.push(row)
+      }
+      row = []
+      current = ''
+      continue
+    }
+
+    current += ch
   }
 
-  const headers = parseLine(lines[0])
-  const rows = lines.slice(1).map(l => {
-    const vals = parseLine(l)
+  if (current.length > 0 || row.length > 0) {
+    row.push(current.trim())
+    if (row.some(cell => String(cell || '').trim() !== '')) {
+      matrix.push(row)
+    }
+  }
+
+  if (matrix.length < 2) return { headers: [], rows: [] }
+
+  const headers = matrix[0]
+  const rows = matrix.slice(1).map(vals => {
     const obj = {}
     headers.forEach((h, i) => { obj[h] = vals[i] || '' })
     return obj
   }).filter(r => Object.values(r).some(v => v))
+
   return { headers, rows }
 }
 
