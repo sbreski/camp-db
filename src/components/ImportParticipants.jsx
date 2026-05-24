@@ -284,6 +284,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
   const [headers, setHeaders] = useState([])
   const [rawRows, setRawRows] = useState([])
   const [mapping, setMapping] = useState({}) // fieldKey -> headerName
+  const [selectedRows, setSelectedRows] = useState(null) // null = all selected; Set of indices when partially selected
   const [importCounts, setImportCounts] = useState({ added: 0, updated: 0 })
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
@@ -320,6 +321,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
         if (field && !Object.values(autoMap).includes(h)) autoMap[field] = h
       })
       setMapping(autoMap)
+      setSelectedRows(null)
       setStep('map')
     }
     reader.readAsText(file)
@@ -537,10 +539,14 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
 
   const preview = buildParticipants()
 
+  const selectedPreview = selectedRows === null
+    ? preview
+    : preview.filter((_, i) => selectedRows.has(i))
+
   async function doImport() {
     setImportError('')
     setImporting(true)
-    const result = await onImport(preview)
+    const result = await onImport(selectedPreview)
     setImporting(false)
 
     if (result && result.ok === false) {
@@ -552,8 +558,8 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
     }
 
     setImportCounts({
-      added: preview.filter(p => !p._isUpdate).length,
-      updated: preview.filter(p => p._isUpdate).length,
+      added: selectedPreview.filter(p => !p._isUpdate).length,
+      updated: selectedPreview.filter(p => p._isUpdate).length,
     })
     setStep('done')
   }
@@ -678,54 +684,108 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
               <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-sm text-amber-800 border border-amber-200">
                 <AlertCircle size={16} className="flex-shrink-0" />
                 <span>
-                  {preview.filter(p => !p._isUpdate).length > 0 && (
-                    <><strong>{preview.filter(p => !p._isUpdate).length} new</strong> participant{preview.filter(p => !p._isUpdate).length !== 1 ? 's' : ''} will be added. </>
+                  {selectedPreview.filter(p => !p._isUpdate).length > 0 && (
+                    <><strong>{selectedPreview.filter(p => !p._isUpdate).length} new</strong> participant{selectedPreview.filter(p => !p._isUpdate).length !== 1 ? 's' : ''} will be added. </>
                   )}
-                  {preview.filter(p => p._isUpdate).length > 0 && (
-                    <><strong>{preview.filter(p => p._isUpdate).length}</strong> existing participant{preview.filter(p => p._isUpdate).length !== 1 ? 's' : ''} will be updated. </>
+                  {selectedPreview.filter(p => p._isUpdate).length > 0 && (
+                    <><strong>{selectedPreview.filter(p => p._isUpdate).length}</strong> existing participant{selectedPreview.filter(p => p._isUpdate).length !== 1 ? 's' : ''} will be updated. </>
                   )}
-                  No duplicates will be created.
+                  {selectedPreview.length === 0
+                    ? <strong>No rows selected.</strong>
+                    : 'No duplicates will be created.'}
                 </span>
               </div>
               <div className="overflow-x-auto max-h-72 border border-stone-100 rounded-xl">
                 <table className="w-full text-xs">
                   <thead className="bg-stone-50 sticky top-0">
                     <tr>
+                      <th className="px-3 py-2 w-8">
+                        <input
+                          type="checkbox"
+                          className="rounded accent-forest-600 cursor-pointer"
+                          checked={selectedRows === null || selectedRows.size === preview.length}
+                          ref={el => {
+                            if (el) el.indeterminate = selectedRows !== null && selectedRows.size > 0 && selectedRows.size < preview.length
+                          }}
+                          onChange={e => {
+                            setSelectedRows(e.target.checked ? null : new Set())
+                          }}
+                          title={selectedRows === null ? 'Deselect all' : 'Select all'}
+                        />
+                      </th>
                       {['', 'Name', 'Age', 'Parent', 'Medical'].map(h => (
                         <th key={h} className="text-left px-3 py-2 font-semibold text-stone-500 uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-50">
-                    {preview.map((p, i) => (
-                      <tr key={i} className="hover:bg-stone-50">
-                        <td className="px-3 py-2">
-                          {p._isUpdate
-                            ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Update</span>
-                            : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">New</span>
-                          }
-                        </td>
-                        <td className="px-3 py-2 font-medium text-forest-950">{p.name}</td>
-                        <td className="px-3 py-2 text-stone-600">{p.age || '—'}</td>
-                        <td className="px-3 py-2 text-stone-600">{p.parentName || '—'}</td>
-                        <td className="px-3 py-2">
-                          {p.medicalType?.length > 0
-                            ? p.medicalType.map(t => (
-                              <span key={t} className={`mr-1 text-[10px] font-bold px-1 rounded ${
-                                t === 'Allergy' ? 'bg-red-100 text-red-700' :
-                                t === 'Medical' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                              }`}>{t[0]}</span>
-                            ))
-                            : <span className="text-stone-300">—</span>}
-                        </td>
-                      </tr>
-                    ))}
+                    {preview.map((p, i) => {
+                      const isSelected = selectedRows === null || selectedRows.has(i)
+                      return (
+                        <tr
+                          key={i}
+                          className={`cursor-pointer transition-colors ${isSelected ? 'hover:bg-stone-50' : 'opacity-40 bg-stone-50/60 hover:bg-stone-100/60'}`}
+                          onClick={() => {
+                            setSelectedRows(prev => {
+                              const current = prev === null
+                                ? new Set(preview.map((_, idx) => idx))
+                                : new Set(prev)
+                              if (current.has(i)) current.delete(i)
+                              else current.add(i)
+                              return current.size === preview.length ? null : current
+                            })
+                          }}
+                        >
+                          <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="rounded accent-forest-600 cursor-pointer"
+                              checked={isSelected}
+                              onChange={() => {
+                                setSelectedRows(prev => {
+                                  const current = prev === null
+                                    ? new Set(preview.map((_, idx) => idx))
+                                    : new Set(prev)
+                                  if (current.has(i)) current.delete(i)
+                                  else current.add(i)
+                                  return current.size === preview.length ? null : current
+                                })
+                              }}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            {p._isUpdate
+                              ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Update</span>
+                              : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">New</span>
+                            }
+                          </td>
+                          <td className="px-3 py-2 font-medium text-forest-950">{p.name}</td>
+                          <td className="px-3 py-2 text-stone-600">{p.age || '—'}</td>
+                          <td className="px-3 py-2 text-stone-600">{p.parentName || '—'}</td>
+                          <td className="px-3 py-2">
+                            {p.medicalType?.length > 0
+                              ? p.medicalType.map(t => (
+                                <span key={t} className={`mr-1 text-[10px] font-bold px-1 rounded ${
+                                  t === 'Allergy' ? 'bg-red-100 text-red-700' :
+                                  t === 'Medical' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                }`}>{t[0]}</span>
+                              ))
+                              : <span className="text-stone-300">—</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
               <div className="flex gap-3">
-                <button onClick={doImport} disabled={importing} className={`btn-primary flex-1 ${importing ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                  {importing ? 'Importing...' : `Import (${preview.filter(p => !p._isUpdate).length} new${preview.filter(p => p._isUpdate).length > 0 ? `, ${preview.filter(p => p._isUpdate).length} updated` : ''})`}
+                <button onClick={doImport} disabled={importing || selectedPreview.length === 0}
+                  className={`btn-primary flex-1 ${(importing || selectedPreview.length === 0) ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                  {importing
+                    ? 'Importing...'
+                    : selectedPreview.length === 0
+                      ? 'No rows selected'
+                      : `Import (${selectedPreview.filter(p => !p._isUpdate).length} new${selectedPreview.filter(p => p._isUpdate).length > 0 ? `, ${selectedPreview.filter(p => p._isUpdate).length} updated` : ''})`}
                 </button>
                 <button onClick={() => setStep('map')} className="btn-secondary">Back</button>
               </div>

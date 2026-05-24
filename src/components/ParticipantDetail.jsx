@@ -837,7 +837,12 @@ export default function ParticipantDetail({
   function defaultSummaryForCategory(category) {
     if (!participant) return ''
     const key = String(category || '').toLowerCase()
-    if (key === 'send') return String(participant.sendNeeds || '').trim()
+    if (key === 'send') {
+      return [
+        participant.sendDiagnosis ? `Diagnosis / EHCP details: ${String(participant.sendDiagnosis).trim()}` : '',
+        participant.sendNeeds ? `Support needs: ${String(participant.sendNeeds).trim()}` : '',
+      ].filter(Boolean).join('\n\n')
+    }
     if (key === 'allergy') return String(participant.allergyDetails || '').trim()
     if (key === 'medical') return String(participant.medicalDetails || '').trim()
     if (key === 'notes') return String(participant.notes || '').trim()
@@ -1258,13 +1263,6 @@ export default function ParticipantDetail({
       setLoadingMedical(false)
     })
   }, [activeTab, participantId])
-
-  useEffect(() => {
-    if (!canManageShares || !participant) return
-    if (String(shareSummary || '').trim()) return
-    if (shareCategories.length !== 1) return
-    setShareSummary(defaultSummaryForCategory(shareCategories[0]))
-  }, [canManageShares, shareCategories, participantId, participant?.sendNeeds, participant?.allergyDetails, participant?.medicalDetails, participant?.dietaryType, participant?.mealAdjustments])
 
   function toggleShareCategory(category) {
     setShareCategories(prev => (
@@ -1952,8 +1950,13 @@ export default function ParticipantDetail({
                 className="input min-h-[96px]"
                 value={shareSummary}
                 onChange={e => setShareSummary(e.target.value)}
-                placeholder="Leave blank to use participant details for each selected type, or add custom text to apply to all selected shares."
+                placeholder="Leave blank to use the participant's stored diagnosis/details for each selected type, or add custom text here to override what gets shared."
               />
+              {!String(shareSummary || '').trim() && shareCategories.length === 1 && (
+                <p className="text-xs text-stone-500 mt-2 whitespace-pre-wrap">
+                  Default share preview: {defaultSummaryForCategory(shareCategories[0]) || 'No details available for this category yet.'}
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end">
