@@ -1637,6 +1637,8 @@ export default function App() {
           canViewSafeguarding={canViewSafeguarding}
           canViewSendDiagnosis={canViewSendDiagnosis}
           canManageShares={isOwnerUser || isAdminUser}
+          canViewUploadedData={isOwnerUser || isAdminUser}
+          currentUserEmail={currentUserEmail}
           onNavigate={navigate}
           onBack={() => navigate('participants')}
         />

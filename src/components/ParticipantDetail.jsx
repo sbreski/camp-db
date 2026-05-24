@@ -70,7 +70,7 @@ const TABS = ['Overview', 'Medical', 'SEND / Support', 'Attendance', 'Incidents'
 
 export default function ParticipantDetail({
   participant, participants, setParticipants,
-  attendance, setAttendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, onNavigate, onBack
+  attendance, setAttendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, canViewUploadedData = false, currentUserEmail = '', onNavigate, onBack
 }) {
   const [editing, setEditing] = useState(false)
   const [showIncident, setShowIncident] = useState(false)
@@ -99,6 +99,13 @@ export default function ParticipantDetail({
   const [noteDraftByIncident, setNoteDraftByIncident] = useState({})
   const [editingNote, setEditingNote] = useState(null)
   const [uploadingExtraIncidentId, setUploadingExtraIncidentId] = useState('')
+  const [uploadedDataUnlocked, setUploadedDataUnlocked] = useState(false)
+  const [uploadedDataPassword, setUploadedDataPassword] = useState('')
+  const [uploadedDataUnlocking, setUploadedDataUnlocking] = useState(false)
+  const [uploadedDataError, setUploadedDataError] = useState('')
+  const [uploadedDataDraft, setUploadedDataDraft] = useState({})
+  const [uploadedDataSaving, setUploadedDataSaving] = useState(false)
+  const [uploadedDataSaveNotice, setUploadedDataSaveNotice] = useState('')
 
   const editingIncident = incidents.find(inc => inc.id === editingIncidentId) || null
   const participantId = participant?.id || null
@@ -627,6 +634,205 @@ export default function ParticipantDetail({
   )
   const hasDietaryAllergy = Boolean(participant.dietaryType || participant.allergyDetails || participant.mealAdjustments)
   const hasSend = !!participant.sendNeeds
+
+  const uploadedFieldSchema = [
+    { key: 'name', label: 'Full Name', type: 'text' },
+    { key: 'pronouns', label: 'Pronouns', type: 'text' },
+    { key: 'age', label: 'Age', type: 'number' },
+    { key: 'birthday', label: 'Date of Birth', type: 'date' },
+    { key: 'address', label: 'Address', type: 'textarea' },
+    { key: 'postcode', label: 'Postcode', type: 'text' },
+    { key: 'schoolAttending', label: 'School Attending', type: 'text' },
+    { key: 'parentName', label: 'Parent Name', type: 'text' },
+    { key: 'parentPhone', label: 'Parent Phone', type: 'text' },
+    { key: 'parentEmail', label: 'Parent Email', type: 'email' },
+    { key: 'can_leave_alone', label: 'Permission to Leave Unaccompanied', type: 'boolean' },
+    { key: 'approvedAdults', label: 'Approved Adults', type: 'textarea' },
+    { key: 'medicalDetails', label: 'Medical Info', type: 'textarea' },
+    { key: 'allergyDetails', label: 'Allergy Details', type: 'textarea' },
+    { key: 'dietaryType', label: 'Dietary Requirements', type: 'text' },
+    { key: 'otcNotes', label: 'Medication Details / OTC Notes', type: 'textarea' },
+    { key: 'sendNeeds', label: 'Additional Needs / SEND Support', type: 'textarea' },
+    { key: 'sendDiagnosed', label: 'EHCP / Diagnosed', type: 'boolean' },
+    { key: 'sendDiagnosis', label: 'Diagnosis / If yes or not sure', type: 'textarea' },
+    { key: 'notes', label: 'Declaration / Additional Notes', type: 'textarea' },
+    { key: 'siblings', label: 'Siblings?', type: 'boolean' },
+    { key: 'siblingsName', label: 'Siblings Name', type: 'text' },
+    { key: 'photoConsent', label: 'Photo Consent', type: 'select', options: ['yes', 'no', 'internal'] },
+    { key: 'familyGroupKey', label: 'Family Group Key', type: 'text' },
+  ]
+
+  function buildUploadedDataDraft(sourceParticipant) {
+    return {
+      name: String(sourceParticipant?.name || ''),
+      pronouns: String(sourceParticipant?.pronouns || ''),
+      age: String(sourceParticipant?.age ?? ''),
+      birthday: String(sourceParticipant?.birthday || sourceParticipant?.dob || ''),
+      address: String(sourceParticipant?.address || ''),
+      postcode: String(sourceParticipant?.postcode || ''),
+      schoolAttending: String(sourceParticipant?.schoolAttending || ''),
+      parentName: String(sourceParticipant?.parentName || ''),
+      parentPhone: String(sourceParticipant?.parentPhone || ''),
+      parentEmail: String(sourceParticipant?.parentEmail || ''),
+      can_leave_alone: Boolean(sourceParticipant?.can_leave_alone ?? sourceParticipant?.canLeaveAlone),
+      approvedAdults: String(sourceParticipant?.approvedAdults || ''),
+      medicalDetails: String(sourceParticipant?.medicalDetails || ''),
+      allergyDetails: String(sourceParticipant?.allergyDetails || ''),
+      dietaryType: String(sourceParticipant?.dietaryType || ''),
+      otcNotes: String(sourceParticipant?.otcNotes || ''),
+      sendNeeds: String(sourceParticipant?.sendNeeds || ''),
+      sendDiagnosed: Boolean(sourceParticipant?.sendDiagnosed),
+      sendDiagnosis: String(sourceParticipant?.sendDiagnosis || ''),
+      notes: String(sourceParticipant?.notes || ''),
+      siblings: Boolean(sourceParticipant?.siblings),
+      siblingsName: String(sourceParticipant?.siblingsName || ''),
+      photoConsent: String(sourceParticipant?.photoConsent || 'yes'),
+      familyGroupKey: String(sourceParticipant?.familyGroupKey || sourceParticipant?.family_group_key || ''),
+    }
+  }
+
+  const uploadedDataRows = [
+    ['Full Name', participant.name],
+    ['Pronouns', participant.pronouns],
+    ['Age', participant.age],
+    ['Date of Birth', participant.birthday || participant.dob],
+    ['Address', participant.address],
+    ['Postcode', participant.postcode],
+    ['School Attending', participant.schoolAttending],
+    ['Parent Name', participant.parentName],
+    ['Parent Phone', participant.parentPhone],
+    ['Parent Email', participant.parentEmail],
+    ['Permission to Leave Unaccompanied', (participant.can_leave_alone || participant.canLeaveAlone) ? 'Yes' : 'No'],
+    ['Approved Adults', participant.approvedAdults],
+    ['Medical Type', Array.isArray(participant.medicalType) ? participant.medicalType.join(', ') : participant.medicalType],
+    ['Medical Info', participant.medicalDetails],
+    ['Allergy Details', participant.allergyDetails],
+    ['Dietary Requirements', participant.dietaryType],
+    ['Medication Details / OTC Notes', participant.otcNotes],
+    ['Additional Needs / SEND Support', participant.sendNeeds],
+    ['EHCP / Diagnosed', participant.sendDiagnosed ? 'Yes' : 'No'],
+    ['Diagnosis / If yes or not sure', participant.sendDiagnosis],
+    ['Declaration / Additional Notes', participant.notes],
+    ['Siblings?', participant.siblings ? 'Yes' : 'No'],
+    ['Siblings Name', participant.siblingsName],
+    ['Photo Consent', participant.photoConsent],
+    ['Family Group Key', participant.familyGroupKey || participant.family_group_key],
+  ]
+
+  useEffect(() => {
+    setUploadedDataUnlocked(false)
+    setUploadedDataPassword('')
+    setUploadedDataError('')
+    setUploadedDataDraft(buildUploadedDataDraft(participant))
+    setUploadedDataSaveNotice('')
+  }, [participantId])
+
+  async function unlockUploadedData() {
+    const email = String(currentUserEmail || '').trim().toLowerCase()
+    if (!email) {
+      setUploadedDataError('Unable to verify account email for this session.')
+      return
+    }
+
+    if (!uploadedDataPassword) {
+      setUploadedDataError('Enter your login password to continue.')
+      return
+    }
+
+    setUploadedDataUnlocking(true)
+    setUploadedDataError('')
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: uploadedDataPassword,
+    })
+
+    setUploadedDataUnlocking(false)
+    if (error) {
+      setUploadedDataError('Password check failed. Try again.')
+      return
+    }
+
+    setUploadedDataUnlocked(true)
+    setUploadedDataPassword('')
+    setUploadedDataDraft(buildUploadedDataDraft(participant))
+  }
+
+  function updateUploadedDraft(field, value) {
+    setUploadedDataDraft(prev => ({ ...prev, [field]: value }))
+    if (uploadedDataSaveNotice) setUploadedDataSaveNotice('')
+  }
+
+  function cancelUploadedDataEdits() {
+    setUploadedDataDraft(buildUploadedDataDraft(participant))
+    setUploadedDataError('')
+    setUploadedDataSaveNotice('')
+  }
+
+  const uploadedDataHasChanges = uploadedFieldSchema.some((field) => {
+    const baseline = buildUploadedDataDraft(participant)[field.key]
+    const draft = uploadedDataDraft[field.key]
+    if (field.type === 'boolean') {
+      return Boolean(baseline) !== Boolean(draft)
+    }
+    return String(baseline ?? '') !== String(draft ?? '')
+  })
+
+  async function saveUploadedDataEdits() {
+    if (!participant?.id) return
+
+    const trimmedName = String(uploadedDataDraft.name || '').trim()
+    if (!trimmedName) {
+      setUploadedDataError('Full Name is required.')
+      return
+    }
+
+    const parsedAge = parseInt(String(uploadedDataDraft.age || '').trim(), 10)
+    const nextAge = Number.isNaN(parsedAge) ? '' : parsedAge
+
+    setUploadedDataSaving(true)
+    setUploadedDataError('')
+    setUploadedDataSaveNotice('')
+
+    try {
+      const updates = {
+        name: trimmedName,
+        pronouns: String(uploadedDataDraft.pronouns || '').trim(),
+        age: nextAge,
+        birthday: String(uploadedDataDraft.birthday || '').trim(),
+        address: String(uploadedDataDraft.address || '').trim(),
+        postcode: String(uploadedDataDraft.postcode || '').trim(),
+        schoolAttending: String(uploadedDataDraft.schoolAttending || '').trim(),
+        parentName: String(uploadedDataDraft.parentName || '').trim(),
+        parentPhone: String(uploadedDataDraft.parentPhone || '').trim(),
+        parentEmail: String(uploadedDataDraft.parentEmail || '').trim(),
+        can_leave_alone: Boolean(uploadedDataDraft.can_leave_alone),
+        approvedAdults: String(uploadedDataDraft.approvedAdults || '').trim(),
+        medicalDetails: String(uploadedDataDraft.medicalDetails || '').trim(),
+        allergyDetails: String(uploadedDataDraft.allergyDetails || '').trim(),
+        dietaryType: String(uploadedDataDraft.dietaryType || '').trim(),
+        otcNotes: String(uploadedDataDraft.otcNotes || '').trim(),
+        sendNeeds: String(uploadedDataDraft.sendNeeds || '').trim(),
+        sendDiagnosed: Boolean(uploadedDataDraft.sendDiagnosed),
+        sendDiagnosis: String(uploadedDataDraft.sendDiagnosis || '').trim(),
+        notes: String(uploadedDataDraft.notes || '').trim(),
+        siblings: Boolean(uploadedDataDraft.siblings),
+        siblingsName: String(uploadedDataDraft.siblingsName || '').trim(),
+        photoConsent: String(uploadedDataDraft.photoConsent || 'yes').trim() || 'yes',
+        familyGroupKey: String(uploadedDataDraft.familyGroupKey || '').trim(),
+      }
+
+      await setParticipants(prev => prev.map(item => (
+        item.id === participant.id ? { ...item, ...updates } : item
+      )))
+
+      setUploadedDataSaveNotice('Uploaded data saved globally.')
+    } catch (error) {
+      setUploadedDataError(error?.message || 'Unable to save uploaded data changes.')
+    } finally {
+      setUploadedDataSaving(false)
+    }
+  }
 
   function defaultSummaryForCategory(category) {
     if (!participant) return ''
@@ -1203,6 +1409,125 @@ export default function ParticipantDetail({
                 <p className="text-stone-700">Siblings: {participant.siblingsName || 'Yes'}</p>
               )}
             </div>
+
+            {canViewUploadedData && (
+              <div className="pt-3 border-t border-stone-100 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="label mb-0">Uploaded Data Table (Protected)</p>
+                  {uploadedDataUnlocked && (
+                    <button
+                      type="button"
+                      onClick={() => setUploadedDataUnlocked(false)}
+                      className="text-xs text-stone-500 hover:text-stone-700 underline"
+                    >
+                      Lock
+                    </button>
+                  )}
+                </div>
+
+                {!uploadedDataUnlocked ? (
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-2">
+                    <p className="text-xs text-stone-600">Enter your own login password to view full uploaded participant data.</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="password"
+                        className="input flex-1"
+                        value={uploadedDataPassword}
+                        onChange={e => setUploadedDataPassword(e.target.value)}
+                        placeholder="Your account password"
+                      />
+                      <button
+                        type="button"
+                        onClick={unlockUploadedData}
+                        disabled={uploadedDataUnlocking}
+                        className={`btn-secondary ${uploadedDataUnlocking ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      >
+                        {uploadedDataUnlocking ? 'Checking...' : 'Unlock'}
+                      </button>
+                    </div>
+                    {uploadedDataError && <p className="text-xs text-red-700">{uploadedDataError}</p>}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-stone-200">
+                    <table className="w-full text-xs">
+                      <thead className="bg-stone-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-semibold text-stone-600 uppercase tracking-wide">Field</th>
+                          <th className="text-left px-3 py-2 font-semibold text-stone-600 uppercase tracking-wide">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {uploadedFieldSchema.map((field) => (
+                          <tr key={field.key}>
+                            <td className="px-3 py-2 font-medium text-stone-700 align-top whitespace-nowrap">{field.label}</td>
+                            <td className="px-3 py-2 text-stone-700 align-top whitespace-pre-wrap break-words">
+                              {field.type === 'boolean' ? (
+                                <label className="inline-flex items-center gap-2 text-xs text-stone-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(uploadedDataDraft[field.key])}
+                                    onChange={e => updateUploadedDraft(field.key, e.target.checked)}
+                                    className="rounded"
+                                  />
+                                  {uploadedDataDraft[field.key] ? 'Yes' : 'No'}
+                                </label>
+                              ) : field.type === 'select' ? (
+                                <select
+                                  className="input py-1.5"
+                                  value={String(uploadedDataDraft[field.key] || '')}
+                                  onChange={e => updateUploadedDraft(field.key, e.target.value)}
+                                >
+                                  {(field.options || []).map(option => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              ) : field.type === 'textarea' ? (
+                                <textarea
+                                  className="input resize-none"
+                                  rows={2}
+                                  value={String(uploadedDataDraft[field.key] || '')}
+                                  onChange={e => updateUploadedDraft(field.key, e.target.value)}
+                                />
+                              ) : (
+                                <input
+                                  type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : 'text'}
+                                  className="input py-1.5"
+                                  value={String(uploadedDataDraft[field.key] || '')}
+                                  onChange={e => updateUploadedDraft(field.key, e.target.value)}
+                                />
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="p-3 border-t border-stone-100 bg-stone-50 flex flex-wrap gap-2 items-center justify-end">
+                      {uploadedDataError && <p className="text-xs text-red-700 mr-auto">{uploadedDataError}</p>}
+                      {uploadedDataSaveNotice && <p className="text-xs text-emerald-700 mr-auto">{uploadedDataSaveNotice}</p>}
+                      {!uploadedDataError && !uploadedDataSaveNotice && uploadedDataHasChanges && (
+                        <p className="text-xs text-amber-700 mr-auto">Unsaved changes</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={cancelUploadedDataEdits}
+                        className="btn-secondary"
+                        disabled={uploadedDataSaving || !uploadedDataHasChanges}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveUploadedDataEdits}
+                        className={`btn-primary ${uploadedDataSaving || !uploadedDataHasChanges ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        disabled={uploadedDataSaving || !uploadedDataHasChanges}
+                      >
+                        {uploadedDataSaving ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {participant.approvedAdults && (
               <div className="pt-3 border-t border-stone-100">
