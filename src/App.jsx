@@ -257,6 +257,8 @@ function toSnake(obj) {
 
   // Normalize optional date fields so Postgres date columns never receive empty strings.
   const nullableDateKeys = [
+    'birthday',
+    'dob',
     'first_aid_expires_on',
     'safeguarding_expires_on',
     'dbs_issue_date',
@@ -435,6 +437,7 @@ export default function App() {
   }
 
   async function setParticipants(updater) {
+    const errors = []
     const next = typeof updater === 'function' ? updater(participants) : updater
     const added = next.filter(p => !participants.find(x => x.id === p.id))
     const removed = participants.filter(p => !next.find(x => x.id === p.id))
@@ -452,7 +455,10 @@ export default function App() {
         payload = stripped
         ;({ error } = await supabase.from('participants').insert(payload))
       }
-      if (error) console.error('INSERT ERROR:', error.message, error.details, error.hint)
+      if (error) {
+        console.error('INSERT ERROR:', error.message, error.details, error.hint)
+        errors.push(`Insert failed for ${p.name || p.id}: ${error.message || 'unknown error'}`)
+      }
     }
     for (const p of removed) {
       await supabase.from('participants').update({ deleted_at: new Date().toISOString() }).eq('id', p.id)
@@ -467,9 +473,13 @@ export default function App() {
         payload = stripped
         ;({ error } = await supabase.from('participants').update(payload).eq('id', p.id))
       }
-      if (error) console.error('UPDATE ERROR:', error.message, error.details, error.hint)
+      if (error) {
+        console.error('UPDATE ERROR:', error.message, error.details, error.hint)
+        errors.push(`Update failed for ${p.name || p.id}: ${error.message || 'unknown error'}`)
+      }
     }
     reloadP()
+    return { ok: errors.length === 0, errors }
   }
 
   async function setAttendance(updater) {

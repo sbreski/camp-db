@@ -264,7 +264,7 @@ export default function Participants({ participants, setParticipants, onView, ca
   }
 
   function importParticipants(list) {
-    setParticipants(prev => {
+    return setParticipants(prev => {
       // Merge: update existing records matched by id, then append genuinely new ones
       const updated = prev.map(p => {
         const match = list.find(item => item.id === p.id)

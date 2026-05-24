@@ -250,6 +250,8 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
   const [rawRows, setRawRows] = useState([])
   const [mapping, setMapping] = useState({}) // fieldKey -> headerName
   const [importCounts, setImportCounts] = useState({ added: 0, updated: 0 })
+  const [importError, setImportError] = useState('')
+  const [importing, setImporting] = useState(false)
   const fileRef = useRef()
 
   const OUR_FIELDS = Object.keys(FIELD_MAP)
@@ -480,8 +482,20 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
 
   const preview = buildParticipants()
 
-  function doImport() {
-    onImport(preview)
+  async function doImport() {
+    setImportError('')
+    setImporting(true)
+    const result = await onImport(preview)
+    setImporting(false)
+
+    if (result && result.ok === false) {
+      const firstError = Array.isArray(result.errors) && result.errors.length > 0
+        ? result.errors[0]
+        : 'Unknown import error.'
+      setImportError(`Import could not complete: ${firstError}`)
+      return
+    }
+
     setImportCounts({
       added: preview.filter(p => !p._isUpdate).length,
       updated: preview.filter(p => p._isUpdate).length,
@@ -600,6 +614,12 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           {/* STEP: Preview */}
           {step === 'preview' && (
             <div className="space-y-4">
+              {importError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl text-sm text-red-800 border border-red-200">
+                  <AlertCircle size={16} className="flex-shrink-0" />
+                  <span>{importError}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-sm text-amber-800 border border-amber-200">
                 <AlertCircle size={16} className="flex-shrink-0" />
                 <span>
@@ -649,8 +669,8 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
                 </table>
               </div>
               <div className="flex gap-3">
-                <button onClick={doImport} className="btn-primary flex-1">
-                  Import ({preview.filter(p => !p._isUpdate).length} new{preview.filter(p => p._isUpdate).length > 0 ? `, ${preview.filter(p => p._isUpdate).length} updated` : ''})
+                <button onClick={doImport} disabled={importing} className={`btn-primary flex-1 ${importing ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                  {importing ? 'Importing...' : `Import (${preview.filter(p => !p._isUpdate).length} new${preview.filter(p => p._isUpdate).length > 0 ? `, ${preview.filter(p => p._isUpdate).length} updated` : ''})`}
                 </button>
                 <button onClick={() => setStep('map')} className="btn-secondary">Back</button>
               </div>
