@@ -1190,6 +1190,18 @@ export default function ParticipantDetail({
               {!participant.parentName && !participant.parentPhone && !participant.parentEmail && (
                 <p className="text-stone-400 text-sm">No contact details recorded.</p>
               )}
+              {participant.address && (
+                <p className="text-stone-700 whitespace-pre-wrap">Address: {participant.address}</p>
+              )}
+              {participant.postcode && (
+                <p className="text-stone-700">Postcode: {participant.postcode}</p>
+              )}
+              {participant.schoolAttending && (
+                <p className="text-stone-700">School: {participant.schoolAttending}</p>
+              )}
+              {participant.siblings && (
+                <p className="text-stone-700">Siblings: {participant.siblingsName || 'Yes'}</p>
+              )}
             </div>
 
             {participant.approvedAdults && (

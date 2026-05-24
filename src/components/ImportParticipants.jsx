@@ -8,21 +8,67 @@ const FIELD_MAP = {
   pronouns: ['pronouns', 'pronoun'],
   age: ['age'],
   birthday: ['birthday', 'date of birth', 'birth date', 'dob', 'date_of_birth'],
+  address: ['address'],
+  postcode: ['postcode', 'post code'],
+  schoolAttending: ['school attending'],
   parentName: ['parent', 'guardian', 'parent name', 'guardian name', 'parent/guardian'],
   parentEmail: ['email', 'parent email', 'guardian email', 'e-mail'],
   parentPhone: ['phone', 'mobile', 'telephone', 'contact number', 'parent phone', 'phone number'],
-  approvedAdults: ['approved adults', 'approved', 'authorised adults', 'authorized adults', 'collection'],
-  can_leave_alone: ['can leave alone', 'can_leave_alone', 'leave alone', 'can go home alone', 'self leave'],
+  siblings: ['siblings', 'sibling'],
+  siblingsName: ['siblings name', 'sibling name', 'names of siblings'],
+  familyGroupKey: ['family group key', 'family_group_key'],
+  approvedAdults: ['approved adults', 'approved', 'authorised adults', 'authorized adults', 'collection', 'please provide names of adults permitted to pick up my child from camp this will be separated by commas'],
+  can_leave_alone: ['can leave alone', 'can_leave_alone', 'leave alone', 'can go home alone', 'self leave', 'permission to leave unaccompanied'],
   medicalType: ['medical type', 'medical types', 'medical category', 'medical categories'],
-  medicalDetails: ['medical', 'medical details', 'medical info', 'health', 'allergies', 'dietary'],
+  medicalDetails: ['medical', 'medical details', 'medical info', 'health', 'allergies', 'dietary', 'does your child have any medical conditions we should be aware of', 'medical info', 'does your child need to take medication during the camp day', 'medication details'],
   dietaryType: ['dietary type', 'dietary requirements', 'dietary'],
-  allergyDetails: ['allergy details', 'allergies', 'allergy info'],
-  sendNeeds: ['send', 'send needs', 'support', 'support needs', 'additional needs', 'sen'],
-  sendDiagnosed: ['send diagnosed', 'send_diagnosed', 'diagnosed send'],
-  sendDiagnosis: ['send diagnosis', 'send_diagnosis', 'diagnosis'],
+  allergyDetails: ['allergy details', 'allergies', 'allergy info', 'please tell us about any allergies intolerances or dietary requirements your child has'],
+  sendNeeds: ['send', 'send needs', 'support', 'support needs', 'additional needs', 'sen', 'does your child have any additional needs or require adjustments to take part fully in the camp'],
+  sendDiagnosed: ['send diagnosed', 'send_diagnosed', 'diagnosed send', 'does your child have an ehcp or receive additional support in school for example learning support or regular adult support'],
+  sendDiagnosis: ['send diagnosis', 'send_diagnosis', 'diagnosis', 'if yes or not sure please tell us more'],
   photoConsent: ['photo consent', 'photo_consent', 'photos'],
   otcConsent: ['otc consent', 'otc_consent', 'otc meds consent', 'otc'],
-  notes: ['notes', 'additional notes', 'other'],
+  notes: ['notes', 'additional notes', 'other', 'is there anything else youd like us to know to help your child have a positive experience at camp'],
+}
+
+const PRONOUNS_SELF_DESCRIBE_ALIASES = [
+  'if you selected prefer to self describe please tell us your childs pronouns',
+]
+
+function normalizeHeader(text) {
+  return String(text || '')
+    .normalize('NFKD')
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function rowValueByAliases(row, aliases = []) {
+  const aliasSet = new Set(aliases.map(normalizeHeader))
+  for (const [key, value] of Object.entries(row || {})) {
+    if (aliasSet.has(normalizeHeader(key))) {
+      return String(value || '').trim()
+    }
+  }
+  return ''
+}
+
+function normalizeNameKey(name) {
+  return String(name || '').trim().toLowerCase()
+}
+
+function getParticipantFamilyGroupKey(participant) {
+  return String(participant?.familyGroupKey || participant?.family_group_key || '').trim()
+}
+
+function parseSiblingNames(value) {
+  return String(value || '')
+    .replace(/\band\b/gi, ',')
+    .split(/[,;\n]+/)
+    .map(item => item.trim())
+    .filter(Boolean)
 }
 
 function parseBoolean(value, defaultValue = false) {
@@ -31,6 +77,23 @@ function parseBoolean(value, defaultValue = false) {
   if (['true', '1', 'yes', 'y', 'on'].includes(raw)) return true
   if (['false', '0', 'no', 'n', 'off'].includes(raw)) return false
   return defaultValue
+}
+
+function parseLeavePermission(value) {
+  const raw = String(value || '').trim().toLowerCase()
+  if (!raw) return false
+  if (raw.includes('permission to travel home by themselves')) return true
+  if (raw.includes('myself or an authorised adult') || raw.includes('myself or an authorized adult')) return false
+  return parseBoolean(raw, false)
+}
+
+function parseSendDiagnosed(value) {
+  const raw = String(value || '').trim().toLowerCase()
+  if (!raw) return false
+  if (raw.includes('not sure')) return true
+  if (raw.includes('yes')) return true
+  if (raw.includes('no')) return false
+  return parseBoolean(raw, false)
 }
 
 function parseCsvList(value) {
@@ -51,6 +114,36 @@ function normalizeMedicalTypeList(value) {
       return null
     })
     .filter(Boolean)
+}
+
+function splitAllergyDietaryText(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return { allergyDetails: '', dietaryType: '' }
+
+  const parts = raw
+    .split(/[,;\n]+/)
+    .map(item => item.trim())
+    .filter(Boolean)
+
+  const allergyKeywords = ['allerg', 'anaphyl', 'epi', 'intoleran', 'reaction']
+  const dietaryKeywords = ['diet', 'vegetarian', 'vegan', 'halal', 'kosher', 'gluten', 'coeliac', 'celiac', 'lactose', 'dairy', 'pescatarian']
+
+  const allergyParts = []
+  const dietaryParts = []
+
+  for (const part of parts) {
+    const text = part.toLowerCase()
+    const isAllergy = allergyKeywords.some(keyword => text.includes(keyword))
+    const isDietary = dietaryKeywords.some(keyword => text.includes(keyword))
+
+    if (isAllergy) allergyParts.push(part)
+    if (isDietary) dietaryParts.push(part)
+  }
+
+  const allergyDetails = allergyParts.length > 0 ? allergyParts.join(', ') : ''
+  const dietaryType = dietaryParts.length > 0 ? dietaryParts.join(', ') : ''
+
+  return { allergyDetails, dietaryType }
 }
 
 function parseBirthday(value) {
@@ -77,9 +170,9 @@ function parseBirthday(value) {
 }
 
 function detectField(header) {
-  const h = header.toLowerCase().trim()
+  const h = normalizeHeader(header)
   for (const [field, aliases] of Object.entries(FIELD_MAP)) {
-    if (aliases.includes(h)) return field
+    if (aliases.map(normalizeHeader).includes(h)) return field
   }
   return null
 }
@@ -122,7 +215,9 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
   const OUR_FIELDS = Object.keys(FIELD_MAP)
   const FIELD_LABELS = {
     name: 'Full Name *', pronouns: 'Pronouns', age: 'Age', birthday: 'Birthday',
+    address: 'Address', postcode: 'Postcode', schoolAttending: 'School Attending',
     parentName: 'Parent Name', parentEmail: 'Parent Email', parentPhone: 'Parent Phone',
+    siblings: 'Siblings?', siblingsName: 'Siblings Name', familyGroupKey: 'Family Group Key',
     approvedAdults: 'Approved Adults', medicalDetails: 'Medical Details',
     can_leave_alone: 'Can Leave Alone',
     medicalType: 'Medical Type', dietaryType: 'Dietary Type', allergyDetails: 'Allergy Details',
@@ -157,8 +252,96 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
     return String(name || '').trim().toLowerCase()
   }
 
+  function linkImportedFamilies(list) {
+    if (!Array.isArray(list) || list.length === 0) return list
+
+    const importedByName = new Map()
+    list.forEach((participant, index) => {
+      const key = normalizeNameKey(participant.name)
+      if (!key) return
+      if (!importedByName.has(key)) importedByName.set(key, [])
+      importedByName.get(key).push(index)
+    })
+
+    const existingByName = new Map()
+    ;(existingParticipants || []).forEach(participant => {
+      const key = normalizeNameKey(participant.name)
+      if (!key || existingByName.has(key)) return
+      existingByName.set(key, participant)
+    })
+
+    const parent = list.map((_, index) => index)
+
+    function find(index) {
+      if (parent[index] === index) return index
+      parent[index] = find(parent[index])
+      return parent[index]
+    }
+
+    function union(a, b) {
+      const rootA = find(a)
+      const rootB = find(b)
+      if (rootA !== rootB) parent[rootB] = rootA
+    }
+
+    const anchorFamilyKeyByIndex = new Map()
+
+    list.forEach((participant, index) => {
+      const siblingNames = parseSiblingNames(participant.siblingsName)
+      siblingNames.forEach(siblingName => {
+        const siblingKey = normalizeNameKey(siblingName)
+        if (!siblingKey) return
+
+        const importedMatches = importedByName.get(siblingKey) || []
+        if (importedMatches.length > 0) {
+          importedMatches.forEach(matchIndex => union(index, matchIndex))
+          return
+        }
+
+        const existingMatch = existingByName.get(siblingKey)
+        const existingFamilyKey = getParticipantFamilyGroupKey(existingMatch)
+        if (existingFamilyKey) {
+          anchorFamilyKeyByIndex.set(index, existingFamilyKey)
+        }
+      })
+    })
+
+    const memberIndexesByRoot = new Map()
+    list.forEach((_, index) => {
+      const root = find(index)
+      if (!memberIndexesByRoot.has(root)) memberIndexesByRoot.set(root, [])
+      memberIndexesByRoot.get(root).push(index)
+    })
+
+    for (const memberIndexes of memberIndexesByRoot.values()) {
+      const existingKey = memberIndexes
+        .map(index => getParticipantFamilyGroupKey(list[index]))
+        .find(Boolean)
+
+      const anchoredKey = memberIndexes
+        .map(index => anchorFamilyKeyByIndex.get(index))
+        .find(Boolean)
+
+      const hasSiblingSignal = memberIndexes.some(index => {
+        const participant = list[index]
+        const siblingNames = parseSiblingNames(participant.siblingsName)
+        return Boolean(participant.siblings) || siblingNames.length > 0
+      })
+
+      const shouldCreateGroup = memberIndexes.length > 1 || hasSiblingSignal
+      const familyGroupKey = existingKey || anchoredKey || (shouldCreateGroup ? `import-family:${crypto.randomUUID()}` : '')
+      if (!familyGroupKey) continue
+
+      memberIndexes.forEach(index => {
+        list[index].familyGroupKey = familyGroupKey
+      })
+    }
+
+    return list
+  }
+
   function buildParticipants() {
-    return rawRows.map(row => {
+    const built = rawRows.map(row => {
       const nameFromRow = String(row[mapping.name] || '').trim()
       const existing = existingParticipants.find(
         p => normalizeName(p.name) === normalizeName(nameFromRow)
@@ -182,7 +365,11 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           return
         }
         if (field === 'can_leave_alone') {
-          p.can_leave_alone = parseBoolean(raw, false)
+          p.can_leave_alone = parseLeavePermission(raw)
+          return
+        }
+        if (field === 'siblings') {
+          p.siblings = parseBoolean(raw, false)
           return
         }
         if (field === 'isActiveThisSeason') {
@@ -190,7 +377,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           return
         }
         if (field === 'sendDiagnosed' || field === 'otcConsent') {
-          p[field] = parseBoolean(raw, false)
+          p[field] = field === 'sendDiagnosed' ? parseSendDiagnosed(raw) : parseBoolean(raw, false)
           return
         }
         if (field === 'medicalType') {
@@ -215,6 +402,23 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
 
       p.medicalType = normalizeMedicalTypeList(p.medicalType)
 
+      // If one combined form answer includes both allergy and dietary info,
+      // split it into separate fields to keep records structured.
+      if (p.allergyDetails || p.dietaryType) {
+        const source = p.allergyDetails || p.dietaryType
+        const split = splitAllergyDietaryText(source)
+        if (split.allergyDetails) p.allergyDetails = split.allergyDetails
+        if (!p.dietaryType && split.dietaryType) p.dietaryType = split.dietaryType
+      }
+
+      // Prefer explicit self-described pronouns when provided.
+      const selfDescribedPronouns = rowValueByAliases(row, PRONOUNS_SELF_DESCRIBE_ALIASES)
+      const pronounsText = String(p.pronouns || '').trim().toLowerCase()
+      const pronounsIndicateSelfDescribe = pronounsText.includes('self describe') || pronounsText.includes('self-describe')
+      if (selfDescribedPronouns && (!pronounsText || pronounsIndicateSelfDescribe)) {
+        p.pronouns = selfDescribedPronouns
+      }
+
       // Normalise medicalType from medicalDetails text
       if (p.medicalType.length === 0 && p.medicalDetails) {
         const types = []
@@ -230,6 +434,8 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
 
       return p
     }).filter(p => p.name?.trim())
+
+    return linkImportedFamilies(built)
   }
 
   const preview = buildParticipants()
@@ -249,9 +455,14 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'Pronouns',
       'Age',
       'Birthday',
+      'Address',
+      'Postcode',
+      'School Attending',
       'Parent Name',
       'Parent Email',
       'Parent Phone',
+      'Siblings?',
+      'Siblings Name',
       'Approved Adults',
       'Can Leave Alone',
       'Medical Type',
@@ -271,9 +482,14 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'she/her',
       '10',
       '2014-07-18',
+      '12 Acacia Avenue, London',
+      'N1 9QX',
+      'St Mary Primary School',
       'Sarah Smith',
       'sarah@email.com',
       '07700000000',
+      'yes',
+      'Tom Smith',
       'Sarah Smith (Parent), Grandma Smith (Grandmother)',
       'no',
       'Allergy, Dietary',

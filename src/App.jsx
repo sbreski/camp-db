@@ -203,6 +203,9 @@ function useSupabaseTable(table, orderBy = 'created_at', options = {}) {
 function toSnake(obj) {
   const map = {
     parentName: 'parent_name', parentEmail: 'parent_email', parentPhone: 'parent_phone',
+    address: 'address', postcode: 'postcode', schoolAttending: 'school_attending',
+    siblings: 'siblings', siblingsName: 'siblings_name',
+    familyGroupKey: 'family_group_key',
     approvedAdults: 'approved_adults', medicalType: 'medical_type', medicalDetails: 'medical_details',
     sendNeeds: 'send_needs', sendDiagnosed: 'send_diagnosed', sendDiagnosis: 'send_diagnosis', dressingRoom: 'dressing_room',
     safeguardingFlag: 'safeguarding_flag',
@@ -292,6 +295,9 @@ function attendanceToSnake(obj) {
 function toCamel(obj) {
   const map = {
     parent_name: 'parentName', parent_email: 'parentEmail', parent_phone: 'parentPhone',
+    address: 'address', postcode: 'postcode', school_attending: 'schoolAttending',
+    siblings: 'siblings', siblings_name: 'siblingsName',
+    family_group_key: 'familyGroupKey',
     approved_adults: 'approvedAdults', medical_type: 'medicalType', medical_details: 'medicalDetails',
     send_needs: 'sendNeeds', send_diagnosed: 'sendDiagnosed', send_diagnosis: 'sendDiagnosis', dressing_room: 'dressingRoom',
     safeguarding_flag: 'safeguardingFlag',

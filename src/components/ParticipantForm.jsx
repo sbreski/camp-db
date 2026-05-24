@@ -4,6 +4,8 @@ import { X, Plus, Trash2 } from 'lucide-react'
 const EMPTY = {
   name: '', pronouns: '', age: '',
   birthday: '',
+  address: '', postcode: '', schoolAttending: '',
+  siblings: false, siblingsName: '',
   parentName: '', parentEmail: '', parentPhone: '',
   approvedAdults: '',
   can_leave_alone: false,
@@ -72,6 +74,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
     ...EMPTY,
     ...initial,
     birthday: normalizeDateInput(initial.birthday || initial.dob),
+    siblings: Boolean(initial.siblings),
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
     isActiveThisSeason: (initial.isActiveThisSeason ?? initial.is_active_this_season) !== false,
@@ -199,6 +202,39 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             <div>
               <label className="label">Birthday</label>
               <input className="input" type="date" value={form.birthday || ''} onChange={e => set('birthday', e.target.value)} />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="label">School Attending</label>
+              <input className="input" value={form.schoolAttending || ''} onChange={e => set('schoolAttending', e.target.value)} placeholder="Primary/secondary school" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="label">Postcode</label>
+              <input className="input" value={form.postcode || ''} onChange={e => set('postcode', e.target.value)} placeholder="N1 9QX" />
+            </div>
+            <div className="col-span-2">
+              <label className="label">Address</label>
+              <textarea
+                className="input resize-none"
+                rows={2}
+                value={form.address || ''}
+                onChange={e => set('address', e.target.value)}
+                placeholder="Home address"
+              />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-1">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.siblings)}
+                  onChange={e => set('siblings', e.target.checked)}
+                  className="rounded"
+                />
+                Has siblings attending
+              </label>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="label">Sibling Name(s)</label>
+              <input className="input" value={form.siblingsName || ''} onChange={e => set('siblingsName', e.target.value)} placeholder="Comma-separated names" />
             </div>
             <div className="col-span-2">
               <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-1">

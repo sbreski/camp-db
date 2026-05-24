@@ -21,6 +21,9 @@ function hashString(input) {
 }
 
 export function getParticipantFamilyKey(participant) {
+  const explicitFamilyGroupKey = normalizeText(participant?.familyGroupKey || participant?.family_group_key)
+  if (explicitFamilyGroupKey) return `group:${explicitFamilyGroupKey}`
+
   const emailKey = normalizeText(participant?.parentEmail)
   if (emailKey) return `email:${emailKey}`
 
