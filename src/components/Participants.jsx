@@ -4,6 +4,7 @@ import ParticipantForm from './ParticipantForm'
 import ImportParticipants from './ImportParticipants'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
+import { supabase } from '../supabase'
 
 function photoConsentMode(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -238,10 +239,15 @@ function DemographicsPanel({ participants, ageSplits, setAgeSplits, genderFilter
   )
 }
 
-export default function Participants({ participants, setParticipants, onView }) {
+export default function Participants({ participants, setParticipants, onView, canViewUploadedData = false, currentUserEmail = '' }) {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showAllTable, setShowAllTable] = useState(false)
+  const [allTableUnlocked, setAllTableUnlocked] = useState(false)
+  const [allTablePassword, setAllTablePassword] = useState('')
+  const [allTableUnlocking, setAllTableUnlocking] = useState(false)
+  const [allTableError, setAllTableError] = useState('')
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([])
   const [subTab, setSubTab] = useState('active')
   const [sortKey, setSortKey] = useState('firstName')
@@ -386,6 +392,34 @@ export default function Participants({ participants, setParticipants, onView }) 
   }
 
   const activeFilterCount = (genderFilter.size < 3 ? 1 : 0) + (ageGroupFilter !== null ? 1 : 0)
+  const allParticipantsSorted = useMemo(() => (
+    [...participants].sort((a, b) => participantDisplayName(a).localeCompare(participantDisplayName(b)))
+  ), [participants])
+
+  async function unlockAllParticipantsTable() {
+    const email = String(currentUserEmail || '').trim().toLowerCase()
+    if (!email) {
+      setAllTableError('Unable to verify account email for this session.')
+      return
+    }
+    if (!allTablePassword) {
+      setAllTableError('Enter your login password to continue.')
+      return
+    }
+
+    setAllTableUnlocking(true)
+    setAllTableError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password: allTablePassword })
+    setAllTableUnlocking(false)
+
+    if (error) {
+      setAllTableError('Password check failed. Try again.')
+      return
+    }
+
+    setAllTableUnlocked(true)
+    setAllTablePassword('')
+  }
 
   return (
     <div className="fade-in space-y-5">
@@ -403,6 +437,14 @@ export default function Participants({ participants, setParticipants, onView }) 
           <p className="text-stone-500 text-sm">{participants.length} registered</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
+          {canViewUploadedData && (
+            <button
+              onClick={() => setShowAllTable(prev => !prev)}
+              className="btn-secondary flex items-center justify-center gap-2 flex-1 sm:flex-none"
+            >
+              {showAllTable ? 'Hide All-Participants Table' : 'Show All-Participants Table'}
+            </button>
+          )}
           <button onClick={() => setShowImport(true)} className="btn-secondary flex items-center justify-center gap-2 flex-1 sm:flex-none">
             <Upload size={14} /> Import CSV
           </button>
@@ -414,6 +456,116 @@ export default function Participants({ participants, setParticipants, onView }) 
 
       {showForm && (
         <ParticipantForm onSave={addParticipant} onCancel={() => setShowForm(false)} />
+      )}
+
+      {canViewUploadedData && showAllTable && (
+        <div className="card space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-display font-semibold text-forest-950">All Participants Data Table (Protected)</h3>
+            {allTableUnlocked && (
+              <button
+                type="button"
+                onClick={() => setAllTableUnlocked(false)}
+                className="text-xs text-stone-500 hover:text-stone-700 underline"
+              >
+                Lock
+              </button>
+            )}
+          </div>
+
+          {!allTableUnlocked ? (
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-2">
+              <p className="text-xs text-stone-600">Enter your own login password to view all participants in one table.</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="password"
+                  className="input flex-1"
+                  value={allTablePassword}
+                  onChange={e => setAllTablePassword(e.target.value)}
+                  placeholder="Your account password"
+                />
+                <button
+                  type="button"
+                  onClick={unlockAllParticipantsTable}
+                  disabled={allTableUnlocking}
+                  className={`btn-secondary ${allTableUnlocking ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  {allTableUnlocking ? 'Checking...' : 'Unlock'}
+                </button>
+              </div>
+              {allTableError && <p className="text-xs text-red-700">{allTableError}</p>}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-stone-200">
+              <table className="w-full text-xs">
+                <thead className="bg-stone-50">
+                  <tr>
+                    {[
+                      'Full Name',
+                      'Pronouns',
+                      'Age',
+                      'Date of Birth',
+                      'School Attending',
+                      'Postcode',
+                      'Address',
+                      'Siblings?',
+                      'Siblings Name',
+                      'Parent Name',
+                      'Parent Phone',
+                      'Parent Email',
+                      'Permission to Leave Unaccompanied',
+                      'Approved Adults',
+                      'Photo Consent',
+                      'Medical Type',
+                      'Medical Info',
+                      'Allergy Details',
+                      'Dietary Requirements',
+                      'Medication Details / OTC Notes',
+                      'Additional Needs / SEND Support',
+                      'EHCP / Diagnosed',
+                      'Diagnosis / If yes or not sure',
+                      'Declaration / Additional Notes',
+                      'Family Group Key',
+                    ].map(header => (
+                      <th key={header} className="text-left px-3 py-2 font-semibold text-stone-600 uppercase tracking-wide whitespace-nowrap">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {allParticipantsSorted.map((p) => (
+                    <tr key={p.id} className="hover:bg-stone-50">
+                      <td className="px-3 py-2 whitespace-nowrap">{participantDisplayName(p)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.pronouns || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.age || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.birthday || p.dob || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.schoolAttending || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.postcode || '—'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.address || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.siblings ? 'Yes' : 'No'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.siblingsName || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.parentName || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.parentPhone || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.parentEmail || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{(p.can_leave_alone || p.canLeaveAlone) ? 'Yes' : 'No'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.approvedAdults || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.photoConsent || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{Array.isArray(p.medicalType) ? (p.medicalType.join(', ') || '—') : (p.medicalType || '—')}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.medicalDetails || '—'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.allergyDetails || '—'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.dietaryType || '—'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.otcNotes || '—'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.sendNeeds || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.sendDiagnosed ? 'Yes' : 'No'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.sendDiagnosis || '—'}</td>
+                      <td className="px-3 py-2 whitespace-pre-wrap">{p.notes || '—'}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.familyGroupKey || p.family_group_key || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="relative">
