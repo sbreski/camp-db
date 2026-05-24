@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, ChevronRight, Trash2, User, Upload, CameraOff, Camera, ChevronDown, ChevronUp, Users } from 'lucide-react'
 import ParticipantForm from './ParticipantForm'
 import ImportParticipants from './ImportParticipants'
@@ -248,6 +248,12 @@ export default function Participants({ participants, setParticipants, onView, ca
   const [allTablePassword, setAllTablePassword] = useState('')
   const [allTableUnlocking, setAllTableUnlocking] = useState(false)
   const [allTableError, setAllTableError] = useState('')
+  const [allTableEditing, setAllTableEditing] = useState(false)
+  const [allTableDraftById, setAllTableDraftById] = useState({})
+  const [allTableSaving, setAllTableSaving] = useState(false)
+  const [allTableSaveNotice, setAllTableSaveNotice] = useState('')
+  const [allTableEditError, setAllTableEditError] = useState('')
+  const [allTablePendingAutoSave, setAllTablePendingAutoSave] = useState(false)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([])
   const [subTab, setSubTab] = useState('active')
   const [sortKey, setSortKey] = useState('firstName')
@@ -396,6 +402,178 @@ export default function Participants({ participants, setParticipants, onView, ca
     [...participants].sort((a, b) => participantDisplayName(a).localeCompare(participantDisplayName(b)))
   ), [participants])
 
+  function buildAllTableDraftRow(participant) {
+    return {
+      name: String(participant.name || ''),
+      pronouns: String(participant.pronouns || ''),
+      age: String(participant.age ?? ''),
+      birthday: String(participant.birthday || participant.dob || ''),
+      schoolAttending: String(participant.schoolAttending || ''),
+      postcode: String(participant.postcode || ''),
+      address: String(participant.address || ''),
+      siblings: Boolean(participant.siblings),
+      siblingsName: String(participant.siblingsName || ''),
+      parentName: String(participant.parentName || ''),
+      parentPhone: String(participant.parentPhone || ''),
+      parentEmail: String(participant.parentEmail || ''),
+      can_leave_alone: Boolean(participant.can_leave_alone ?? participant.canLeaveAlone),
+      approvedAdults: String(participant.approvedAdults || ''),
+      photoConsent: String(participant.photoConsent || 'yes'),
+      medicalTypeText: Array.isArray(participant.medicalType) ? participant.medicalType.join(', ') : String(participant.medicalType || ''),
+      medicalDetails: String(participant.medicalDetails || ''),
+      allergyDetails: String(participant.allergyDetails || ''),
+      dietaryType: String(participant.dietaryType || ''),
+      otcNotes: String(participant.otcNotes || ''),
+      sendNeeds: String(participant.sendNeeds || ''),
+      sendDiagnosed: Boolean(participant.sendDiagnosed),
+      sendDiagnosis: String(participant.sendDiagnosis || ''),
+      notes: String(participant.notes || ''),
+      familyGroupKey: String(participant.familyGroupKey || participant.family_group_key || ''),
+    }
+  }
+
+  function normalizeMedicalTypeFromText(value) {
+    return String(value || '')
+      .split(/[;,|/\n]+/)
+      .map(item => item.trim())
+      .filter(Boolean)
+      .map((item) => {
+        const key = item.toLowerCase()
+        if (key.startsWith('allerg') || key === 'a') return 'Allergy'
+        if (key.startsWith('diet') || key === 'd') return 'Dietary'
+        if (key.startsWith('med') || key === 'm') return 'Medical'
+        return null
+      })
+      .filter(Boolean)
+  }
+
+  function rowDraftHasChanges(participant, draft) {
+    const baseline = buildAllTableDraftRow(participant)
+    const keys = Object.keys(baseline)
+    return keys.some((key) => {
+      if (typeof baseline[key] === 'boolean') return Boolean(baseline[key]) !== Boolean(draft?.[key])
+      return String(baseline[key] ?? '') !== String(draft?.[key] ?? '')
+    })
+  }
+
+  function allDraftsHaveChanges() {
+    return allParticipantsSorted.some((participant) => {
+      const draft = allTableDraftById[participant.id]
+      if (!draft) return false
+      return rowDraftHasChanges(participant, draft)
+    })
+  }
+
+  function startAllTableEdit() {
+    const drafts = {}
+    allParticipantsSorted.forEach((participant) => {
+      drafts[participant.id] = buildAllTableDraftRow(participant)
+    })
+    setAllTableDraftById(drafts)
+    setAllTableEditing(true)
+    setAllTableEditError('')
+    setAllTableSaveNotice('')
+  }
+
+  function cancelAllTableEdit() {
+    setAllTableEditing(false)
+    setAllTableDraftById({})
+    setAllTableEditError('')
+    setAllTableSaveNotice('')
+  }
+
+  function updateAllTableDraft(participantId, key, value) {
+    setAllTableDraftById(prev => ({
+      ...prev,
+      [participantId]: {
+        ...(prev[participantId] || {}),
+        [key]: value,
+      },
+    }))
+    if (allTableEditError) setAllTableEditError('')
+    setAllTableSaveNotice('Saving...')
+    setAllTablePendingAutoSave(true)
+  }
+
+  async function saveAllTableEdits(exitAfterSave = false) {
+    if (!allDraftsHaveChanges()) {
+      if (exitAfterSave) {
+        setAllTableEditing(false)
+        setAllTableDraftById({})
+      }
+      return
+    }
+
+    setAllTableSaving(true)
+    setAllTableEditError('')
+    setAllTableSaveNotice('Saving...')
+
+    const result = await setParticipants(prev => prev.map((participant) => {
+      const draft = allTableDraftById[participant.id]
+      if (!draft) return participant
+
+      const parsedAge = parseInt(String(draft.age || '').trim(), 10)
+      const normalizedPhotoConsent = String(draft.photoConsent || '').trim().toLowerCase()
+
+      return {
+        ...participant,
+        name: String(draft.name || '').trim() || participant.name,
+        pronouns: String(draft.pronouns || '').trim(),
+        age: Number.isNaN(parsedAge) ? '' : parsedAge,
+        birthday: String(draft.birthday || '').trim(),
+        schoolAttending: String(draft.schoolAttending || '').trim(),
+        postcode: String(draft.postcode || '').trim(),
+        address: String(draft.address || '').trim(),
+        siblings: Boolean(draft.siblings),
+        siblingsName: String(draft.siblingsName || '').trim(),
+        parentName: String(draft.parentName || '').trim(),
+        parentPhone: String(draft.parentPhone || '').trim(),
+        parentEmail: String(draft.parentEmail || '').trim(),
+        can_leave_alone: Boolean(draft.can_leave_alone),
+        approvedAdults: String(draft.approvedAdults || '').trim(),
+        photoConsent: normalizedPhotoConsent === 'no' ? 'no' : normalizedPhotoConsent === 'internal' ? 'internal' : 'yes',
+        medicalType: normalizeMedicalTypeFromText(draft.medicalTypeText),
+        medicalDetails: String(draft.medicalDetails || '').trim(),
+        allergyDetails: String(draft.allergyDetails || '').trim(),
+        dietaryType: String(draft.dietaryType || '').trim(),
+        otcNotes: String(draft.otcNotes || '').trim(),
+        sendNeeds: String(draft.sendNeeds || '').trim(),
+        sendDiagnosed: Boolean(draft.sendDiagnosed),
+        sendDiagnosis: String(draft.sendDiagnosis || '').trim(),
+        notes: String(draft.notes || '').trim(),
+        familyGroupKey: String(draft.familyGroupKey || '').trim(),
+      }
+    }))
+
+    setAllTableSaving(false)
+    if (result && result.ok === false) {
+      const firstError = Array.isArray(result.errors) && result.errors.length > 0
+        ? result.errors[0]
+        : 'Unable to save all table edits.'
+      setAllTableEditError(firstError)
+      return
+    }
+
+    setAllTablePendingAutoSave(false)
+    setAllTableSaveNotice('All changes saved.')
+    if (exitAfterSave) {
+      setAllTableEditing(false)
+      setAllTableDraftById({})
+    }
+  }
+
+  useEffect(() => {
+    if (!allTableEditing) return
+    if (!allTablePendingAutoSave) return
+    if (allTableSaving) return
+
+    const timer = setTimeout(() => {
+      saveAllTableEdits(false)
+    }, 700)
+
+    return () => clearTimeout(timer)
+  }, [allTableEditing, allTablePendingAutoSave, allTableSaving, allTableDraftById])
+
   async function unlockAllParticipantsTable() {
     const email = String(currentUserEmail || '').trim().toLowerCase()
     if (!email) {
@@ -419,6 +597,10 @@ export default function Participants({ participants, setParticipants, onView, ca
 
     setAllTableUnlocked(true)
     setAllTablePassword('')
+    setAllTableEditing(false)
+    setAllTableDraftById({})
+    setAllTableEditError('')
+    setAllTableSaveNotice('')
   }
 
   return (
@@ -462,15 +644,44 @@ export default function Participants({ participants, setParticipants, onView, ca
         <div className="card space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-display font-semibold text-forest-950">All Participants Data Table (Protected)</h3>
-            {allTableUnlocked && (
-              <button
-                type="button"
-                onClick={() => setAllTableUnlocked(false)}
-                className="text-xs text-stone-500 hover:text-stone-700 underline"
-              >
-                Lock
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {allTableUnlocked && !allTableEditing && (
+                <button
+                  type="button"
+                  onClick={startAllTableEdit}
+                  className="btn-secondary text-xs"
+                >
+                  Edit Table
+                </button>
+              )}
+              {allTableUnlocked && allTableEditing && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => saveAllTableEdits(true)}
+                    disabled={allTableSaving}
+                    className="btn-secondary text-xs"
+                  >
+                    {allTableSaving ? 'Saving...' : 'Done'}
+                  </button>
+                </>
+              )}
+              {allTableUnlocked && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAllTableUnlocked(false)
+                    setAllTableEditing(false)
+                    setAllTableDraftById({})
+                    setAllTableEditError('')
+                    setAllTableSaveNotice('')
+                  }}
+                  className="text-xs text-stone-500 hover:text-stone-700 underline"
+                >
+                  Lock
+                </button>
+              )}
+            </div>
           </div>
 
           {!allTableUnlocked ? (
@@ -496,7 +707,11 @@ export default function Participants({ participants, setParticipants, onView, ca
               {allTableError && <p className="text-xs text-red-700">{allTableError}</p>}
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-stone-200">
+            <div className="space-y-2">
+              {allTableEditError && <p className="text-xs text-red-700">{allTableEditError}</p>}
+              {allTableSaveNotice && <p className="text-xs text-emerald-700">{allTableSaveNotice}</p>}
+              {allTableEditing && !allTableEditError && <p className="text-xs text-amber-700">Editing mode is on. Changes auto-save.</p>}
+              <div className="overflow-x-auto rounded-xl border border-stone-200">
               <table className="w-full text-xs">
                 <thead className="bg-stone-50">
                   <tr>
@@ -532,37 +747,145 @@ export default function Participants({ participants, setParticipants, onView, ca
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
-                  {allParticipantsSorted.map((p) => (
-                    <tr key={p.id} className="hover:bg-stone-50">
-                      <td className="px-3 py-2 whitespace-nowrap">{participantDisplayName(p)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.pronouns || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.age || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.birthday || p.dob || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.schoolAttending || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.postcode || '—'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.address || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.siblings ? 'Yes' : 'No'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.siblingsName || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.parentName || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.parentPhone || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.parentEmail || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{(p.can_leave_alone || p.canLeaveAlone) ? 'Yes' : 'No'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.approvedAdults || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.photoConsent || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{Array.isArray(p.medicalType) ? (p.medicalType.join(', ') || '—') : (p.medicalType || '—')}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.medicalDetails || '—'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.allergyDetails || '—'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.dietaryType || '—'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.otcNotes || '—'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.sendNeeds || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.sendDiagnosed ? 'Yes' : 'No'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.sendDiagnosis || '—'}</td>
-                      <td className="px-3 py-2 whitespace-pre-wrap">{p.notes || '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{p.familyGroupKey || p.family_group_key || '—'}</td>
-                    </tr>
-                  ))}
+                  {allParticipantsSorted.map((p) => {
+                    const rowDraft = allTableEditing ? (allTableDraftById[p.id] || buildAllTableDraftRow(p)) : null
+                    return (
+                      <tr key={p.id} className="hover:bg-stone-50">
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.name} onChange={e => updateAllTableDraft(p.id, 'name', e.target.value)} />
+                          ) : participantDisplayName(p)}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.pronouns} onChange={e => updateAllTableDraft(p.id, 'pronouns', e.target.value)} />
+                          ) : (p.pronouns || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="number" className="input py-1" value={rowDraft.age} onChange={e => updateAllTableDraft(p.id, 'age', e.target.value)} />
+                          ) : (p.age || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="date" className="input py-1" value={rowDraft.birthday} onChange={e => updateAllTableDraft(p.id, 'birthday', e.target.value)} />
+                          ) : (p.birthday || p.dob || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.schoolAttending} onChange={e => updateAllTableDraft(p.id, 'schoolAttending', e.target.value)} />
+                          ) : (p.schoolAttending || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.postcode} onChange={e => updateAllTableDraft(p.id, 'postcode', e.target.value)} />
+                          ) : (p.postcode || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.address} onChange={e => updateAllTableDraft(p.id, 'address', e.target.value)} />
+                          ) : (p.address || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="checkbox" className="h-4 w-4" checked={Boolean(rowDraft.siblings)} onChange={e => updateAllTableDraft(p.id, 'siblings', e.target.checked)} />
+                          ) : (p.siblings ? 'Yes' : 'No')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.siblingsName} onChange={e => updateAllTableDraft(p.id, 'siblingsName', e.target.value)} />
+                          ) : (p.siblingsName || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.parentName} onChange={e => updateAllTableDraft(p.id, 'parentName', e.target.value)} />
+                          ) : (p.parentName || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.parentPhone} onChange={e => updateAllTableDraft(p.id, 'parentPhone', e.target.value)} />
+                          ) : (p.parentPhone || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="email" className="input py-1" value={rowDraft.parentEmail} onChange={e => updateAllTableDraft(p.id, 'parentEmail', e.target.value)} />
+                          ) : (p.parentEmail || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="checkbox" className="h-4 w-4" checked={Boolean(rowDraft.can_leave_alone)} onChange={e => updateAllTableDraft(p.id, 'can_leave_alone', e.target.checked)} />
+                          ) : ((p.can_leave_alone || p.canLeaveAlone) ? 'Yes' : 'No')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.approvedAdults} onChange={e => updateAllTableDraft(p.id, 'approvedAdults', e.target.value)} />
+                          ) : (p.approvedAdults || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <select className="input py-1" value={rowDraft.photoConsent} onChange={e => updateAllTableDraft(p.id, 'photoConsent', e.target.value)}>
+                              <option value="yes">yes</option>
+                              <option value="no">no</option>
+                              <option value="internal">internal</option>
+                            </select>
+                          ) : (p.photoConsent || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.medicalTypeText} onChange={e => updateAllTableDraft(p.id, 'medicalTypeText', e.target.value)} placeholder="Allergy, Medical" />
+                          ) : (Array.isArray(p.medicalType) ? (p.medicalType.join(', ') || '—') : (p.medicalType || '—'))}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.medicalDetails} onChange={e => updateAllTableDraft(p.id, 'medicalDetails', e.target.value)} />
+                          ) : (p.medicalDetails || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.allergyDetails} onChange={e => updateAllTableDraft(p.id, 'allergyDetails', e.target.value)} />
+                          ) : (p.allergyDetails || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.dietaryType} onChange={e => updateAllTableDraft(p.id, 'dietaryType', e.target.value)} />
+                          ) : (p.dietaryType || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.otcNotes} onChange={e => updateAllTableDraft(p.id, 'otcNotes', e.target.value)} />
+                          ) : (p.otcNotes || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.sendNeeds} onChange={e => updateAllTableDraft(p.id, 'sendNeeds', e.target.value)} />
+                          ) : (p.sendNeeds || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="checkbox" className="h-4 w-4" checked={Boolean(rowDraft.sendDiagnosed)} onChange={e => updateAllTableDraft(p.id, 'sendDiagnosed', e.target.checked)} />
+                          ) : (p.sendDiagnosed ? 'Yes' : 'No')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.sendDiagnosis} onChange={e => updateAllTableDraft(p.id, 'sendDiagnosis', e.target.value)} />
+                          ) : (p.sendDiagnosis || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.notes} onChange={e => updateAllTableDraft(p.id, 'notes', e.target.value)} />
+                          ) : (p.notes || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.familyGroupKey} onChange={e => updateAllTableDraft(p.id, 'familyGroupKey', e.target.value)} />
+                          ) : (p.familyGroupKey || p.family_group_key || '—')}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

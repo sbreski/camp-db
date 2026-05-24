@@ -429,11 +429,21 @@ export default function App() {
   }
 
   function stripMissingColumn(error, payload) {
-    const match = String(error?.message || '').match(/column "([^"]+)" of relation "[^"]+" does not exist/)
+    const message = String(error?.message || '')
+    const match = message.match(/column "([^"]+)" of relation "[^"]+" does not exist/)
+      || message.match(/Could not find the '([^']+)' column of '[^']+' in the schema cache/i)
     if (!match) return null
     const col = match[1]
     const { [col]: _dropped, ...rest } = payload
     return rest
+  }
+
+  function isMissingColumnWriteError(error) {
+    const message = String(error?.message || '').toLowerCase()
+    return (
+      (message.includes('column') && message.includes('does not exist'))
+      || (message.includes('could not find the') && message.includes('column') && message.includes('schema cache'))
+    )
   }
 
   async function setParticipants(updater) {
@@ -449,7 +459,7 @@ export default function App() {
       const { id, ...rest } = toSnake(p)
       let payload = { id: p.id, ...rest }
       let { error } = await supabase.from('participants').insert(payload)
-      while (error && String(error.message).includes('does not exist')) {
+      while (error && isMissingColumnWriteError(error)) {
         const stripped = stripMissingColumn(error, payload)
         if (!stripped) break
         payload = stripped
@@ -467,7 +477,7 @@ export default function App() {
       const { id, ...rest } = toSnake(p)
       let payload = rest
       let { error } = await supabase.from('participants').update(payload).eq('id', p.id)
-      while (error && String(error.message).includes('does not exist')) {
+      while (error && isMissingColumnWriteError(error)) {
         const stripped = stripMissingColumn(error, payload)
         if (!stripped) break
         payload = stripped
