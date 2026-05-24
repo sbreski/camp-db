@@ -10,6 +10,41 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function birthdayParts(value) {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const month = Number.parseInt(match[2], 10)
+  const day = Number.parseInt(match[3], 10)
+  if (Number.isNaN(month) || Number.isNaN(day)) return null
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  return { month, day }
+}
+
+function makeBirthdayDate(year, month, day) {
+  const candidate = new Date(year, month - 1, day, 12, 0, 0, 0)
+  if (candidate.getMonth() === month - 1 && candidate.getDate() === day) return candidate
+  if (month === 2 && day === 29) return new Date(year, 1, 28, 12, 0, 0, 0)
+  return null
+}
+
+function daysUntilBirthday(birthday, fromDateKey) {
+  const parts = birthdayParts(birthday)
+  if (!parts) return null
+
+  const from = new Date(`${fromDateKey}T12:00:00`)
+  if (Number.isNaN(from.getTime())) return null
+
+  let next = makeBirthdayDate(from.getFullYear(), parts.month, parts.day)
+  if (!next) return null
+  if (next < from) {
+    next = makeBirthdayDate(from.getFullYear() + 1, parts.month, parts.day)
+    if (!next) return null
+  }
+
+  const msPerDay = 24 * 60 * 60 * 1000
+  return Math.round((next.getTime() - from.getTime()) / msPerDay)
+}
+
 function fmt(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -1975,6 +2010,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const preverifyStatus = getPreverifyStatusForParticipant(p)
               const noteFollowUp = String(p.register_note || p.registerNote || '').trim()
               const absenceReasonLocked = Boolean(rec?.signIn || rec?.signOut)
+              const birthdayValue = p.birthday || p.dob
+              const birthdayInDays = daysUntilBirthday(birthdayValue, selectedDate)
+              const hasUpcomingBirthday = birthdayInDays !== null && birthdayInDays >= 0 && birthdayInDays <= 5
+              const birthdayTitle = birthdayInDays === 0
+                ? 'Birthday today'
+                : `Birthday in ${birthdayInDays} day${birthdayInDays === 1 ? '' : 's'}`
 
               return (
                 <div key={p.id} id={`participant-row-${p.id}`}
@@ -1990,6 +2031,16 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <ParticipantNameText participant={p} className="font-display font-semibold text-forest-950 text-sm" showDiagnosedHighlight={false} />
+                      {hasUpcomingBirthday && (
+                        <span
+                          role="img"
+                          aria-label={birthdayTitle}
+                          title={birthdayTitle}
+                          className="text-sm"
+                        >
+                          🎂
+                        </span>
+                      )}
                       {photoConsentMode(p.photoConsent) === 'no' && (
                         <CameraOff size={12} className="text-rose-700" title="No photo consent" />
                       )}

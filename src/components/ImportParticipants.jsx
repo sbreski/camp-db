@@ -7,6 +7,7 @@ const FIELD_MAP = {
   name: ['name', 'full name', 'fullname', 'participant', 'participant name', 'child name', 'child'],
   pronouns: ['pronouns', 'pronoun'],
   age: ['age'],
+  birthday: ['birthday', 'date of birth', 'birth date', 'dob', 'date_of_birth'],
   parentName: ['parent', 'guardian', 'parent name', 'guardian name', 'parent/guardian'],
   parentEmail: ['email', 'parent email', 'guardian email', 'e-mail'],
   parentPhone: ['phone', 'mobile', 'telephone', 'contact number', 'parent phone', 'phone number'],
@@ -50,6 +51,29 @@ function normalizeMedicalTypeList(value) {
       return null
     })
     .filter(Boolean)
+}
+
+function parseBirthday(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) {
+    const parsed = new Date(`${raw}T12:00:00`)
+    return Number.isNaN(parsed.getTime()) ? null : raw
+  }
+
+  const uk = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+  if (uk) {
+    const day = uk[1].padStart(2, '0')
+    const month = uk[2].padStart(2, '0')
+    const year = uk[3]
+    const normalized = `${year}-${month}-${day}`
+    const parsed = new Date(`${normalized}T12:00:00`)
+    return Number.isNaN(parsed.getTime()) ? null : normalized
+  }
+
+  return null
 }
 
 function detectField(header) {
@@ -97,7 +121,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
 
   const OUR_FIELDS = Object.keys(FIELD_MAP)
   const FIELD_LABELS = {
-    name: 'Full Name *', pronouns: 'Pronouns', age: 'Age',
+    name: 'Full Name *', pronouns: 'Pronouns', age: 'Age', birthday: 'Birthday',
     parentName: 'Parent Name', parentEmail: 'Parent Email', parentPhone: 'Parent Phone',
     approvedAdults: 'Approved Adults', medicalDetails: 'Medical Details',
     can_leave_alone: 'Can Leave Alone',
@@ -148,6 +172,13 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
         if (field === 'age') {
           const parsed = parseInt(String(raw || '').trim(), 10)
           p.age = Number.isNaN(parsed) ? '' : parsed
+          return
+        }
+        if (field === 'birthday') {
+          const parsedBirthday = parseBirthday(raw)
+          if (parsedBirthday !== null) {
+            p.birthday = parsedBirthday
+          }
           return
         }
         if (field === 'can_leave_alone') {
@@ -217,6 +248,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'Name',
       'Pronouns',
       'Age',
+      'Birthday',
       'Parent Name',
       'Parent Email',
       'Parent Phone',
@@ -238,6 +270,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'Jane Smith',
       'she/her',
       '10',
+      '2014-07-18',
       'Sarah Smith',
       'sarah@email.com',
       '07700000000',

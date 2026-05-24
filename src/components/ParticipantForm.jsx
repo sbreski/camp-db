@@ -3,6 +3,7 @@ import { X, Plus, Trash2 } from 'lucide-react'
 
 const EMPTY = {
   name: '', pronouns: '', age: '',
+  birthday: '',
   parentName: '', parentEmail: '', parentPhone: '',
   approvedAdults: '',
   can_leave_alone: false,
@@ -58,10 +59,19 @@ function getLikelySiblingIdsFromContact(contact, allParticipants, fallbackPartic
   return matches.length > 0 ? matches : [fallbackParticipantId]
 }
 
+function normalizeDateInput(value) {
+  if (!value) return ''
+  const text = String(value).trim()
+  const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (isoMatch) return isoMatch[1]
+  return ''
+}
+
 export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, participants = [] }) {
   const [form, setForm] = useState({
     ...EMPTY,
     ...initial,
+    birthday: normalizeDateInput(initial.birthday || initial.dob),
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
     isActiveThisSeason: (initial.isActiveThisSeason ?? initial.is_active_this_season) !== false,
@@ -185,6 +195,10 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             <div>
               <label className="label">Age</label>
               <input className="input" type="number" min="1" max="25" value={form.age} onChange={e => set('age', e.target.value)} placeholder="10" />
+            </div>
+            <div>
+              <label className="label">Birthday</label>
+              <input className="input" type="date" value={form.birthday || ''} onChange={e => set('birthday', e.target.value)} />
             </div>
             <div className="col-span-2">
               <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-1">
