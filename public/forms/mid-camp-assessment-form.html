@@ -645,10 +645,14 @@
       pdf.text(`${title}  |  Page ${page} of ${totalPages}`, PAGE_W_MM - MARGIN_MM, PAGE_H_MM - 4.5, { align: 'right' })
     }
 
-    const now = new Date().toISOString().slice(0, 10)
+    const nowDate = new Date()
+    const dd = String(nowDate.getDate()).padStart(2, '0')
+    const mm = String(nowDate.getMonth() + 1).padStart(2, '0')
+    const yyyy = String(nowDate.getFullYear())
+    const stamp = `${dd}-${mm}-${yyyy}`
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''
     const cleanName = nameVal.trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'participant'
-    return { pdf, fileName: `${filePrefix}-${cleanName}-${now}.pdf` }
+    return { pdf, fileName: `${filePrefix}-${cleanName}-${stamp}.pdf` }
   }
 
 

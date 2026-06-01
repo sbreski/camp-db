@@ -233,7 +233,8 @@
     <div class="body-diagram-wrapper">
       <div style="flex:0 0 auto;">
         <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
-          <path class="body-outline" d="M90 20 C104 20 114 30 114 44 C114 56 104 66 90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
+          <circle class="body-outline" cx="90" cy="44" r="22"/>
+          <path class="body-outline" d="M90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
           <text x="90" y="310" text-anchor="middle" font-size="9" fill="#888" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Mark on printed copy</text>
         </svg>
         <div class="diagram-hint">Body map is for handwritten annotation on the printed report.</div>
@@ -304,7 +305,7 @@
         <div class="checklist-item"><input type="checkbox" id="c2"/><label for="c2">Camp Coordinator informed</label></div>
         <div class="checklist-item"><input type="checkbox" id="c3"/><label for="c3">Parent called to collect early</label></div>
         <div class="checklist-item"><input type="checkbox" id="c4"/><label for="c4">Child went to hospital</label></div>
-        <div class="checklist-item"><input type="checkbox" id="c5"/><label for="c5">Child accompanied by staff</label></div>
+        <div class="checklist-item"><input type="checkbox" id="c5"/><label for="c5">Child accompanied by staff to hospital</label></div>
         <div class="checklist-item"><input type="checkbox" id="c6"/><label for="c6">999 called</label></div>
         <div class="checklist-item"><input type="checkbox" id="c7"/><label for="c7">Further medical advice sought</label></div>
         <div class="checklist-item"><input type="checkbox" id="c8"/><label for="c8">artsdepot Duty Manager informed</label></div>
@@ -364,6 +365,13 @@
 <script>
   const STORAGE_KEY = 'ik_incident_accident_form'
   const params = new URLSearchParams(window.location.search)
+
+  function currentTimeValue() {
+    const now = new Date()
+    const hh = String(now.getHours()).padStart(2, '0')
+    const mm = String(now.getMinutes()).padStart(2, '0')
+    return `${hh}:${mm}`
+  }
 
   function getFormData() {
     const data = {}
@@ -431,6 +439,7 @@
     sectionD.style.setProperty('display', 'none', 'important')
     const today = new Date().toISOString().split('T')[0]
     document.getElementById('f-date').value = today
+    document.getElementById('f-time').value = currentTimeValue()
     document.getElementById('f-reporteddate').value = today
     const staffMember = params.get('staffMember') || ''
     if (staffMember) {
@@ -568,9 +577,6 @@
     }
 
     const drawMiniBodyMapAt = (boxX, boxY, boxW = 62, boxH = 72) => {
-      const cx = boxX + (boxW / 2)
-      const top = boxY + 12
-
       pdf.setDrawColor(212, 220, 230)
       pdf.setFillColor(250, 252, 254)
       pdf.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'FD')
@@ -582,56 +588,34 @@
       pdf.setDrawColor(stroke[0], stroke[1], stroke[2])
       pdf.setLineWidth(0.7)
 
-      const headY = top
-      const neckY = top + 6
-      const shoulderY = top + 11
-      const hipY = top + 30
-      const kneeY = top + 44
-      const ankleY = top + 57
+      const padX = 7
+      const padTop = 8
+      const padBottom = 10
+      const drawW = boxW - (padX * 2)
+      const drawH = boxH - (padTop + padBottom)
+      const sx = drawW / 180
+      const sy = drawH / 320
+      const ox = boxX + padX
+      const oy = boxY + padTop
+      const tx = (x) => ox + (x * sx)
+      const ty = (y) => oy + (y * sy)
 
-      const lShoulderX = cx - 7.8
-      const rShoulderX = cx + 7.8
-      const lElbowX = cx - 11.5
-      const rElbowX = cx + 11.5
-      const lHandX = cx - 13.2
-      const rHandX = cx + 13.2
+      // Head: explicit full circle, matching the form silhouette style.
+      pdf.circle(tx(90), ty(44), 22 * Math.min(sx, sy), 'S')
 
-      const lHipX = cx - 4.2
-      const rHipX = cx + 4.2
-      const lKneeX = cx - 5.2
-      const rKneeX = cx + 5.2
-      const lAnkleX = cx - 5.7
-      const rAnkleX = cx + 5.7
+      // Body outline follows the same silhouette profile as the form.
+      const bodyPoints = [
+        [90, 66], [68, 75], [56, 88], [52, 102], [38, 136], [43, 152], [58, 146], [67, 125],
+        [70, 176], [48, 248], [36, 260], [49, 272], [72, 272], [81, 265], [90, 212], [99, 265],
+        [108, 272], [131, 272], [144, 260], [132, 248], [110, 176], [113, 125], [122, 146], [137, 152],
+        [142, 136], [128, 102], [124, 88], [112, 75], [90, 66],
+      ]
 
-      pdf.circle(cx, headY, 4.4, 'S')
-      pdf.line(cx, headY + 4.6, cx, neckY + 0.5)
-
-      pdf.ellipse(cx, top + 24, 7.2, 11.2, 'S')
-      pdf.line(cx, neckY + 0.8, cx, hipY + 0.5)
-      pdf.line(lShoulderX, shoulderY, rShoulderX, shoulderY)
-      pdf.line(lHipX, hipY, rHipX, hipY)
-
-      pdf.line(lShoulderX, shoulderY, lElbowX, shoulderY + 8)
-      pdf.line(lElbowX, shoulderY + 8, lHandX, shoulderY + 17.5)
-      pdf.line(rShoulderX, shoulderY, rElbowX, shoulderY + 8)
-      pdf.line(rElbowX, shoulderY + 8, rHandX, shoulderY + 17.5)
-      pdf.circle(lHandX, shoulderY + 18.2, 1.8, 'S')
-      pdf.circle(rHandX, shoulderY + 18.2, 1.8, 'S')
-
-      pdf.line(lHipX, hipY, lKneeX, kneeY)
-      pdf.line(lKneeX, kneeY, lAnkleX, ankleY)
-      pdf.line(rHipX, hipY, rKneeX, kneeY)
-      pdf.line(rKneeX, kneeY, rAnkleX, ankleY)
-      pdf.circle(lKneeX, kneeY, 1.7, 'S')
-      pdf.circle(rKneeX, kneeY, 1.7, 'S')
-      pdf.ellipse(lAnkleX - 0.8, ankleY + 2.2, 3.2, 1.5, 'S')
-      pdf.ellipse(rAnkleX + 0.8, ankleY + 2.2, 3.2, 1.5, 'S')
-
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(7)
-      pdf.setTextColor(115)
-      pdf.text('L', cx - 16.5, shoulderY + 1)
-      pdf.text('R', cx + 15.2, shoulderY + 1)
+      for (let i = 1; i < bodyPoints.length; i += 1) {
+        const [x1, y1] = bodyPoints[i - 1]
+        const [x2, y2] = bodyPoints[i]
+        pdf.line(tx(x1), ty(y1), tx(x2), ty(y2))
+      }
 
       pdf.setFont('helvetica', 'italic')
       pdf.setFontSize(7.5)
@@ -853,10 +837,14 @@
     }
     pdf.setTextColor(0)
 
-    const now = new Date().toISOString().slice(0, 10)
+    const nowDate = new Date()
+    const dd = String(nowDate.getDate()).padStart(2, '0')
+    const mm = String(nowDate.getMonth() + 1).padStart(2, '0')
+    const yyyy = String(nowDate.getFullYear())
+    const stamp = `${dd}-${mm}-${yyyy}`
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''
     const cleanName = nameVal.trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'participant'
-    return { pdf, fileName: `${filePrefix}-${cleanName}-${now}.pdf` }
+    return { pdf, fileName: `${filePrefix}-${cleanName}-${stamp}.pdf` }
   }
 
   function summaryValue(id, fallback = 'Not recorded') {
@@ -882,7 +870,7 @@
       ['c2', 'Camp Coordinator informed'],
       ['c3', 'Parent called to collect early'],
       ['c4', 'Child went to hospital'],
-      ['c5', 'Child accompanied by staff'],
+      ['c5', 'Child accompanied by staff to hospital'],
       ['c6', '999 called'],
       ['c7', 'Further medical advice sought'],
       ['c8', 'artsdepot Duty Manager informed'],
@@ -1049,8 +1037,10 @@
 
     const today = new Date().toISOString().split('T')[0]
     const dateField = document.getElementById('f-date')
+    const timeField = document.getElementById('f-time')
     const reportedDateField = document.getElementById('f-reporteddate')
     if (dateField && !dateField.value) dateField.value = today
+    if (timeField && !timeField.value) timeField.value = currentTimeValue()
     if (reportedDateField && !reportedDateField.value) reportedDateField.value = today
 
     toggleRiddorDetails()

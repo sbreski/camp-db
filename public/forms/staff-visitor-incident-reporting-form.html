@@ -277,7 +277,8 @@
     <div class="body-diagram-wrapper">
       <div style="flex:0 0 auto;">
         <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
-          <path class="body-outline" d="M90 20 C104 20 114 30 114 44 C114 56 104 66 90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
+          <circle class="body-outline" cx="90" cy="44" r="22"/>
+          <path class="body-outline" d="M90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
           <text x="90" y="310" text-anchor="middle" font-size="9" fill="#888" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Mark on printed copy</text>
         </svg>
         <div class="diagram-hint">Body map is for handwritten annotation on the printed report.</div>
@@ -431,6 +432,13 @@
   const STORAGE_KEY = 'ik_staff_visitor_incident_form'
   const params = new URLSearchParams(window.location.search)
 
+  function currentTimeValue() {
+    const now = new Date()
+    const hh = String(now.getHours()).padStart(2, '0')
+    const mm = String(now.getMinutes()).padStart(2, '0')
+    return `${hh}:${mm}`
+  }
+
   function getFormData() {
     const data = {}
 
@@ -509,6 +517,7 @@
     sectionD.style.setProperty('display', 'none', 'important')
     const today = new Date().toISOString().split('T')[0]
     document.getElementById('f-date').value = today
+    document.getElementById('f-time').value = currentTimeValue()
     document.getElementById('f-reporteddate').value = today
     const staffMember = params.get('staffMember') || ''
     if (staffMember) {
@@ -691,10 +700,14 @@
     }
     pdf.setTextColor(0)
 
-    const now = new Date().toISOString().slice(0, 10)
+    const nowDate = new Date()
+    const dd = String(nowDate.getDate()).padStart(2, '0')
+    const mm = String(nowDate.getMonth() + 1).padStart(2, '0')
+    const yyyy = String(nowDate.getFullYear())
+    const stamp = `${dd}-${mm}-${yyyy}`
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''
     const cleanName = nameVal.trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'participant'
-    return { pdf, fileName: `${filePrefix}-${cleanName}-${now}.pdf` }
+    return { pdf, fileName: `${filePrefix}-${cleanName}-${stamp}.pdf` }
   }
 
 
@@ -780,8 +793,10 @@
 
     const today = new Date().toISOString().split('T')[0]
     const dateField = document.getElementById('f-date')
+    const timeField = document.getElementById('f-time')
     const reportedDateField = document.getElementById('f-reporteddate')
     if (dateField && !dateField.value) dateField.value = today
+    if (timeField && !timeField.value) timeField.value = currentTimeValue()
     if (reportedDateField && !reportedDateField.value) reportedDateField.value = today
 
     toggleRiddorDetails()
