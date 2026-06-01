@@ -1692,7 +1692,7 @@ export default function App() {
     <div className="min-h-screen bg-[#f5f3ef]">
       <Nav page={page} onNavigate={navigate} onLogout={logout} visibleTabIds={allowedTabIds} />
       <main className="pt-14 md:pt-0 md:ml-56">
-        <div className="max-w-5xl mx-auto px-4 py-6">
+        <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 xl:px-8 py-6">
           {attendanceError && (
             <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
               <p className="text-sm text-rose-800 font-medium">{attendanceError}</p>
