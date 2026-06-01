@@ -5,6 +5,7 @@ import IncidentForm from './IncidentForm'
 import ParticipantNameText from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
+import { getFreshAccessToken } from '../utils/authToken'
 
 function getNextDateKey(isoString) {
   const date = new Date(isoString)
@@ -301,12 +302,7 @@ export default function ParticipantDetail({
   }
 
   async function fetchSafeguardingDownloadUrlByIncidentId(incidentId) {
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
-
-    if (!accessToken) {
-      throw new Error('You must be logged in to access safeguarding reports')
-    }
+    const accessToken = await getFreshAccessToken()
 
     const response = await fetch('/.netlify/functions/safeguarding-reports', {
       method: 'POST',
@@ -326,8 +322,7 @@ export default function ParticipantDetail({
   }
 
   async function syncSafeguardingReportStatus(incidentId, action) {
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
+    const accessToken = await getFreshAccessToken()
 
     if (!accessToken || !incidentId) return
 
@@ -1123,11 +1118,7 @@ export default function ParticipantDetail({
   }
 
   async function withAccessToken() {
-    const { data, error } = await supabase.auth.getSession()
-    if (error || !data.session?.access_token) {
-      throw new Error('No active auth session')
-    }
-    return data.session.access_token
+    return getFreshAccessToken()
   }
 
   async function loadShareUsers() {

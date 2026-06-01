@@ -76,10 +76,18 @@
 
   /* Body diagram */
   .body-diagram-wrapper { display: flex; gap: 18px; align-items: flex-start; }
-  .body-svg { cursor: crosshair; border: 1.5px solid #e0e0e0; border-radius: 6px; background: #fafafa; display: block; }
-  .body-part { fill: #e8e8e8; stroke: #bbb; stroke-width: 1.5; transition: fill 0.15s; }
-  .body-part:hover { fill: #ffd5d5; stroke: #c0392b; }
-  .body-part.marked { fill: #e74c3c; stroke: #922b21; }
+  .body-svg { cursor: crosshair; border: 1.5px solid #e0e0e0; border-radius: 6px; background: #f3f3f3; display: block; }
+  .body-outline {
+    fill: #fff;
+    stroke: #1f1f1f;
+    stroke-width: 2.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+  .body-part { fill: rgba(255,255,255,0.01); stroke: transparent; stroke-width: 1.2; transition: fill 0.15s, stroke 0.15s; }
+  .body-part:hover { fill: rgba(231, 76, 60, 0.24); stroke: #c0392b; }
+  .body-part.marked { fill: rgba(231, 76, 60, 0.58); stroke: #922b21; }
   .diagram-hint { font-size: 10px; color: #aaa; font-style: italic; margin-top: 4px; text-align: center; }
   .area-tag { display: inline-block; background: #fdf0f0; border: 1px solid #e74c3c; color: #c0392b; border-radius: 10px; padding: 2px 8px; font-size: 11px; margin: 1px; }
   .clear-marks { background: none; border: 1px solid #ddd; color: #aaa; border-radius: 5px; padding: 3px 10px; font-size: 11px; cursor: pointer; margin-top: 4px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
@@ -228,26 +236,27 @@
     <div class="body-diagram-wrapper">
       <div style="flex:0 0 auto;">
         <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
-          <ellipse class="body-part" cx="90" cy="30" rx="24" ry="28" data-label="Head"/>
-          <rect class="body-part" x="80" y="56" width="20" height="14" rx="4" data-label="Neck"/>
-          <ellipse class="body-part" cx="55" cy="78" rx="16" ry="12" data-label="Left shoulder"/>
-          <ellipse class="body-part" cx="125" cy="78" rx="16" ry="12" data-label="Right shoulder"/>
-          <rect class="body-part" x="65" y="68" width="50" height="70" rx="6" data-label="Chest/torso"/>
-          <rect class="body-part" x="38" y="88" width="18" height="36" rx="6" data-label="Left upper arm"/>
-          <rect class="body-part" x="124" y="88" width="18" height="36" rx="6" data-label="Right upper arm"/>
-          <rect class="body-part" x="34" y="128" width="16" height="34" rx="6" data-label="Left forearm"/>
-          <rect class="body-part" x="130" y="128" width="16" height="34" rx="6" data-label="Right forearm"/>
-          <ellipse class="body-part" cx="42" cy="174" rx="10" ry="12" data-label="Left hand"/>
-          <ellipse class="body-part" cx="138" cy="174" rx="10" ry="12" data-label="Right hand"/>
-          <rect class="body-part" x="68" y="138" width="44" height="30" rx="4" data-label="Abdomen"/>
-          <rect class="body-part" x="66" y="170" width="22" height="50" rx="6" data-label="Left thigh"/>
-          <rect class="body-part" x="92" y="170" width="22" height="50" rx="6" data-label="Right thigh"/>
-          <ellipse class="body-part" cx="77" cy="228" rx="12" ry="10" data-label="Left knee"/>
-          <ellipse class="body-part" cx="103" cy="228" rx="12" ry="10" data-label="Right knee"/>
-          <rect class="body-part" x="67" y="238" width="18" height="40" rx="5" data-label="Left shin"/>
-          <rect class="body-part" x="95" y="238" width="18" height="40" rx="5" data-label="Right shin"/>
-          <ellipse class="body-part" cx="74" cy="288" rx="14" ry="10" data-label="Left foot"/>
-          <ellipse class="body-part" cx="106" cy="288" rx="14" ry="10" data-label="Right foot"/>
+          <path class="body-outline" d="M90 20 C104 20 114 30 114 44 C114 56 104 66 90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
+          <ellipse class="body-part" cx="90" cy="44" rx="23" ry="25" data-label="Head"/>
+          <rect class="body-part" x="82" y="68" width="16" height="11" rx="4" data-label="Neck"/>
+          <ellipse class="body-part" cx="66" cy="88" rx="12" ry="10" data-label="Left shoulder"/>
+          <ellipse class="body-part" cx="114" cy="88" rx="12" ry="10" data-label="Right shoulder"/>
+          <path class="body-part" d="M70 80 L110 80 L114 126 L102 166 L78 166 L66 126 Z" data-label="Chest/torso"/>
+          <path class="body-part" d="M56 97 L68 104 L64 136 L50 132 L48 112 Z" data-label="Left upper arm"/>
+          <path class="body-part" d="M124 97 L132 112 L130 132 L116 136 L112 104 Z" data-label="Right upper arm"/>
+          <path class="body-part" d="M49 132 L63 136 L60 152 L47 160 L39 149 Z" data-label="Left forearm"/>
+          <path class="body-part" d="M117 136 L131 132 L141 149 L133 160 L120 152 Z" data-label="Right forearm"/>
+          <ellipse class="body-part" cx="44" cy="160" rx="8" ry="10" data-label="Left hand"/>
+          <ellipse class="body-part" cx="136" cy="160" rx="8" ry="10" data-label="Right hand"/>
+          <path class="body-part" d="M78 146 L102 146 L100 176 L80 176 Z" data-label="Abdomen"/>
+          <path class="body-part" d="M80 176 L90 176 L85 220 L68 252 L58 252 L72 210 Z" data-label="Left thigh"/>
+          <path class="body-part" d="M90 176 L100 176 L108 210 L122 252 L112 252 L95 220 Z" data-label="Right thigh"/>
+          <ellipse class="body-part" cx="70" cy="224" rx="8" ry="7" data-label="Left knee"/>
+          <ellipse class="body-part" cx="110" cy="224" rx="8" ry="7" data-label="Right knee"/>
+          <path class="body-part" d="M58 252 L68 252 L66 271 L52 271 Z" data-label="Left shin"/>
+          <path class="body-part" d="M112 252 L122 252 L128 271 L114 271 Z" data-label="Right shin"/>
+          <ellipse class="body-part" cx="51" cy="262" rx="15" ry="10" data-label="Left foot"/>
+          <ellipse class="body-part" cx="129" cy="262" rx="15" ry="10" data-label="Right foot"/>
           <text x="90" y="310" text-anchor="middle" font-size="9" fill="#bbb" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Click to mark</text>
         </svg>
         <div class="diagram-hint">Click areas to mark</div>
@@ -296,10 +305,9 @@
     </div>
   </div>
 
-  <!-- F: ACTION TAKEN -->
+  <!-- F: MONITORING & OUTCOMES -->
   <div class="section">
-    <div class="section-title">Action taken</div>
-    <div class="field"><label>Action taken</label><textarea id="f-action" placeholder="All steps taken in response..."></textarea></div>
+    <div class="section-title">Monitoring and outcomes</div>
     <div class="field"><label>Anything requiring monitoring</label><textarea id="f-monitoring" style="min-height:44px;" placeholder="Ongoing monitoring notes..."></textarea></div>
     <div class="field">
       <label>Outcome checklist</label>
@@ -545,7 +553,6 @@
 
     const idLabelMap = {
       'f-whathappened': 'What happened',
-      'f-action': 'Action taken',
       'f-monitoring': 'Anything requiring monitoring',
       'f-location-detail': 'Room/Area in building',
       'f-activity': 'Activity at time of incident',
@@ -1009,7 +1016,6 @@
       '</div>',
       '<div class="export-summary-notes">',
       `<div class="export-summary-note"><span class="export-summary-label">What happened:</span>${summaryText(summaryValue('f-whathappened'), 260)}</div>`,
-      `<div class="export-summary-note"><span class="export-summary-label">Action taken:</span>${summaryText(summaryValue('f-action'), 260)}</div>`,
       `<div class="export-summary-note"><span class="export-summary-label">Outcome checklist:</span>${summaryText(buildOutcomeSummary(), 280)}</div>`,
       '</div>',
       '<div class="export-sign-grid">',

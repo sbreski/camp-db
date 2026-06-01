@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { Upload, FileText, Download, Trash2, Lock, ShieldAlert } from 'lucide-react'
 import { toCsv } from '../utils/workflow'
+import { getFreshAccessToken } from '../utils/authToken'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 
 export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST' }) {
@@ -53,12 +54,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function fetchSafeguarding(action, body = {}) {
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
-
-    if (!accessToken) {
-      throw new Error('You must be logged in to access safeguarding reports')
-    }
+    const accessToken = await getFreshAccessToken()
 
     const response = await fetch('/.netlify/functions/safeguarding-reports', {
       method: body && Object.keys(body).length > 0 ? 'POST' : 'GET',

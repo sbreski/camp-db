@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { AlertTriangle, Plus, FileText, Search, ChevronRight, Trash2, Mail, Edit2, MessageSquare, Paperclip, Check, X } from 'lucide-react'
 import IncidentForm from './IncidentForm'
 import { supabase } from '../supabase'
+import { getFreshAccessToken } from '../utils/authToken'
 
 const REPORT_TYPE_ORDER = ['Incident/Accident', 'Safeguarding', 'Mid-Camp Assessment', 'SEND Assessment']
 const BLANK_INCIDENT_FORMS = [
@@ -265,12 +266,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function fetchSafeguardingDownloadUrlByIncidentId(incidentId) {
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
-
-    if (!accessToken) {
-      throw new Error('You must be logged in to access safeguarding reports')
-    }
+    const accessToken = await getFreshAccessToken()
 
     const response = await fetch('/.netlify/functions/safeguarding-reports', {
       method: 'POST',
@@ -290,8 +286,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
   }
 
   async function syncSafeguardingReportStatus(incidentId, action) {
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
+    const accessToken = await getFreshAccessToken()
 
     if (!accessToken || !incidentId) return
 
@@ -1187,9 +1182,6 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                         let body = `Dear ${p.parentName || 'Parent/Guardian'},\n\n`
                         body += `Please find attached a copy of the incident report relating to ${p.name}.\n\n`
                         body += `Incident type: ${inc.type}\nDate: ${new Date(inc.createdAt).toLocaleDateString('en-GB')}\nReported by: ${inc.staffMember || 'Staff'}\n\n`
-                        if (inc.pdfName) {
-                          body += `The report (${inc.pdfName}) has been downloaded to your device — please attach it to this email before sending.\n\n`
-                        }
                         body += `Please do not hesitate to get in touch if you have any questions.\n\nKind regards,\nImpact Kidz Summer Camp`
 
                         const mailtoLink = `mailto:${encodeURIComponent(p.parentEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`

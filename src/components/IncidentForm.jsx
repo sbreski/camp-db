@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { X, Upload, CheckCircle } from 'lucide-react'
 import { supabase } from '../supabase.js'
+import { getFreshAccessToken } from '../utils/authToken'
 
 function templateKeyForType(type, templates) {
   return templates.find(t => t.type === type)?.key || 'incident-accident'
@@ -163,12 +164,7 @@ export default function IncidentForm({
   }
 
   async function saveSafeguardingReport(incidentId, payload) {
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
-
-    if (!accessToken) {
-      throw new Error('You must be logged in to save a safeguarding report')
-    }
+    const accessToken = await getFreshAccessToken()
 
     const response = await fetch('/.netlify/functions/safeguarding-reports', {
       method: 'POST',

@@ -3,6 +3,7 @@ import { Users, LogIn, LogOut, AlertTriangle, Clock, Stethoscope, RefreshCw } fr
 import ParticipantNameText from './ParticipantNameText'
 import { getFollowUpsDue } from '../utils/workflow'
 import { supabase } from '../supabase'
+import { getFreshAccessToken } from '../utils/authToken'
 
 const TIMETABLE_URL = 'https://docs.google.com/spreadsheets/d/1Ts4Z2fneVbuid-KLp8AjJzUlgEB2vUOIfs1aaLTSVGI/edit?usp=sharing'
 
@@ -104,10 +105,7 @@ export default function Dashboard({
     setResetRequestsError('')
 
     try {
-      const { data, error } = await supabase.auth.getSession()
-      if (error) throw error
-      const accessToken = data?.session?.access_token
-      if (!accessToken) throw new Error('No active session found')
+      const accessToken = await getFreshAccessToken()
 
       const response = await fetch('/api/admin-users', {
         headers: {

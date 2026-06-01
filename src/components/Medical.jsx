@@ -2,6 +2,7 @@ import { Download, Pill, Search, Share2, Upload } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import ParticipantNameText from './ParticipantNameText'
 import { supabase } from '../supabase'
+import { getFreshAccessToken } from '../utils/authToken'
 
 const ALLERGEN_OPTIONS = [
   'Milk',
@@ -394,9 +395,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
   async function loadShareUsers() {
     setShareUsersLoading(true)
     try {
-      const { data } = await supabase.auth.getSession()
-      const token = data.session?.access_token
-      if (!token) throw new Error('No active auth session')
+      const token = await getFreshAccessToken()
       const response = await fetch('/api/admin-users', { headers: { Authorization: `Bearer ${token}` } })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || 'Unable to load staff users')

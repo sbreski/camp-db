@@ -69,7 +69,9 @@ function parseJsonBody(body) {
 async function resolveCurrentUser(admin, token) {
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data?.user) {
-    throw new Error('Invalid auth token')
+    const authError = new Error(error?.message || 'Invalid auth token')
+    authError.statusCode = 401
+    throw authError
   }
   return data.user
 }
@@ -488,6 +490,6 @@ export async function handler(event) {
 
     return json(400, { error: 'Unknown action' })
   } catch (error) {
-    return json(500, { error: error.message || 'Unexpected server error' })
+    return json(error?.statusCode || 500, { error: error.message || 'Unexpected server error' })
   }
 }

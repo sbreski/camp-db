@@ -6,6 +6,7 @@ import {
   Paperclip, Calendar, Phone, Mail, AlertTriangle,
 } from 'lucide-react'
 import { supabase } from '../supabase'
+import { getFreshSession } from '../utils/authToken'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1016,10 +1017,9 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   }, [staffList, selected?.id])
 
   async function withAccessToken() {
-    const { data, error } = await supabase.auth.getSession()
-    if (error || !data.session?.access_token) throw new Error('No active auth session')
-    setCurrentUserEmail((data.session.user?.email || '').toLowerCase())
-    return data.session.access_token
+    const session = await getFreshSession()
+    setCurrentUserEmail((session.user?.email || '').toLowerCase())
+    return session.access_token
   }
 
   async function loadAccessUsers() {
