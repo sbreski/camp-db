@@ -1976,7 +1976,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
             <span className="text-right">Action</span>
           </div>
 
-          <div className="divide-y divide-stone-50">
+          <div className="divide-y divide-stone-50 pb-2">
             {visibleParticipants.map(p => {
               const rec = getRecord(p.id)
               const isIn = rec?.signIn && !rec?.signOut
