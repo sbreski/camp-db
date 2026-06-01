@@ -465,7 +465,6 @@
   <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Save form</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   const STORAGE_KEY = 'ik_general_assessment';
@@ -479,21 +478,41 @@
     const { jsPDF } = window.jspdf
     const PAGE_W_MM = 210
     const PAGE_H_MM = 297
-    const MARGIN_MM = 12
+    const MARGIN_MM = 14
     const CONTENT_W_MM = PAGE_W_MM - (MARGIN_MM * 2)
-    const BOTTOM_MM = 12
+    const BOTTOM_MM = 10
     const pdf = new jsPDF('p', 'mm', 'a4')
 
-    let y = 14
-    const lineStep = 4.6
+    let y = 16
+    const lineStep = 4.8
+    const COLORS = {
+      brand: [34, 61, 80],
+      sectionFill: [243, 247, 250],
+      sectionText: [30, 52, 68],
+      label: [75, 75, 75],
+      text: [30, 30, 30],
+      line: [214, 222, 230],
+      muted: [100, 100, 100],
+    }
 
     const clean = (text) => String(text || '').replace(/\s+/g, ' ').trim()
 
     const ensureSpace = (neededMm = lineStep) => {
       if ((y + neededMm) > (PAGE_H_MM - BOTTOM_MM)) {
         pdf.addPage()
-        y = 14
+        y = 16
       }
+    }
+
+    const writeSectionHeader = (text) => {
+      ensureSpace(9)
+      pdf.setFillColor(...COLORS.sectionFill)
+      pdf.roundedRect(MARGIN_MM, y - 3.5, CONTENT_W_MM, 7, 1.4, 1.4, 'F')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(10)
+      pdf.setTextColor(...COLORS.sectionText)
+      pdf.text(clean(text), MARGIN_MM + 2, y + 1)
+      y += 7
     }
 
     const writeBlock = (text, opts = {}) => {
@@ -501,9 +520,11 @@
       if (!value) return
       const size = opts.size || 10
       const weight = opts.weight || 'normal'
+      const color = opts.color || COLORS.text
       const gapAfter = opts.gapAfter ?? 1.5
       pdf.setFont('helvetica', weight)
       pdf.setFontSize(size)
+      pdf.setTextColor(...color)
       const lines = pdf.splitTextToSize(value, CONTENT_W_MM)
       for (const line of lines) {
         ensureSpace(lineStep)
@@ -511,6 +532,30 @@
         y += lineStep
       }
       y += gapAfter
+    }
+
+    const writeFieldRow = (row) => {
+      const splitAt = row.indexOf(':')
+      const label = splitAt >= 0 ? clean(row.slice(0, splitAt)) : 'Field'
+      const value = splitAt >= 0 ? clean(row.slice(splitAt + 1)) : clean(row)
+      if (!value) return
+      ensureSpace(8)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.setTextColor(...COLORS.label)
+      pdf.text(label, MARGIN_MM, y)
+      y += 4
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+      pdf.setTextColor(...COLORS.text)
+      const lines = pdf.splitTextToSize(value, CONTENT_W_MM - 2)
+      for (const line of lines) {
+        ensureSpace(lineStep)
+        pdf.text(line, MARGIN_MM + 1.5, y)
+        y += lineStep
+      }
+      y += 0.6
     }
 
     const extractLabel = (el) => {
@@ -549,8 +594,12 @@
     }
 
     const title = clean(formRoot.querySelector('.title-block h1, h1')?.textContent) || 'Form Export'
-    writeBlock(title, { size: 14, weight: 'bold', gapAfter: 2 })
-    writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 9, gapAfter: 3 })
+    writeBlock(title, { size: 16, weight: 'bold', color: COLORS.brand, gapAfter: 1 })
+    writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 8.5, color: COLORS.muted, gapAfter: 2.5 })
+
+    pdf.setDrawColor(...COLORS.line)
+    pdf.line(MARGIN_MM, y, PAGE_W_MM - MARGIN_MM, y)
+    y += 3
 
     const sections = Array.from(formRoot.querySelectorAll('.section'))
     const sectionNodes = sections.length ? sections : [formRoot]
@@ -580,10 +629,19 @@
       })
 
       if (!rows.length) return
-      writeBlock(sectionTitle, { size: 11, weight: 'bold', gapAfter: 1 })
-      rows.forEach(row => writeBlock(row, { size: 10, gapAfter: 0.8 }))
-      y += 1.5
+      writeSectionHeader(sectionTitle)
+      rows.forEach(writeFieldRow)
+      y += 1.8
     })
+
+    const totalPages = pdf.getNumberOfPages()
+    for (let page = 1; page <= totalPages; page += 1) {
+      pdf.setPage(page)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8)
+      pdf.setTextColor(...COLORS.muted)
+      pdf.text(`${title}  |  Page ${page} of ${totalPages}`, PAGE_W_MM - MARGIN_MM, PAGE_H_MM - 4.5, { align: 'right' })
+    }
 
     const now = new Date().toISOString().slice(0, 10)
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''

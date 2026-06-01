@@ -486,7 +486,6 @@
   <button type="button" class="btn btn-send" onclick="sendPdfToCampDb()">Save form</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   const STORAGE_KEY = 'ik_send_assessment';
@@ -503,10 +502,11 @@
     const MARGIN_MM = 12
     const CONTENT_W_MM = PAGE_W_MM - (MARGIN_MM * 2)
     const BOTTOM_MM = 12
+    const LABEL_COL_MM = 56
     const pdf = new jsPDF('p', 'mm', 'a4')
 
     let y = 14
-    const lineStep = 4.6
+    const lineStep = 4.8
 
     const clean = (text) => String(text || '').replace(/\s+/g, ' ').trim()
 
@@ -532,6 +532,46 @@
         y += lineStep
       }
       y += gapAfter
+    }
+
+    const writeSectionHeader = (text) => {
+      const value = clean(text)
+      if (!value) return
+      ensureSpace(9)
+      pdf.setFillColor(243, 246, 250)
+      pdf.setDrawColor(212, 220, 230)
+      pdf.rect(MARGIN_MM, y - 2.7, CONTENT_W_MM, 6.4, 'FD')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(10.5)
+      pdf.text(value, MARGIN_MM + 2, y + 1.7)
+      y += 8
+    }
+
+    const writeFieldRow = (label, value) => {
+      const left = clean(label)
+      const right = clean(value)
+      if (!right) return
+      const leftWidth = Math.max(34, LABEL_COL_MM - 2)
+      const rightX = MARGIN_MM + LABEL_COL_MM
+      const rightW = CONTENT_W_MM - LABEL_COL_MM
+      const leftLines = pdf.splitTextToSize(left || 'Field', leftWidth)
+      const rightLines = pdf.splitTextToSize(right, rightW)
+      const rows = Math.max(leftLines.length, rightLines.length)
+      for (let i = 0; i < rows; i += 1) {
+        ensureSpace(lineStep)
+        if (i < leftLines.length) {
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(9)
+          pdf.text(leftLines[i], MARGIN_MM, y)
+        }
+        if (i < rightLines.length) {
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(10)
+          pdf.text(rightLines[i], rightX, y)
+        }
+        y += lineStep
+      }
+      y += 0.8
     }
 
     const extractLabel = (el) => {
@@ -570,8 +610,11 @@
     }
 
     const title = clean(formRoot.querySelector('.title-block h1, h1')?.textContent) || 'Form Export'
-    writeBlock(title, { size: 14, weight: 'bold', gapAfter: 2 })
-    writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 9, gapAfter: 3 })
+    writeBlock(title, { size: 16, weight: 'bold', gapAfter: 1.2 })
+    writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 9, gapAfter: 2.5 })
+    pdf.setDrawColor(208, 216, 227)
+    pdf.line(MARGIN_MM, y - 0.8, PAGE_W_MM - MARGIN_MM, y - 0.8)
+    y += 1.3
 
     const sections = Array.from(formRoot.querySelectorAll('.section'))
     const sectionNodes = sections.length ? sections : [formRoot]
@@ -592,19 +635,29 @@
           if (!checked) return
           const label = extractLabel(checked)
           const value = clean(checked.value) || 'Selected'
-          if (label && value) rows.push(`${label}: ${value}`)
+          if (label && value) rows.push({ label, value })
           return
         }
         const label = extractLabel(el)
         const value = extractControlValue(el)
-        if (label && value) rows.push(`${label}: ${value}`)
+        if (label && value) rows.push({ label, value })
       })
 
       if (!rows.length) return
-      writeBlock(sectionTitle, { size: 11, weight: 'bold', gapAfter: 1 })
-      rows.forEach(row => writeBlock(row, { size: 10, gapAfter: 0.8 }))
-      y += 1.5
+      writeSectionHeader(sectionTitle)
+      rows.forEach(row => writeFieldRow(row.label, row.value))
+      y += 1.8
     })
+
+    const totalPages = pdf.getNumberOfPages()
+    for (let i = 1; i <= totalPages; i += 1) {
+      pdf.setPage(i)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8.5)
+      pdf.setTextColor(120)
+      pdf.text(`Page ${i} of ${totalPages}`, PAGE_W_MM - MARGIN_MM, PAGE_H_MM - 6, { align: 'right' })
+    }
+    pdf.setTextColor(0)
 
     const now = new Date().toISOString().slice(0, 10)
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''
