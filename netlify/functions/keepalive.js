@@ -12,9 +12,6 @@ function json(statusCode, payload) {
 }
 
 function getTokenFromEvent(event) {
-  const queryToken = String(event.queryStringParameters?.token || '').trim()
-  if (queryToken) return queryToken
-
   const headerToken = String(
     event.headers?.['x-keepalive-token']
       || event.headers?.['X-Keepalive-Token']

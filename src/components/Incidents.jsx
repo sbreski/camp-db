@@ -55,6 +55,42 @@ function incidentDocumentsForIncident(incident) {
   return Array.isArray(docs) ? docs : []
 }
 
+function resolveStoredPath(value) {
+  return String(value?.storagePath || value?.storage_path || value?.filepath || '').trim()
+}
+
+function isAllowedLegacyUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return false
+  if (raw.startsWith('blob:')) return true
+
+  try {
+    const parsed = new URL(raw, window.location.origin)
+    return parsed.origin === window.location.origin || /(^|\.)supabase\.co$/i.test(parsed.hostname)
+  } catch (_error) {
+    return false
+  }
+}
+
+async function openStoredFile(pathOrUrl) {
+  if (!pathOrUrl) throw new Error('No file available')
+  if (isAllowedLegacyUrl(pathOrUrl)) {
+    window.open(pathOrUrl, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  const { data, error } = await supabase.storage.from('documents').download(pathOrUrl)
+  if (error) throw error
+
+  const url = URL.createObjectURL(data)
+  const opened = window.open(url, '_blank', 'noopener,noreferrer')
+  if (!opened) {
+    URL.revokeObjectURL(url)
+    throw new Error('Popup blocked. Please allow popups for this site.')
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
 export default function Incidents({ incidents, setIncidents, participants, setParticipants, attendance = [], setAttendance, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewParticipant = false, logOnly = false, onNavigate, onView }) {
   const [showForm, setShowForm] = useState(false)
   const [selectedParticipant, setSelectedParticipant] = useState('')
@@ -320,12 +356,13 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         return
       }
 
-      if (!inc.pdfData) {
+      const filePath = resolveStoredPath(inc) || inc.pdfData
+      if (!filePath) {
         alert('No attached form found for this report.')
         return
       }
 
-      window.open(inc.pdfData, '_blank', 'noopener,noreferrer')
+      await openStoredFile(filePath)
     } catch (error) {
       alert(error.message || 'Unable to open report')
     } finally {
@@ -346,11 +383,21 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         }
         sourceUrl = await fetchSafeguardingDownloadUrlByIncidentId(inc.id)
       } else {
-        if (!inc.pdfData) {
+        const filePath = resolveStoredPath(inc) || inc.pdfData
+        if (!filePath) {
           alert('No attached form found for this report.')
           return
         }
-        sourceUrl = inc.pdfData
+
+        if (isAllowedLegacyUrl(filePath)) {
+          sourceUrl = filePath
+        } else {
+          const { data, error } = await supabase.storage.from('documents').download(filePath)
+          if (error) throw error
+          const blobUrl = URL.createObjectURL(data)
+          sourceUrl = blobUrl
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+        }
       }
 
       const response = await fetch(sourceUrl)
@@ -397,8 +444,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         throw error
       }
 
-      const { data } = supabase.storage.from(target.bucket).getPublicUrl(target.filePath)
-      return data?.publicUrl || ''
+      return target.filePath
     }
 
     throw new Error(lastError?.message || 'No storage bucket available for incident uploads.')
@@ -976,6 +1022,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                   ref={staffVisitorFormRef}
                   title="Staff and Visitor Incident Form"
                   src="/forms/staff-visitor-incident-reporting-form.html"
+                  sandbox="allow-scripts allow-forms allow-same-origin"
                   className="w-full h-[560px] border-0"
                 />
               </div>
@@ -1388,7 +1435,13 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                               {doc.deletedAt ? (
                                 <span className="text-stone-500 line-through">{doc.name}</span>
                               ) : (
-                                <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                                <button
+                                  type="button"
+                                  onClick={() => openStoredFile(resolveStoredPath(doc) || doc.url).catch(error => alert(error.message || 'Unable to open document'))}
+                                  className="underline text-forest-700 hover:text-forest-900"
+                                >
+                                  {doc.name}
+                                </button>
                               )}
                               <span className="text-stone-500">
                                 Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
@@ -1756,7 +1809,13 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                               {doc.deletedAt ? (
                                 <span className="text-stone-500 line-through">{doc.name}</span>
                               ) : (
-                                <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                                <button
+                                  type="button"
+                                  onClick={() => openStoredFile(resolveStoredPath(doc) || doc.url).catch(error => alert(error.message || 'Unable to open document'))}
+                                  className="underline text-forest-700 hover:text-forest-900"
+                                >
+                                  {doc.name}
+                                </button>
                               )}
                               <span className="text-stone-500">
                                 Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
@@ -1922,6 +1981,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                   ref={staffVisitorFormRef}
                   title="Staff and Visitor Incident Form"
                   src="/forms/staff-visitor-incident-reporting-form.html"
+                  sandbox="allow-scripts allow-forms allow-same-origin"
                   className="w-full h-[560px] border-0"
                 />
               </div>

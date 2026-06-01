@@ -126,14 +126,17 @@ Supabase free projects can pause after 7 days of inactivity. This repo now inclu
 	- `SUPABASE_SERVICE_ROLE_KEY` (already required by existing admin functions)
 	- `VITE_SUPABASE_URL` (or `SUPABASE_URL`)
 2. In GitHub repository settings, add secret:
-	- `KEEPALIVE_URL`
+	- `KEEPALIVE_URL` (the function URL without any token query string)
+	- `KEEPALIVE_TOKEN`
 3. Set `KEEPALIVE_URL` to:
 
 ```text
-https://impactkidz.netlify.app/.netlify/functions/keepalive?token=YOUR_KEEPALIVE_TOKEN
+https://impactkidz.netlify.app/.netlify/functions/keepalive
 ```
 
-4. In GitHub Actions, run the `Supabase Keepalive` workflow once manually (`workflow_dispatch`) to confirm setup.
+4. Set `KEEPALIVE_TOKEN` to the same long random string used in Netlify.
+
+5. In GitHub Actions, run the `Supabase Keepalive` workflow once manually (`workflow_dispatch`) to confirm setup.
 
 If the workflow returns HTTP 200, your Supabase project will stay active.
 

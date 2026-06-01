@@ -997,14 +997,19 @@ export default function App() {
     }
   }
 
-  // Reads the stored expiry for this device. If missing or already expired, creates a
-  // fresh 12-hour window from now. Call on page load and on SIGNED_IN events.
-  // A fresh login always creates a new entry because logout() removes it first.
+  // Reads the stored expiry for this device. If missing, creates a fresh session window.
+  // If the stored expiry is already past, the session is over and we sign out instead
+  // of extending it on reload.
   function initLocalSessionExpiry(userId) {
     if (!userId) return
     const now = Date.now()
     let expiresAt = readLocalSessionExpiry(userId)
-    if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+    if (Number.isFinite(expiresAt) && expiresAt <= now) {
+      logout()
+      return
+    }
+
+    if (!Number.isFinite(expiresAt)) {
       expiresAt = now + SESSION_MAX_DURATION_MS
       writeLocalSessionExpiry(userId, expiresAt)
     }

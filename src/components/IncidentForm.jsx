@@ -133,9 +133,8 @@ export default function IncidentForm({
         throw error
       }
 
-      const { data } = supabase.storage.from(target.bucket).getPublicUrl(target.filePath)
       set('pdfName', fileDisplayName)
-      set('pdfData', data?.publicUrl || null)
+      set('pdfData', target.filePath)
       set('pdfPayload', null)
       return
     }
@@ -436,6 +435,7 @@ export default function IncidentForm({
               <iframe
                 title={selectedTemplate.label}
                 src={iframeSrc}
+                sandbox="allow-scripts allow-forms allow-same-origin"
                 className="w-full h-[520px] border-0"
               />
             </div>

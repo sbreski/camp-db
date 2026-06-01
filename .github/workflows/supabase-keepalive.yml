@@ -14,9 +14,15 @@ jobs:
       - name: Ping keepalive endpoint
         env:
           KEEPALIVE_URL: ${{ secrets.KEEPALIVE_URL }}
+          KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
         run: |
           if [ -z "$KEEPALIVE_URL" ]; then
             echo "Missing GitHub secret KEEPALIVE_URL"
+            exit 1
+          fi
+
+          if [ -z "$KEEPALIVE_TOKEN" ]; then
+            echo "Missing GitHub secret KEEPALIVE_TOKEN"
             exit 1
           fi
 
@@ -25,7 +31,7 @@ jobs:
 
           while [ "$attempt" -le "$max_attempts" ]; do
             echo "Pinging keepalive endpoint... attempt $attempt/$max_attempts"
-            http_code=$(curl -sS --max-time 20 -o response.json -w "%{http_code}" "$KEEPALIVE_URL")
+            http_code=$(curl -sS --max-time 20 -H "x-keepalive-token: $KEEPALIVE_TOKEN" -o response.json -w "%{http_code}" "$KEEPALIVE_URL")
 
             echo "HTTP status: $http_code"
             cat response.json

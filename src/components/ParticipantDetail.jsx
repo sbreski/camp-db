@@ -54,6 +54,23 @@ function participantDocumentsForParticipant(value) {
   return Array.isArray(docs) ? docs : []
 }
 
+function resolveStoredDocumentPath(doc) {
+  return String(doc?.storagePath || doc?.storage_path || doc?.filepath || '').trim()
+}
+
+function isAllowedLegacyDocumentUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return false
+  if (raw.startsWith('blob:')) return true
+
+  try {
+    const parsed = new URL(raw, window.location.origin)
+    return parsed.origin === window.location.origin || /(^|\.)supabase\.co$/i.test(parsed.hostname)
+  } catch (_error) {
+    return false
+  }
+}
+
 function fmt(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -487,7 +504,7 @@ export default function ParticipantDetail({
 
     setUploadingExtraIncidentId(incident.id)
     try {
-      const url = await uploadDocumentFile(file)
+      const storagePath = await uploadDocumentFile(file)
       const uploadedAt = new Date().toISOString()
 
       await setIncidents(prev => prev.map(inc => (
@@ -499,7 +516,7 @@ export default function ParticipantDetail({
                 {
                   id: crypto.randomUUID(),
                   name: file.name,
-                  url,
+                  storagePath,
                   uploadedAt,
                   uploadedBy: actorInitials,
                 },
@@ -870,8 +887,7 @@ export default function ParticipantDetail({
         throw error
       }
 
-      const { data } = supabase.storage.from(target.bucket).getPublicUrl(target.filePath)
-      return data?.publicUrl || ''
+      return target.filePath
     }
 
     throw new Error(lastError?.message || 'No storage bucket available for participant uploads.')
@@ -1057,12 +1073,12 @@ export default function ParticipantDetail({
 
     setUploadingParticipantDocument(true)
     try {
-      const url = await uploadDocumentFile(file)
+      const storagePath = await uploadDocumentFile(file)
       const uploadedAt = new Date().toISOString()
       const doc = {
         id: crypto.randomUUID(),
         name: file.name,
-        url,
+        storagePath,
         uploadedAt,
         uploadedBy: actorInitials,
       }
@@ -1231,6 +1247,28 @@ export default function ParticipantDetail({
     } catch (error) {
       setShareError(error.message || 'Unable to remove shared item')
     }
+  }
+
+  async function openStoredDocument(doc) {
+    const storagePath = resolveStoredDocumentPath(doc)
+    if (!storagePath) {
+      if (isAllowedLegacyDocumentUrl(doc?.url)) {
+        window.open(doc.url, '_blank', 'noopener,noreferrer')
+        return
+      }
+      throw new Error('No document path available')
+    }
+
+    const { data, error } = await supabase.storage.from('documents').download(storagePath)
+    if (error) throw error
+
+    const url = URL.createObjectURL(data)
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      URL.revokeObjectURL(url)
+      throw new Error('Popup blocked. Please allow popups for this site.')
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
 
   useEffect(() => {
@@ -1643,7 +1681,13 @@ export default function ParticipantDetail({
                         {doc.deletedAt ? (
                           <span className="text-stone-500 line-through">{doc.name}</span>
                         ) : (
-                          <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                          <button
+                            type="button"
+                            onClick={() => openStoredDocument(doc).catch(error => alert(error.message || 'Unable to open document'))}
+                            className="underline text-forest-700 hover:text-forest-900"
+                          >
+                            {doc.name}
+                          </button>
                         )}
                         <span className="text-stone-500">
                           Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {
@@ -2374,7 +2418,13 @@ export default function ParticipantDetail({
                                   {doc.deletedAt ? (
                                     <span className="text-stone-500 line-through">{doc.name}</span>
                                   ) : (
-                                    <a href={doc.url} target="_blank" rel="noreferrer" className="underline text-forest-700 hover:text-forest-900">{doc.name}</a>
+                                    <button
+                                      type="button"
+                                      onClick={() => openStoredDocument(doc).catch(error => alert(error.message || 'Unable to open document'))}
+                                      className="underline text-forest-700 hover:text-forest-900"
+                                    >
+                                      {doc.name}
+                                    </button>
                                   )}
                                   <span className="text-stone-500">
                                     Added {new Date(doc.uploadedAt).toLocaleDateString('en-GB', {

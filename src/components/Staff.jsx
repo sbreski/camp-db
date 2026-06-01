@@ -77,6 +77,23 @@ function addYearsToDate(dateStr, years) {
   return toYmd(date)
 }
 
+function resolveStoredDocumentPath(doc) {
+  return String(doc?.storagePath || doc?.storage_path || doc?.filepath || '').trim()
+}
+
+function isAllowedLegacyDocumentUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return false
+  if (raw.startsWith('blob:')) return true
+
+  try {
+    const parsed = new URL(raw, window.location.origin)
+    return parsed.origin === window.location.origin || /(^|\.)supabase\.co$/i.test(parsed.hostname)
+  } catch (_error) {
+    return false
+  }
+}
+
 function getDbsMeta(source) {
   const issueDate = source?.dbsIssueDate || source?.dbs_issue_date || ''
   const onUpdateService = Boolean(source?.dbsOnUpdateService ?? source?.dbs_on_update_service)
@@ -545,11 +562,10 @@ function StaffDetailPanel({
         .upload(path, file, { upsert: false })
       if (uploadError) throw uploadError
 
-      const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
       const doc = {
         id: crypto.randomUUID(),
         name: file.name,
-        url: urlData.publicUrl,
+        storagePath: path,
         uploadedAt: new Date().toISOString(),
         size: file.size,
       }
@@ -561,6 +577,28 @@ function StaffDetailPanel({
     } finally {
       setUploadingDoc(false)
     }
+  }
+
+  async function openStoredDocument(doc) {
+    const storagePath = resolveStoredDocumentPath(doc)
+    if (!storagePath) {
+      if (isAllowedLegacyDocumentUrl(doc?.url)) {
+        window.open(doc.url, '_blank', 'noopener,noreferrer')
+        return
+      }
+      throw new Error('No document path available')
+    }
+
+    const { data, error } = await supabase.storage.from('documents').download(storagePath)
+    if (error) throw error
+
+    const url = URL.createObjectURL(data)
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      URL.revokeObjectURL(url)
+      throw new Error('Popup blocked. Please allow popups for this site.')
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
 
   function removeDocument(docId) {
@@ -937,10 +975,13 @@ function StaffDetailPanel({
                         </p>
                       )}
                     </div>
-                    <a href={doc.url} target="_blank" rel="noreferrer"
-                      className="p-1.5 text-forest-600 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => openStoredDocument(doc).catch(error => alert(error.message || 'Unable to open document'))}
+                      className="p-1.5 text-forest-600 hover:text-forest-800 hover:bg-forest-50 rounded-lg transition-colors"
+                    >
                       <Download size={14} />
-                    </a>
+                    </button>
                     <button onClick={() => removeDocument(doc.id)}
                       className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                       <X size={14} />
