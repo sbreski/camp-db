@@ -543,7 +543,169 @@
       y += 0.8
     }
 
+    const idLabelMap = {
+      'f-whathappened': 'What happened',
+      'f-action': 'Action taken',
+      'f-monitoring': 'Anything requiring monitoring',
+      'f-location-detail': 'Room/Area in building',
+      'f-activity': 'Activity at time of incident',
+      'f-staff': 'Staff present (initials only)',
+      'f-firstaid': 'First aid given',
+      'f-injuryother': 'Injury details (other)',
+      'f-name': 'Full name',
+      'f-age': 'Age',
+      'f-date': 'Date',
+      'f-time': 'Time',
+      'f-reportedby': 'Reported by',
+      'f-reporteddate': 'Reported date',
+    }
+
+    const getCheckboxLabel = (el) => {
+      const wrapLabel = el.closest('label')
+      if (wrapLabel) {
+        const clone = wrapLabel.cloneNode(true)
+        clone.querySelectorAll('input, textarea, select').forEach(n => n.remove())
+        return clean(clone.textContent)
+      }
+      if (el.id) {
+        const linked = formRoot.querySelector(`label[for="${el.id}"]`)
+        if (linked) return clean(linked.textContent)
+      }
+      return clean(el.name || el.id || 'Selected item')
+    }
+
+    const getRadioGroupLabel = (checkedEl, groupName) => {
+      if (groupName === 'authorised') return 'Authorised activity'
+      if (groupName === 'side') return 'Side affected'
+      if (groupName === 'reporttype') return 'Incident type'
+      const field = checkedEl.closest('.field')
+      if (field) {
+        const directLabel = Array.from(field.children).find(n => n.tagName && n.tagName.toLowerCase() === 'label')
+        const text = clean(directLabel?.textContent)
+        if (text) return text
+      }
+      return extractLabel(checkedEl)
+    }
+
+    const buildBodyMapZones = (markedLabels) => {
+      const zones = {
+        head: false,
+        neck: false,
+        torso: false,
+        leftArm: false,
+        rightArm: false,
+        leftHand: false,
+        rightHand: false,
+        leftLeg: false,
+        rightLeg: false,
+        leftFoot: false,
+        rightFoot: false,
+      }
+
+      ;(markedLabels || []).forEach(raw => {
+        const label = clean(raw).toLowerCase()
+        if (!label) return
+        if (label.includes('head')) zones.head = true
+        if (label.includes('neck')) zones.neck = true
+        if (label.includes('chest') || label.includes('torso') || label.includes('abdomen')) zones.torso = true
+        if (label.includes('left shoulder') || label.includes('left upper arm') || label.includes('left forearm')) zones.leftArm = true
+        if (label.includes('right shoulder') || label.includes('right upper arm') || label.includes('right forearm')) zones.rightArm = true
+        if (label.includes('left hand')) zones.leftHand = true
+        if (label.includes('right hand')) zones.rightHand = true
+        if (label.includes('left thigh') || label.includes('left knee') || label.includes('left shin')) zones.leftLeg = true
+        if (label.includes('right thigh') || label.includes('right knee') || label.includes('right shin')) zones.rightLeg = true
+        if (label.includes('left foot')) zones.leftFoot = true
+        if (label.includes('right foot')) zones.rightFoot = true
+      })
+
+      return zones
+    }
+
+    const drawMiniBodyMapAt = (markedLabels, boxX, boxY, boxW = 62, boxH = 72) => {
+      const zones = buildBodyMapZones(markedLabels)
+      const cx = boxX + (boxW / 2)
+      const top = boxY + 12
+
+      pdf.setDrawColor(212, 220, 230)
+      pdf.setFillColor(250, 252, 254)
+      pdf.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'FD')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.text('Body map (summary)', boxX + 2, boxY + 6)
+
+      const drawPart = (isMarked, drawFn) => {
+        pdf.setFillColor(isMarked ? 231 : 235, isMarked ? 76 : 238, isMarked ? 60 : 241)
+        pdf.setDrawColor(isMarked ? 170 : 176, isMarked ? 52 : 186, isMarked ? 45 : 194)
+        drawFn()
+      }
+
+      drawPart(zones.head, () => pdf.circle(cx, top, 4, 'FD'))
+      drawPart(zones.neck, () => pdf.roundedRect(cx - 1.4, top + 4.5, 2.8, 3.2, 0.8, 0.8, 'FD'))
+      drawPart(zones.torso, () => pdf.roundedRect(cx - 7, top + 8, 14, 18, 1.6, 1.6, 'FD'))
+
+      drawPart(zones.leftArm, () => {
+        pdf.roundedRect(cx - 13.5, top + 9, 5, 10, 1.2, 1.2, 'FD')
+        pdf.roundedRect(cx - 14.5, top + 19.5, 4.5, 9.5, 1.2, 1.2, 'FD')
+      })
+      drawPart(zones.rightArm, () => {
+        pdf.roundedRect(cx + 8.5, top + 9, 5, 10, 1.2, 1.2, 'FD')
+        pdf.roundedRect(cx + 10, top + 19.5, 4.5, 9.5, 1.2, 1.2, 'FD')
+      })
+
+      drawPart(zones.leftHand, () => pdf.circle(cx - 12.2, top + 31.3, 2.2, 'FD'))
+      drawPart(zones.rightHand, () => pdf.circle(cx + 12.2, top + 31.3, 2.2, 'FD'))
+
+      drawPart(zones.leftLeg, () => {
+        pdf.roundedRect(cx - 6.6, top + 27.5, 5.6, 16, 1.2, 1.2, 'FD')
+        pdf.roundedRect(cx - 6.4, top + 43.6, 5.2, 12.2, 1.2, 1.2, 'FD')
+      })
+      drawPart(zones.rightLeg, () => {
+        pdf.roundedRect(cx + 1, top + 27.5, 5.6, 16, 1.2, 1.2, 'FD')
+        pdf.roundedRect(cx + 1.2, top + 43.6, 5.2, 12.2, 1.2, 1.2, 'FD')
+      })
+
+      drawPart(zones.leftFoot, () => pdf.ellipse(cx - 3.8, top + 58.6, 4, 1.8, 'FD'))
+      drawPart(zones.rightFoot, () => pdf.ellipse(cx + 3.8, top + 58.6, 4, 1.8, 'FD'))
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(8)
+      pdf.setTextColor(90)
+      const markedCount = (markedLabels || []).length
+      pdf.text(markedCount ? `${markedCount} area(s) marked` : 'No areas marked', boxX + 2, boxY + boxH - 3)
+      pdf.setTextColor(0)
+
+      return boxH
+    }
+
+    const writeFieldRowInColumn = (label, value, columnX, columnW, startY) => {
+      const left = clean(label)
+      const right = clean(value)
+      if (!right) return startY
+      const labelColW = Math.min(32, Math.max(24, columnW * 0.36))
+      const valueColW = columnW - labelColW - 2
+      const labelLines = pdf.splitTextToSize(left || 'Field', labelColW)
+      const valueLines = pdf.splitTextToSize(right, valueColW)
+      const rowLines = Math.max(labelLines.length, valueLines.length)
+
+      let rowY = startY
+      for (let i = 0; i < rowLines; i += 1) {
+        if (i < labelLines.length) {
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(9)
+          pdf.text(labelLines[i], columnX, rowY)
+        }
+        if (i < valueLines.length) {
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(10)
+          pdf.text(valueLines[i], columnX + labelColW + 2, rowY)
+        }
+        rowY += lineStep
+      }
+      return rowY + 0.8
+    }
+
     const extractLabel = (el) => {
+      if (el.id && idLabelMap[el.id]) return idLabelMap[el.id]
       if (el.id) {
         const linked = formRoot.querySelector(`label[for="${el.id}"]`)
         if (linked) {
@@ -578,7 +740,9 @@
       return clean(el.value)
     }
 
-    const title = clean(formRoot.querySelector('.title-block h1, h1')?.textContent) || 'Form Export'
+    const participantName = clean(document.getElementById('f-name')?.value) || 'Participant'
+    const incidentType = clean(document.querySelector('input[type="radio"][name="reporttype"]:checked')?.value) || 'Not selected'
+    const title = `Incident/Accident Form - ${participantName} (${incidentType})`
     writeBlock(title, { size: 16, weight: 'bold', gapAfter: 1.2 })
     writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 9, gapAfter: 2.5 })
     pdf.setDrawColor(208, 216, 227)
@@ -590,9 +754,22 @@
 
     sectionNodes.forEach((section, index) => {
       const sectionTitle = clean(section.querySelector('.section-title, .section-header, h2, h3, legend')?.textContent) || `Section ${index + 1}`
+      const sectionTitleLower = sectionTitle.toLowerCase()
+      if (sectionTitleLower === 'incident type') return
+      const isInjurySection = sectionTitleLower.includes('nature and location of injury')
+
       const controls = Array.from(section.querySelectorAll('input, textarea, select')).filter(el => !el.disabled)
       const rows = []
       const seenRadio = new Set()
+      const seenCheckboxGroups = new Set()
+      const marked = isInjurySection ? Array.from(markedParts || []) : []
+
+      if (isInjurySection) {
+        rows.push({
+          label: 'Body map markings',
+          value: marked.length ? marked.join(', ') : 'No areas marked on body map',
+        })
+      }
 
       controls.forEach(el => {
         const type = (el.type || '').toLowerCase()
@@ -602,18 +779,61 @@
           seenRadio.add(groupName)
           const checked = controls.find(c => (c.type || '').toLowerCase() === 'radio' && (c.name || c.id) === groupName && c.checked)
           if (!checked) return
-          const label = extractLabel(checked)
+          const label = getRadioGroupLabel(checked, groupName)
           const value = clean(checked.value) || 'Selected'
           if (label && value) rows.push({ label, value })
           return
         }
+
+        if (type === 'checkbox') {
+          const groupRoot = el.closest('.check-group, .checklist')
+          if (groupRoot) {
+            const groupKey = `${sectionTitle}::${Array.from(section.querySelectorAll('.check-group, .checklist')).indexOf(groupRoot)}`
+            if (seenCheckboxGroups.has(groupKey)) return
+            seenCheckboxGroups.add(groupKey)
+
+            const selected = Array.from(groupRoot.querySelectorAll('input[type="checkbox"]:checked')).map(getCheckboxLabel).filter(Boolean)
+            if (!selected.length) return
+            const field = groupRoot.closest('.field')
+            const headerLabel = clean(field?.querySelector('label')?.textContent) || 'Selected options'
+            rows.push({ label: headerLabel, value: selected.join(', ') })
+            return
+          }
+
+          if (!el.checked) return
+          const label = extractLabel(el)
+          if (label) rows.push({ label, value: 'Yes' })
+          return
+        }
+
         const label = extractLabel(el)
         const value = extractControlValue(el)
         if (label && value) rows.push({ label, value })
       })
 
-      if (!rows.length) return
+      if (!rows.length && !isInjurySection) return
       writeSectionHeader(sectionTitle)
+
+      if (isInjurySection) {
+        const gapMM = 6
+        const rightW = 62
+        const leftW = CONTENT_W_MM - rightW - gapMM
+        const leftX = MARGIN_MM
+        const rightX = MARGIN_MM + leftW + gapMM
+
+        // Keep injury details and body map on the same visual row.
+        ensureSpace(80)
+        const rowTopY = y
+        let leftY = rowTopY
+        rows.forEach(row => {
+          leftY = writeFieldRowInColumn(row.label, row.value, leftX, leftW, leftY)
+        })
+        const mapHeight = drawMiniBodyMapAt(marked, rightX, rowTopY, rightW, 72)
+        y = Math.max(leftY, rowTopY + mapHeight + 2)
+        y += 1.8
+        return
+      }
+
       rows.forEach(row => writeFieldRow(row.label, row.value))
       y += 1.8
     })
@@ -630,6 +850,7 @@
         y += 10
       })
 
+      y += 4
       writeSectionHeader('Camp Coordinator Sign-off')
       ;['Coordinator name', 'Signature', 'Date'].forEach(label => {
         ensureSpace(12)
