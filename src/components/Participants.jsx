@@ -5,6 +5,7 @@ import ImportParticipants from './ImportParticipants'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
+import { hasMeaningfulSendText } from '../utils/send'
 
 function photoConsentMode(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -1059,9 +1060,9 @@ export default function Participants({ participants, setParticipants, onView, ca
                   {/* Badges inline on mobile below the name */}
                   <div className="flex items-center gap-1 flex-wrap mt-1 sm:hidden">
                     {(() => {
-                      const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
+                      const hasSendDiagnosis = hasMeaningfulSendText(p.sendDiagnosis)
                       const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
-                      const hasSend = Boolean(String(p.sendNeeds || '').trim()) || hasDiagnosedSend
+                      const hasSend = hasMeaningfulSendText(p.sendNeeds) || hasDiagnosedSend
                       if (!hasSend) return null
                       return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
                     })()}
@@ -1080,9 +1081,9 @@ export default function Participants({ participants, setParticipants, onView, ca
                 {/* Badges on the right — desktop only */}
                 <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                   {(() => {
-                    const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
+                    const hasSendDiagnosis = hasMeaningfulSendText(p.sendDiagnosis)
                     const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
-                    const hasSend = Boolean(String(p.sendNeeds || '').trim()) || hasDiagnosedSend
+                    const hasSend = hasMeaningfulSendText(p.sendNeeds) || hasDiagnosedSend
                     if (!hasSend) return null
                     return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
                   })()}

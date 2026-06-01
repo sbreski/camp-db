@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Upload, X, CheckCircle, AlertCircle, FileText, Download } from 'lucide-react'
 import ViewportOverlay from './ViewportOverlay'
+import { hasMeaningfulSendText } from '../utils/send'
 
 // Map common header names to our field keys
 const FIELD_MAP = {
@@ -517,18 +518,8 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       }
 
       if (!Array.isArray(p.medicalType)) p.medicalType = []
-      if (p.sendDiagnosis && p.sendDiagnosed !== true) {
-        const diagnosisText = String(p.sendDiagnosis || '').trim().toLowerCase()
-        const isExplicitNo = diagnosisText === 'no'
-          || diagnosisText === 'none'
-          || diagnosisText === 'n/a'
-          || diagnosisText === 'na'
-          || diagnosisText.startsWith('no ')
-          || diagnosisText.startsWith('none ')
-
-        if (!isExplicitNo) {
-          p.sendDiagnosed = true
-        }
+      if (p.sendDiagnosed !== true && hasMeaningfulSendText(p.sendDiagnosis)) {
+        p.sendDiagnosed = true
       }
 
       return p
