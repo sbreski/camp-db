@@ -478,6 +478,10 @@
 
     const { jsPDF } = window.jspdf
     const SCALE = 2
+    const PAGE_W_MM = 210, PAGE_H_MM = 297
+    const MARGIN_MM = 0
+    const USABLE_W_MM = PAGE_W_MM - MARGIN_MM * 2
+    const USABLE_H_MM = PAGE_H_MM - MARGIN_MM * 2
 
     // Inject a temporary stylesheet to expand inputs in the live DOM so that
     // getBoundingClientRect() measurements match the canvas render output.
@@ -492,7 +496,6 @@
       'textarea { min-height: 30px !important; }',
       '.section { box-shadow: none !important; border: 1px solid #d8d8d8 !important; border-radius: 4px !important; }',
       '.action-bar, #saved_note, .intro, .title-block .subtitle { display: none !important; }',
-      'body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg, input, textarea, select { background: #fff !important; }',
     ].join('\n')
     document.head.appendChild(tempStyle)
 
@@ -533,9 +536,6 @@
       scrollY: -window.scrollY,
       onclone: (doc) => {
         doc.querySelectorAll('.action-bar, #saved_note, .intro, .title-block .subtitle').forEach(e => e.style.display = 'none')
-        doc.querySelectorAll('body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg').forEach(e => {
-          e.style.background = '#fff'
-        })
         doc.querySelectorAll('.section').forEach(e => {
           e.style.boxShadow = 'none'
           e.style.border = '1px solid #d8d8d8'
@@ -559,13 +559,57 @@
     // Remove the temporary measurement style.
     document.head.removeChild(tempStyle)
 
-    // Export at full captured size to avoid squashing content into fixed A4 pagination.
-    const pxToMm = (25.4 / 96) / SCALE
-    const pageWmm = Math.max(120, canvas.width * pxToMm)
-    const pageHmm = Math.max(120, canvas.height * pxToMm)
-    const orientation = pageWmm > pageHmm ? 'l' : 'p'
-    const pdf = new jsPDF({ orientation, unit: 'mm', format: [pageWmm, pageHmm] })
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWmm, pageHmm)
+    // Derive canvas-px to mm scale for full-width A4 portrait output.
+    const cssW_mm = (canvas.width / SCALE) * (25.4 / 96)
+    const pxToMm = ((25.4 / 96) / SCALE) * (USABLE_W_MM / cssW_mm)
+    const USABLE_H_px = USABLE_H_MM / pxToMm
+
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const totalH_px = canvas.height
+    let pageStartPx = 0
+    let isFirst = true
+
+    while (pageStartPx < totalH_px - 1) {
+      if (!isFirst) pdf.addPage()
+      isFirst = false
+
+      const idealCutPx = pageStartPx + USABLE_H_px
+      let cutPx
+
+      if (idealCutPx >= totalH_px) {
+        cutPx = totalH_px
+      } else {
+        const fullyFitting = atoms.filter(a => a.top_px >= pageStartPx && a.bottom_px <= idealCutPx)
+        if (fullyFitting.length > 0) {
+          cutPx = fullyFitting[fullyFitting.length - 1].bottom_px
+        } else {
+          const nextAtom = atoms.find(a => a.top_px > pageStartPx + 1)
+          cutPx = (nextAtom && nextAtom.top_px < idealCutPx) ? nextAtom.top_px : idealCutPx
+        }
+      }
+
+      if (cutPx <= pageStartPx) cutPx = Math.min(pageStartPx + USABLE_H_px, totalH_px)
+
+      const sliceTopPx = Math.max(0, Math.floor(pageStartPx))
+      let sliceBottomPx = Math.min(totalH_px, Math.floor(cutPx))
+      if (sliceBottomPx <= sliceTopPx) {
+        sliceBottomPx = Math.min(totalH_px, sliceTopPx + Math.max(1, Math.floor(USABLE_H_px)))
+      }
+
+      const sliceH_px = sliceBottomPx - sliceTopPx
+      const sliceCanvas = document.createElement('canvas')
+      sliceCanvas.width = canvas.width
+      sliceCanvas.height = sliceH_px
+      const ctx = sliceCanvas.getContext('2d')
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(0, 0, canvas.width, sliceH_px)
+      ctx.drawImage(canvas, 0, sliceTopPx, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
+
+      const sliceH_mm = sliceH_px * pxToMm
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', MARGIN_MM, MARGIN_MM, USABLE_W_MM, sliceH_mm)
+
+      pageStartPx = sliceBottomPx
+    }
 
     const now = new Date().toISOString().slice(0, 10)
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''

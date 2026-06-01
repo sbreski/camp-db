@@ -469,7 +469,7 @@
 
     const { jsPDF } = window.jspdf
     const PAGE_W_MM = 210, PAGE_H_MM = 297
-    const MARGIN_MM = 10
+    const MARGIN_MM = 0
     const USABLE_W_MM = PAGE_W_MM - MARGIN_MM * 2
     const USABLE_H_MM = PAGE_H_MM - MARGIN_MM * 2
     const SCALE = 2
@@ -493,8 +493,12 @@
       '.export-summary-label { font-weight: 700 !important; color: #555 !important; margin-right: 4px !important; }',
       '.export-summary-notes { margin-top: 8px !important; display: grid !important; gap: 6px !important; }',
       '.export-summary-note { font-size: 11px !important; border: 1px solid #e3e3e3 !important; border-radius: 6px !important; padding: 6px 8px !important; line-height: 1.5 !important; }',
+      '.export-sign-grid { margin-top: 10px !important; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }',
+      '.export-sign-card { border: 1px solid #e3e3e3 !important; border-radius: 6px !important; padding: 8px !important; }',
+      '.export-sign-title { font-size: 11px !important; font-weight: 700 !important; color: #444 !important; margin-bottom: 8px !important; }',
+      '.export-sign-line { border-bottom: 1px solid #aaa !important; height: 18px !important; margin-bottom: 5px !important; }',
+      '.export-sign-caption { font-size: 10px !important; color: #777 !important; }',
       '.action-bar, #saved_note, .intro, .title-block .subtitle { display: none !important; }',
-      'body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg, input, textarea, select { background: #fff !important; }',
     ].join('\n')
     document.head.appendChild(tempStyle)
 
@@ -536,9 +540,6 @@
       scrollY: -window.scrollY,
       onclone: (doc) => {
         doc.querySelectorAll('.action-bar, #saved_note, .intro, .title-block .subtitle').forEach(e => e.style.display = 'none')
-        doc.querySelectorAll('body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg').forEach(e => {
-          e.style.background = '#fff'
-        })
         doc.querySelectorAll('.section').forEach(e => {
           e.style.boxShadow = 'none'
           e.style.border = '1px solid #d8d8d8'
@@ -682,6 +683,20 @@
       `<div class="export-summary-note"><span class="export-summary-label">What happened:</span>${summaryText(summaryValue('f-whathappened'), 260)}</div>`,
       `<div class="export-summary-note"><span class="export-summary-label">Action taken:</span>${summaryText(summaryValue('f-action'), 260)}</div>`,
       `<div class="export-summary-note"><span class="export-summary-label">Outcome checklist:</span>${summaryText(buildOutcomeSummary(), 280)}</div>`,
+      '</div>',
+      '<div class="export-sign-grid">',
+      '<div class="export-sign-card">',
+      '<div class="export-sign-title">Parent / Carer Sign-off</div>',
+      '<div class="export-sign-line"></div><div class="export-sign-caption">Parent/Carer name</div>',
+      '<div class="export-sign-line"></div><div class="export-sign-caption">Signature</div>',
+      '<div class="export-sign-line"></div><div class="export-sign-caption">Date</div>',
+      '</div>',
+      '<div class="export-sign-card">',
+      '<div class="export-sign-title">Camp Coordinator Sign-off</div>',
+      '<div class="export-sign-line"></div><div class="export-sign-caption">Coordinator name</div>',
+      '<div class="export-sign-line"></div><div class="export-sign-caption">Signature</div>',
+      '<div class="export-sign-line"></div><div class="export-sign-caption">Date</div>',
+      '</div>',
       '</div>',
     ].join('')
 
