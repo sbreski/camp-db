@@ -485,6 +485,14 @@
       '  white-space: normal !important; box-sizing: border-box !important;',
       '}',
       'textarea { min-height: 30px !important; }',
+      '.section { box-shadow: none !important; border: 1px solid #d8d8d8 !important; border-radius: 4px !important; }',
+      '.export-summary { background: #fff !important; border: 2px solid #c0392b !important; border-radius: 8px !important; margin: 0 0 14px !important; padding: 12px 14px !important; }',
+      '.export-summary-title { font-size: 13px !important; font-weight: 700 !important; color: #c0392b !important; margin-bottom: 8px !important; }',
+      '.export-summary-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px 12px !important; }',
+      '.export-summary-item { font-size: 11px !important; color: #222 !important; line-height: 1.45 !important; }',
+      '.export-summary-label { font-weight: 700 !important; color: #555 !important; margin-right: 4px !important; }',
+      '.export-summary-notes { margin-top: 8px !important; display: grid !important; gap: 6px !important; }',
+      '.export-summary-note { font-size: 11px !important; border: 1px solid #e3e3e3 !important; border-radius: 6px !important; padding: 6px 8px !important; line-height: 1.5 !important; }',
       '.action-bar, #saved_note, .intro, .title-block .subtitle { display: none !important; }',
       'body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg, input, textarea, select { background: #fff !important; }',
     ].join('\n')
@@ -499,7 +507,9 @@
     // but never within one. Grid containers are treated as single atoms so their
     // cells are always kept on the same row.
     const ATOM_SEL = [
-      '.field', '.section-title', '.header-banner', '.title-block',
+      '.field', '.section-title', '.section-header', '.header-banner', '.title-block',
+      '.consideration', '.criterion', '.conclusion-option', '.section-note',
+      '.export-summary',
       '.body-diagram-wrapper', '.checklist', '.signoff-row',
       '.two-col', '.three-col', '.four-col',
     ].join(', ')
@@ -528,6 +538,11 @@
         doc.querySelectorAll('.action-bar, #saved_note, .intro, .title-block .subtitle').forEach(e => e.style.display = 'none')
         doc.querySelectorAll('body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg').forEach(e => {
           e.style.background = '#fff'
+        })
+        doc.querySelectorAll('.section').forEach(e => {
+          e.style.boxShadow = 'none'
+          e.style.border = '1px solid #d8d8d8'
+          e.style.borderRadius = '4px'
         })
         doc.querySelectorAll('input, textarea, select').forEach(e => {
           e.style.background = '#fff'
@@ -583,19 +598,26 @@
       // Safety: always advance to prevent infinite loops.
       if (cutPx <= pageStartPx) cutPx = Math.min(pageStartPx + USABLE_H_px, totalH_px)
 
-      const sliceH_px = Math.round(cutPx - pageStartPx)
+      // Use integer pixel boundaries so adjacent pages meet exactly with no overlap/gaps.
+      const sliceTopPx = Math.max(0, Math.floor(pageStartPx))
+      let sliceBottomPx = Math.min(totalH_px, Math.floor(cutPx))
+      if (sliceBottomPx <= sliceTopPx) {
+        sliceBottomPx = Math.min(totalH_px, sliceTopPx + Math.max(1, Math.floor(USABLE_H_px)))
+      }
+
+      const sliceH_px = sliceBottomPx - sliceTopPx
       const sliceCanvas = document.createElement('canvas')
       sliceCanvas.width = canvas.width
       sliceCanvas.height = sliceH_px
       const ctx = sliceCanvas.getContext('2d')
       ctx.fillStyle = '#fff'
       ctx.fillRect(0, 0, canvas.width, sliceH_px)
-      ctx.drawImage(canvas, 0, pageStartPx, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
+      ctx.drawImage(canvas, 0, sliceTopPx, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
 
       const sliceH_mm = sliceH_px * pxToMm
       pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_MM, MARGIN_MM, USABLE_W_MM, sliceH_mm)
 
-      pageStartPx = Math.round(cutPx)
+      pageStartPx = sliceBottomPx
     }
 
     const now = new Date().toISOString().slice(0, 10)
@@ -604,11 +626,84 @@
     return { pdf, fileName: `${filePrefix}-${cleanName}-${now}.pdf` }
   }
 
+  function summaryValue(id, fallback = 'Not recorded') {
+    const value = String(document.getElementById(id)?.value || '').trim()
+    return value || fallback
+  }
+
+  function selectedRadioValue(name, fallback = 'Not recorded') {
+    const selected = document.querySelector(`input[type="radio"][name="${name}"]:checked`)
+    return selected ? String(selected.value || '').trim() || fallback : fallback
+  }
+
+  function summaryText(value, maxLen = 220) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim()
+    if (!text) return 'Not recorded'
+    if (text.length <= maxLen) return text
+    return `${text.slice(0, maxLen - 1)}…`
+  }
+
+  function buildOutcomeSummary() {
+    const map = [
+      ['c1', 'Parent/carer informed'],
+      ['c2', 'Camp Coordinator informed'],
+      ['c3', 'Parent called to collect early'],
+      ['c4', 'Child went to hospital'],
+      ['c5', 'Child accompanied by staff'],
+      ['c6', '999 called'],
+      ['c7', 'Further medical advice sought'],
+      ['c8', 'artsdepot Duty Manager informed'],
+      ['c9', 'Risk assessment review needed'],
+      ['c10', 'Safeguarding concern raised'],
+    ]
+    const selected = map.filter(([id]) => Boolean(document.getElementById(id)?.checked)).map(([, label]) => label)
+    return selected.length > 0 ? selected.join('; ') : 'No outcome items selected'
+  }
+
+  function buildExportSummaryNode() {
+    const container = document.createElement('section')
+    container.className = 'export-summary'
+    container.setAttribute('aria-label', 'Export summary')
+
+    const reportType = selectedRadioValue('reporttype', 'Not selected')
+    const summaryHtml = [
+      '<div class="export-summary-title">Incident Summary (Page 1)</div>',
+      '<div class="export-summary-grid">',
+      `<div class="export-summary-item"><span class="export-summary-label">Participant:</span>${summaryValue('f-name')}</div>`,
+      `<div class="export-summary-item"><span class="export-summary-label">Age:</span>${summaryValue('f-age')}</div>`,
+      `<div class="export-summary-item"><span class="export-summary-label">Date:</span>${summaryValue('f-date')}</div>`,
+      `<div class="export-summary-item"><span class="export-summary-label">Time:</span>${summaryValue('f-time')}</div>`,
+      `<div class="export-summary-item"><span class="export-summary-label">Report Type:</span>${summaryText(reportType, 80)}</div>`,
+      `<div class="export-summary-item"><span class="export-summary-label">Location:</span>${summaryText(summaryValue('f-location-detail'), 120)}</div>`,
+      `<div class="export-summary-item"><span class="export-summary-label">Activity:</span>${summaryText(summaryValue('f-activity'), 120)}</div>`,
+      `<div class="export-summary-item"><span class="export-summary-label">Staff:</span>${summaryText(summaryValue('f-staff'), 120)}</div>`,
+      '</div>',
+      '<div class="export-summary-notes">',
+      `<div class="export-summary-note"><span class="export-summary-label">What happened:</span>${summaryText(summaryValue('f-whathappened'), 260)}</div>`,
+      `<div class="export-summary-note"><span class="export-summary-label">Action taken:</span>${summaryText(summaryValue('f-action'), 260)}</div>`,
+      `<div class="export-summary-note"><span class="export-summary-label">Outcome checklist:</span>${summaryText(buildOutcomeSummary(), 280)}</div>`,
+      '</div>',
+    ].join('')
+
+    container.innerHTML = summaryHtml
+    return container
+  }
+
 
 
   async function sendPdfToCampDb() {
+    const exportRoot = document.getElementById('print_root')
+    const exportSummary = exportRoot ? buildExportSummaryNode() : null
     try {
       saveForm()
+      if (exportRoot && exportSummary) {
+        const pageRoot = exportRoot.querySelector('.page')
+        if (pageRoot) {
+          pageRoot.insertBefore(exportSummary, pageRoot.firstChild)
+        } else {
+          exportRoot.prepend(exportSummary)
+        }
+      }
       const { pdf, fileName } = await generateFormPdf('#print_root', 'incident-accident', 'f-name')
       if (!window.parent || window.parent === window) {
         pdf.save(fileName)
@@ -623,6 +718,10 @@
       setTimeout(() => { if (note.textContent.includes('PDF sent')) note.textContent = '' }, 5000)
     } catch (error) {
       alert('Failed to send PDF to Camp DB: ' + error.message)
+    } finally {
+      if (exportSummary?.parentElement) {
+        exportSummary.parentElement.removeChild(exportSummary)
+      }
     }
   }
 

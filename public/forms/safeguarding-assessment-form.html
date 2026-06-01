@@ -407,10 +407,6 @@
     if (!formRoot) throw new Error('Could not find form content to export.')
 
     const { jsPDF } = window.jspdf
-    const PAGE_W_MM = 210, PAGE_H_MM = 297
-    const MARGIN_MM = 10
-    const USABLE_W_MM = PAGE_W_MM - MARGIN_MM * 2
-    const USABLE_H_MM = PAGE_H_MM - MARGIN_MM * 2
     const SCALE = 2
 
     // Inject a temporary stylesheet to expand inputs in the live DOM so that
@@ -424,6 +420,7 @@
       '  white-space: normal !important; box-sizing: border-box !important;',
       '}',
       'textarea { min-height: 30px !important; }',
+      '.section { box-shadow: none !important; border: 1px solid #d8d8d8 !important; border-radius: 4px !important; }',
       '.action-bar, #saved_note, .intro, .title-block .subtitle { display: none !important; }',
       'body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg, input, textarea, select { background: #fff !important; }',
     ].join('\n')
@@ -438,7 +435,8 @@
     // but never within one. Grid containers are treated as single atoms so their
     // cells are always kept on the same row.
     const ATOM_SEL = [
-      '.field', '.section-title', '.header-banner', '.title-block',
+      '.field', '.section-title', '.section-header', '.header-banner', '.title-block',
+      '.consideration', '.criterion', '.conclusion-option', '.section-note',
       '.body-diagram-wrapper', '.checklist', '.signoff-row',
       '.two-col', '.three-col', '.four-col',
     ].join(', ')
@@ -468,6 +466,11 @@
         doc.querySelectorAll('body, .page, .form-body, .section, .checklist-item, .conclusion-option, .category-tag, .sig-line, .body-svg').forEach(e => {
           e.style.background = '#fff'
         })
+        doc.querySelectorAll('.section').forEach(e => {
+          e.style.boxShadow = 'none'
+          e.style.border = '1px solid #d8d8d8'
+          e.style.borderRadius = '4px'
+        })
         doc.querySelectorAll('input, textarea, select').forEach(e => {
           e.style.background = '#fff'
           e.style.overflow = 'visible'
@@ -486,56 +489,13 @@
     // Remove the temporary measurement style.
     document.head.removeChild(tempStyle)
 
-    // Derive the canvas-px → page-mm scale (accounts for width fitting).
-    const cssW_mm = (canvas.width / SCALE) * (25.4 / 96)
-    const pxToMm = ((25.4 / 96) / SCALE) * (USABLE_W_MM / cssW_mm)
-    const USABLE_H_px = USABLE_H_MM / pxToMm
-
-    // Slice the canvas into A4 pages, cutting only at safe points between atoms.
-    const pdf = new jsPDF('p', 'mm', 'a4')
-    const totalH_px = canvas.height
-    let pageStartPx = 0
-    let isFirst = true
-
-    while (pageStartPx < totalH_px - 1) {
-      if (!isFirst) pdf.addPage()
-      isFirst = false
-
-      const idealCutPx = pageStartPx + USABLE_H_px
-      let cutPx
-
-      if (idealCutPx >= totalH_px) {
-        cutPx = totalH_px
-      } else {
-        // Prefer: bottom of the last atom that fits fully on this page.
-        const fullyFitting = atoms.filter(a => a.top_px >= pageStartPx && a.bottom_px <= idealCutPx)
-        if (fullyFitting.length > 0) {
-          cutPx = fullyFitting[fullyFitting.length - 1].bottom_px
-        } else {
-          // No atom fully fits — cut just before the first atom that would
-          // otherwise be split, or fall back to the ideal position.
-          const nextAtom = atoms.find(a => a.top_px > pageStartPx + 1)
-          cutPx = (nextAtom && nextAtom.top_px < idealCutPx) ? nextAtom.top_px : idealCutPx
-        }
-      }
-
-      // Safety: always advance to prevent infinite loops.
-      if (cutPx <= pageStartPx) cutPx = Math.min(pageStartPx + USABLE_H_px, totalH_px)
-
-      const sliceH_px = Math.round(cutPx - pageStartPx)
-      const sliceCanvas = document.createElement('canvas')
-      sliceCanvas.width = canvas.width
-      sliceCanvas.height = sliceH_px
-      const ctx = sliceCanvas.getContext('2d')
-      ctx.fillStyle = '#fff'
-      ctx.fillRect(0, 0, canvas.width, sliceH_px)
-      ctx.drawImage(canvas, 0, pageStartPx, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
-
-      const sliceH_mm = sliceH_px * pxToMm
-      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_MM, MARGIN_MM, USABLE_W_MM, sliceH_mm)
-
-      pageStartPx = Math.round(cutPx)
-    }
+    // Export at full captured size to avoid squashing content into fixed A4 pagination.
+    const pxToMm = (25.4 / 96) / SCALE
+    const pageWmm = Math.max(120, canvas.width * pxToMm)
+    const pageHmm = Math.max(120, canvas.height * pxToMm)
+    const orientation = pageWmm > pageHmm ? 'l' : 'p'
+    const pdf = new jsPDF({ orientation, unit: 'mm', format: [pageWmm, pageHmm] })
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWmm, pageHmm)
 
     const now = new Date().toISOString().slice(0, 10)
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''
