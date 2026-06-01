@@ -498,7 +498,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
                               {editingAdults.length === 0 ? (
                                 <span className="text-sm text-stone-500">No approved adults yet.</span>
                               ) : editingAdults.map((adult, i) => (
-                                <div key={`${adult.name}-${adult.relationship}-${i}`} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2 sm:flex-row sm:items-center">
+                                <div key={`adult-row-${i}`} className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-2 sm:flex-row sm:items-center">
                                   <span className="w-6 h-6 rounded-full bg-stone-200 flex items-center justify-center text-xs font-bold text-stone-700">
                                     {i + 1}
                                   </span>

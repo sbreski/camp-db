@@ -633,7 +633,9 @@ export default function ParticipantDetail({
     || participant.otcNotes
   )
   const hasDietaryAllergy = Boolean(participant.dietaryType || participant.allergyDetails || participant.mealAdjustments)
-  const hasSend = !!participant.sendNeeds
+  const hasSendDiagnosis = Boolean(String(participant.sendDiagnosis || '').trim())
+  const hasDiagnosedSend = Boolean(participant.sendDiagnosed) || hasSendDiagnosis
+  const hasSend = Boolean(String(participant.sendNeeds || '').trim()) || hasDiagnosedSend
 
   const uploadedFieldSchema = [
     { key: 'name', label: 'Full Name', type: 'text' },
@@ -1339,7 +1341,7 @@ export default function ParticipantDetail({
           )}
           {participant.medicalType?.includes('Dietary') && <span className="badge-dietary">🍽 Dietary</span>}
           {participant.medicalType?.includes('Medical') && <span className="badge-medical">+ Medical</span>}
-          {(participant.sendDiagnosed || participant.sendNeeds) && <span className={participant.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>★ SEND / Support</span>}
+          {hasSend && <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>★ SEND / Support</span>}
           {participant.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={12} />}
         </div>
       </div>
@@ -1869,23 +1871,25 @@ export default function ParticipantDetail({
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display font-semibold text-forest-950">SEND & Support Needs</h3>
-              {participant.sendDiagnosed && (
+              {hasDiagnosedSend && (
                 <span className="text-xs bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full font-semibold">
-                  Formally Diagnosed
+                  {participant.sendDiagnosed ? 'Formally Diagnosed' : 'Diagnosis Recorded'}
                 </span>
               )}
             </div>
             {hasSend ? (
               <div className="space-y-4">
-                {participant.sendDiagnosed && canViewSendDiagnosis && participant.sendDiagnosis && (
+                {hasDiagnosedSend && canViewSendDiagnosis && participant.sendDiagnosis && (
                   <div className="bg-red-50 rounded-xl p-4 text-sm text-red-900 border border-red-200">
                     <p className="font-semibold mb-1">Diagnosis</p>
                     <p>{participant.sendDiagnosis}</p>
                   </div>
                 )}
-                <div className="bg-purple-50 rounded-xl p-4 text-sm text-purple-900 leading-relaxed whitespace-pre-wrap">
-                  {participant.sendNeeds}
-                </div>
+                {String(participant.sendNeeds || '').trim() && (
+                  <div className="bg-purple-50 rounded-xl p-4 text-sm text-purple-900 leading-relaxed whitespace-pre-wrap">
+                    {participant.sendNeeds}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8">

@@ -1999,7 +1999,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const hasAllergy = p.medicalType?.includes('Allergy') || Boolean(String(p.allergyDetails || '').trim())
               const hasDietary = p.medicalType?.includes('Dietary') || Boolean(String(p.dietaryType || '').trim()) || Boolean(String(p.mealAdjustments || '').trim())
               const hasMedical = p.medicalType?.includes('Medical')
-              const hasSend = !!p.sendNeeds || !!p.sendDiagnosed
+              const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
+              const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
+              const hasSend = Boolean(String(p.sendNeeds || '').trim()) || hasDiagnosedSend
               const hasSafeguarding = !!p.safeguardingFlag
               const pendingFollowUps = getPendingFollowUps(p.id)
               const pendingMarFollowUps = getPendingMarFollowUps(p.id)
@@ -2084,9 +2086,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       )}
                       {hasSend && (
                         <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-help ${p.sendDiagnosed ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-purple-100 text-purple-700 border-purple-200'}`}
-                          title={p.sendDiagnosed ? [
-                            'Formally diagnosed SEND',
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-help ${hasDiagnosedSend ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-purple-100 text-purple-700 border-purple-200'}`}
+                          title={hasDiagnosedSend ? [
+                            p.sendDiagnosed ? 'Formally diagnosed SEND' : 'SEND diagnosis recorded',
                             p.sendDiagnosis ? `Diagnosis: ${p.sendDiagnosis}` : '',
                             p.sendNeeds ? `Support needs: ${p.sendNeeds}` : '',
                           ].filter(Boolean).join('\n') : (String(p.sendNeeds || '').trim() || 'No SEND/support details recorded')}

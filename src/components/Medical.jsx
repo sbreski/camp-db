@@ -1101,7 +1101,13 @@ export default function Medical({ participants, setParticipants, actorInitials =
                       t === 'Allergy' ? 'badge-allergy' : t === 'Dietary' ? 'badge-dietary' : t === 'Medical' ? 'badge-medical' : 'badge-dietary'
                     }>{t}</span>
                   ))}
-                  {(p.sendDiagnosed || p.sendNeeds) && <span className={p.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>SEND</span>}
+                  {(() => {
+                    const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
+                    const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
+                    const hasSend = Boolean(String(p.sendNeeds || '').trim()) || hasDiagnosedSend
+                    if (!hasSend) return null
+                    return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>SEND</span>
+                  })()}
                 </div>
               </div>
               {(() => {
