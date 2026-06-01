@@ -230,59 +230,60 @@
   <!-- D: INJURY (accident only) -->
   <div class="section" id="sectionD">
     <div class="section-title">Nature and location of injury</div>
-    <div class="body-diagram-wrapper">
-      <div style="flex:0 0 auto;">
-        <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
-          <circle class="body-outline" cx="90" cy="44" r="22"/>
-          <path class="body-outline" d="M90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
-          <text x="90" y="310" text-anchor="middle" font-size="9" fill="#888" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Mark on printed copy</text>
-        </svg>
-        <div class="diagram-hint">Body map is for handwritten annotation on the printed report.</div>
-      </div>
-      <div style="flex:1;">
-        <div class="field">
-          <label>Body parts affected (select all that apply)</label>
-          <div class="check-group">
-            <label><input type="checkbox"/> Head/face</label>
-            <label><input type="checkbox"/> Neck</label>
-            <label><input type="checkbox"/> Left arm/hand</label>
-            <label><input type="checkbox"/> Right arm/hand</label>
-            <label><input type="checkbox"/> Chest/back</label>
-            <label><input type="checkbox"/> Abdomen/hips</label>
-            <label><input type="checkbox"/> Left leg/foot</label>
-            <label><input type="checkbox"/> Right leg/foot</label>
-          </div>
-        </div>
-        <div class="field">
-          <label>Injury type(s)</label>
-          <div class="check-group">
-            <label><input type="checkbox"/> Cut/laceration</label>
-            <label><input type="checkbox"/> Bruise/swelling</label>
-            <label><input type="checkbox"/> Graze/abrasion</label>
-            <label><input type="checkbox"/> Sprain/strain</label>
-            <label><input type="checkbox"/> Fracture/suspected fracture</label>
-            <label><input type="checkbox" id="cb-bumphead" onchange="toggleBumpHeadNotice(this)"/> Bump to head</label>
-            <label><input type="checkbox"/> Burn/scald</label>
-            <label><input type="checkbox"/> Allergic reaction</label>
-            <label><input type="checkbox"/> Loss of consciousness</label>
-            <label><input type="checkbox"/> Other</label>
-          </div>
-        </div>
-        <div id="bumpHeadNotice" style="display:none;background:#fff8e1;border-left:4px solid #f39c12;padding:10px 14px;border-radius:0 5px 5px 0;margin-bottom:10px;font-size:12px;color:#7d5a00;">
-          <strong>⚠ Bump to Head selected</strong> — please also complete a <strong>Notification of Head Bump</strong> form and give a copy to the parent/carer at collection.
-        </div>
-        <div class="field"><label>If other</label><input type="text" id="f-injuryother" placeholder="Describe..."/></div>
-        <div class="field"><label>Side affected (Child's Perspective)</label>
-          <div class="radio-group">
-            <label><input type="radio" name="side" value="Left"/> Left</label>
-            <label><input type="radio" name="side" value="Right"/> Right</label>
-            <label><input type="radio" name="side" value="Both"/> Both</label>
-            <label><input type="radio" name="side" value="N/A"/> N/A</label>
-          </div>
-        </div>
-        <div class="field"><label>First aid given</label><textarea id="f-firstaid" placeholder="What was administered and by whom..."></textarea></div>
+    <div class="field">
+      <label>Body parts affected (select all that apply)</label>
+      <div class="check-group">
+        <label><input type="checkbox"/> Scalp / head</label>
+        <label><input type="checkbox"/> Face / jaw / mouth</label>
+        <label><input type="checkbox"/> Eye</label>
+        <label><input type="checkbox"/> Ear</label>
+        <label><input type="checkbox"/> Neck / throat</label>
+        <label><input type="checkbox"/> Shoulder</label>
+        <label><input type="checkbox"/> Upper arm</label>
+        <label><input type="checkbox"/> Elbow</label>
+        <label><input type="checkbox"/> Forearm</label>
+        <label><input type="checkbox"/> Wrist / hand / fingers</label>
+        <label><input type="checkbox"/> Chest / ribs</label>
+        <label><input type="checkbox"/> Upper back</label>
+        <label><input type="checkbox"/> Lower back</label>
+        <label><input type="checkbox"/> Abdomen</label>
+        <label><input type="checkbox"/> Groin / pelvis</label>
+        <label><input type="checkbox"/> Buttock</label>
+        <label><input type="checkbox"/> Thigh</label>
+        <label><input type="checkbox"/> Knee</label>
+        <label><input type="checkbox"/> Shin / calf</label>
+        <label><input type="checkbox"/> Ankle</label>
+        <label><input type="checkbox"/> Foot / toes</label>
       </div>
     </div>
+    <div class="field">
+      <label>Injury type(s)</label>
+      <div class="check-group">
+        <label><input type="checkbox"/> Cut/laceration</label>
+        <label><input type="checkbox"/> Bruise/swelling</label>
+        <label><input type="checkbox"/> Graze/abrasion</label>
+        <label><input type="checkbox"/> Sprain/strain</label>
+        <label><input type="checkbox"/> Fracture/suspected fracture</label>
+        <label><input type="checkbox" id="cb-bumphead" onchange="toggleBumpHeadNotice(this)"/> Bump to head</label>
+        <label><input type="checkbox"/> Burn/scald</label>
+        <label><input type="checkbox"/> Allergic reaction</label>
+        <label><input type="checkbox"/> Loss of consciousness</label>
+        <label><input type="checkbox"/> Other</label>
+      </div>
+    </div>
+    <div id="bumpHeadNotice" style="display:none;background:#fff8e1;border-left:4px solid #f39c12;padding:10px 14px;border-radius:0 5px 5px 0;margin-bottom:10px;font-size:12px;color:#7d5a00;">
+      <strong>⚠ Bump to Head selected</strong> — please also complete a <strong>Notification of Head Bump</strong> form and give a copy to the parent/carer at collection.
+    </div>
+    <div class="field"><label>If other</label><input type="text" id="f-injuryother" placeholder="Describe..."/></div>
+    <div class="field"><label>Side affected (Child's Perspective)</label>
+      <div class="radio-group">
+        <label><input type="radio" name="side" value="Left"/> Left</label>
+        <label><input type="radio" name="side" value="Right"/> Right</label>
+        <label><input type="radio" name="side" value="Both"/> Both</label>
+        <label><input type="radio" name="side" value="N/A"/> N/A</label>
+      </div>
+    </div>
+    <div class="field"><label>First aid given</label><textarea id="f-firstaid" placeholder="What was administered and by whom..."></textarea></div>
   </div>
 
   <!-- E: WHAT HAPPENED -->
@@ -576,56 +577,6 @@
       return extractLabel(checkedEl)
     }
 
-    const drawMiniBodyMapAt = (boxX, boxY, boxW = 62, boxH = 72) => {
-      pdf.setDrawColor(212, 220, 230)
-      pdf.setFillColor(250, 252, 254)
-      pdf.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'FD')
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(9)
-      pdf.text('Body map', boxX + 2, boxY + 6)
-
-      const stroke = [35, 35, 35]
-      pdf.setDrawColor(stroke[0], stroke[1], stroke[2])
-      pdf.setLineWidth(0.7)
-
-      const padX = 7
-      const padTop = 8
-      const padBottom = 10
-      const drawW = boxW - (padX * 2)
-      const drawH = boxH - (padTop + padBottom)
-      const sx = drawW / 180
-      const sy = drawH / 320
-      const ox = boxX + padX
-      const oy = boxY + padTop
-      const tx = (x) => ox + (x * sx)
-      const ty = (y) => oy + (y * sy)
-
-      // Head: explicit full circle, matching the form silhouette style.
-      pdf.circle(tx(90), ty(44), 22 * Math.min(sx, sy), 'S')
-
-      // Body outline follows the same silhouette profile as the form.
-      const bodyPoints = [
-        [90, 66], [68, 75], [56, 88], [52, 102], [38, 136], [43, 152], [58, 146], [67, 125],
-        [70, 176], [48, 248], [36, 260], [49, 272], [72, 272], [81, 265], [90, 212], [99, 265],
-        [108, 272], [131, 272], [144, 260], [132, 248], [110, 176], [113, 125], [122, 146], [137, 152],
-        [142, 136], [128, 102], [124, 88], [112, 75], [90, 66],
-      ]
-
-      for (let i = 1; i < bodyPoints.length; i += 1) {
-        const [x1, y1] = bodyPoints[i - 1]
-        const [x2, y2] = bodyPoints[i]
-        pdf.line(tx(x1), ty(y1), tx(x2), ty(y2))
-      }
-
-      pdf.setFont('helvetica', 'italic')
-      pdf.setFontSize(7.5)
-      pdf.setTextColor(90)
-      pdf.text('Complete by hand on printed copy', boxX + 2, boxY + boxH - 3)
-      pdf.setTextColor(0)
-
-      return boxH
-    }
-
     const writeFieldRowInColumn = (label, value, columnX, columnW, startY) => {
       const left = clean(label)
       const right = clean(value)
@@ -756,21 +707,7 @@
       writeSectionHeader(sectionTitle)
 
       if (isInjurySection) {
-        const gapMM = 6
-        const rightW = 62
-        const leftW = CONTENT_W_MM - rightW - gapMM
-        const leftX = MARGIN_MM
-        const rightX = MARGIN_MM + leftW + gapMM
-
-        // Keep injury details and body map on the same visual row.
-        ensureSpace(80)
-        const rowTopY = y
-        let leftY = rowTopY
-        rows.forEach(row => {
-          leftY = writeFieldRowInColumn(row.label, row.value, leftX, leftW, leftY)
-        })
-        const mapHeight = drawMiniBodyMapAt(rightX, rowTopY, rightW, 72)
-        y = Math.max(leftY, rowTopY + mapHeight + 2)
+        rows.forEach(row => writeFieldRow(row.label, row.value))
         y += 1.8
         return
       }

@@ -274,56 +274,57 @@
   <!-- D: INJURY (accident only) -->
   <div class="section" id="sectionD">
     <div class="section-title">Nature and location of injury</div>
-    <div class="body-diagram-wrapper">
-      <div style="flex:0 0 auto;">
-        <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
-          <circle class="body-outline" cx="90" cy="44" r="22"/>
-          <path class="body-outline" d="M90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
-          <text x="90" y="310" text-anchor="middle" font-size="9" fill="#888" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Mark on printed copy</text>
-        </svg>
-        <div class="diagram-hint">Body map is for handwritten annotation on the printed report.</div>
-      </div>
-      <div style="flex:1;">
-        <div class="field">
-          <label>Body parts affected (select all that apply)</label>
-          <div class="check-group">
-            <label><input type="checkbox"/> Head/face</label>
-            <label><input type="checkbox"/> Neck</label>
-            <label><input type="checkbox"/> Left arm/hand</label>
-            <label><input type="checkbox"/> Right arm/hand</label>
-            <label><input type="checkbox"/> Chest/back</label>
-            <label><input type="checkbox"/> Abdomen/hips</label>
-            <label><input type="checkbox"/> Left leg/foot</label>
-            <label><input type="checkbox"/> Right leg/foot</label>
-          </div>
-        </div>
-        <div class="field">
-          <label>Injury type(s)</label>
-          <div class="check-group">
-            <label><input type="checkbox"/> Cut / laceration</label>
-            <label><input type="checkbox"/> Bruise / swelling</label>
-            <label><input type="checkbox"/> Graze / abrasion</label>
-            <label><input type="checkbox"/> Sprain / strain</label>
-            <label><input type="checkbox"/> Fracture / suspected fracture</label>
-            <label><input type="checkbox"/> Bump to head</label>
-            <label><input type="checkbox"/> Burn / scald</label>
-            <label><input type="checkbox"/> Allergic reaction</label>
-            <label><input type="checkbox"/> Loss of consciousness</label>
-            <label><input type="checkbox"/> Other</label>
-          </div>
-        </div>
-        <div class="field"><label>If other</label><input type="text" id="f-injuryother" placeholder="Describe..."/></div>
-        <div class="field"><label>Side affected</label>
-          <div class="radio-group">
-            <label><input type="radio" name="side" value="Left"/> Left</label>
-            <label><input type="radio" name="side" value="Right"/> Right</label>
-            <label><input type="radio" name="side" value="Both"/> Both</label>
-            <label><input type="radio" name="side" value="N/A"/> N/A</label>
-          </div>
-        </div>
-        <div class="field"><label>First aid given</label><textarea id="f-firstaid" placeholder="What was administered and by whom..."></textarea></div>
+    <div class="field">
+      <label>Body parts affected (select all that apply)</label>
+      <div class="check-group">
+        <label><input type="checkbox"/> Scalp / head</label>
+        <label><input type="checkbox"/> Face / jaw / mouth</label>
+        <label><input type="checkbox"/> Eye</label>
+        <label><input type="checkbox"/> Ear</label>
+        <label><input type="checkbox"/> Neck / throat</label>
+        <label><input type="checkbox"/> Shoulder</label>
+        <label><input type="checkbox"/> Upper arm</label>
+        <label><input type="checkbox"/> Elbow</label>
+        <label><input type="checkbox"/> Forearm</label>
+        <label><input type="checkbox"/> Wrist / hand / fingers</label>
+        <label><input type="checkbox"/> Chest / ribs</label>
+        <label><input type="checkbox"/> Upper back</label>
+        <label><input type="checkbox"/> Lower back</label>
+        <label><input type="checkbox"/> Abdomen</label>
+        <label><input type="checkbox"/> Groin / pelvis</label>
+        <label><input type="checkbox"/> Buttock</label>
+        <label><input type="checkbox"/> Thigh</label>
+        <label><input type="checkbox"/> Knee</label>
+        <label><input type="checkbox"/> Shin / calf</label>
+        <label><input type="checkbox"/> Ankle</label>
+        <label><input type="checkbox"/> Foot / toes</label>
       </div>
     </div>
+    <div class="field">
+      <label>Injury type(s)</label>
+      <div class="check-group">
+        <label><input type="checkbox"/> Cut / laceration</label>
+        <label><input type="checkbox"/> Bruise / swelling</label>
+        <label><input type="checkbox"/> Graze / abrasion</label>
+        <label><input type="checkbox"/> Sprain / strain</label>
+        <label><input type="checkbox"/> Fracture / suspected fracture</label>
+        <label><input type="checkbox"/> Bump to head</label>
+        <label><input type="checkbox"/> Burn / scald</label>
+        <label><input type="checkbox"/> Allergic reaction</label>
+        <label><input type="checkbox"/> Loss of consciousness</label>
+        <label><input type="checkbox"/> Other</label>
+      </div>
+    </div>
+    <div class="field"><label>If other</label><input type="text" id="f-injuryother" placeholder="Describe..."/></div>
+    <div class="field"><label>Side affected</label>
+      <div class="radio-group">
+        <label><input type="radio" name="side" value="Left"/> Left</label>
+        <label><input type="radio" name="side" value="Right"/> Right</label>
+        <label><input type="radio" name="side" value="Both"/> Both</label>
+        <label><input type="radio" name="side" value="N/A"/> N/A</label>
+      </div>
+    </div>
+    <div class="field"><label>First aid given</label><textarea id="f-firstaid" placeholder="What was administered and by whom..."></textarea></div>
   </div>
 
   <!-- E: WHAT HAPPENED -->
