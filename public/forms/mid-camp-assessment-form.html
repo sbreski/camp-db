@@ -593,7 +593,9 @@
       return clean(el.value)
     }
 
-    const title = clean(formRoot.querySelector('.title-block h1, h1')?.textContent) || 'Form Export'
+    const nameForTitle = clean(nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : '') || 'Participant'
+    const titleBase = clean(formRoot.querySelector('.title-block .doc-title, .title-block h1, h1')?.textContent) || 'Form Export'
+    const title = `${titleBase} - ${nameForTitle}`
     writeBlock(title, { size: 16, weight: 'bold', color: COLORS.brand, gapAfter: 1 })
     writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 8.5, color: COLORS.muted, gapAfter: 2.5 })
 

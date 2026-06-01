@@ -633,40 +633,92 @@
       pdf.setFontSize(9)
       pdf.text('Body map (summary)', boxX + 2, boxY + 6)
 
-      const drawPart = (isMarked, drawFn) => {
-        pdf.setFillColor(isMarked ? 231 : 235, isMarked ? 76 : 238, isMarked ? 60 : 241)
-        pdf.setDrawColor(isMarked ? 170 : 176, isMarked ? 52 : 186, isMarked ? 45 : 194)
-        drawFn()
+      const neutralStroke = [144, 154, 166]
+      const neutralFill = [236, 240, 245]
+      const markStroke = [183, 39, 33]
+      const markFill = [231, 76, 60]
+
+      const setStroke = (isMarked, width = 1.5) => {
+        const c = isMarked ? markStroke : neutralStroke
+        pdf.setDrawColor(c[0], c[1], c[2])
+        pdf.setLineWidth(width)
       }
 
-      drawPart(zones.head, () => pdf.circle(cx, top, 4, 'FD'))
-      drawPart(zones.neck, () => pdf.roundedRect(cx - 1.4, top + 4.5, 2.8, 3.2, 0.8, 0.8, 'FD'))
-      drawPart(zones.torso, () => pdf.roundedRect(cx - 7, top + 8, 14, 18, 1.6, 1.6, 'FD'))
+      const drawJoint = (x, y, r, isMarked) => {
+        const fill = isMarked ? markFill : neutralFill
+        const stroke = isMarked ? markStroke : neutralStroke
+        pdf.setFillColor(fill[0], fill[1], fill[2])
+        pdf.setDrawColor(stroke[0], stroke[1], stroke[2])
+        pdf.circle(x, y, r, 'FD')
+      }
 
-      drawPart(zones.leftArm, () => {
-        pdf.roundedRect(cx - 13.5, top + 9, 5, 10, 1.2, 1.2, 'FD')
-        pdf.roundedRect(cx - 14.5, top + 19.5, 4.5, 9.5, 1.2, 1.2, 'FD')
-      })
-      drawPart(zones.rightArm, () => {
-        pdf.roundedRect(cx + 8.5, top + 9, 5, 10, 1.2, 1.2, 'FD')
-        pdf.roundedRect(cx + 10, top + 19.5, 4.5, 9.5, 1.2, 1.2, 'FD')
-      })
+      const drawLimb = (x1, y1, x2, y2, x3, y3, isMarked) => {
+        setStroke(isMarked, 1.9)
+        pdf.line(x1, y1, x2, y2)
+        pdf.line(x2, y2, x3, y3)
+      }
 
-      drawPart(zones.leftHand, () => pdf.circle(cx - 12.2, top + 31.3, 2.2, 'FD'))
-      drawPart(zones.rightHand, () => pdf.circle(cx + 12.2, top + 31.3, 2.2, 'FD'))
+      const headY = top
+      const neckY = top + 6
+      const shoulderY = top + 11
+      const chestY = top + 18
+      const hipY = top + 30
+      const kneeY = top + 44
+      const ankleY = top + 57
 
-      drawPart(zones.leftLeg, () => {
-        pdf.roundedRect(cx - 6.6, top + 27.5, 5.6, 16, 1.2, 1.2, 'FD')
-        pdf.roundedRect(cx - 6.4, top + 43.6, 5.2, 12.2, 1.2, 1.2, 'FD')
-      })
-      drawPart(zones.rightLeg, () => {
-        pdf.roundedRect(cx + 1, top + 27.5, 5.6, 16, 1.2, 1.2, 'FD')
-        pdf.roundedRect(cx + 1.2, top + 43.6, 5.2, 12.2, 1.2, 1.2, 'FD')
-      })
+      const lShoulderX = cx - 7.8
+      const rShoulderX = cx + 7.8
+      const lElbowX = cx - 11.5
+      const rElbowX = cx + 11.5
+      const lHandX = cx - 13.2
+      const rHandX = cx + 13.2
 
-      drawPart(zones.leftFoot, () => pdf.ellipse(cx - 3.8, top + 58.6, 4, 1.8, 'FD'))
-      drawPart(zones.rightFoot, () => pdf.ellipse(cx + 3.8, top + 58.6, 4, 1.8, 'FD'))
+      const lHipX = cx - 4.2
+      const rHipX = cx + 4.2
+      const lKneeX = cx - 5.2
+      const rKneeX = cx + 5.2
+      const lAnkleX = cx - 5.7
+      const rAnkleX = cx + 5.7
 
+      drawJoint(cx, headY, 4.4, zones.head)
+      setStroke(zones.neck, 1.5)
+      pdf.line(cx, headY + 4.6, cx, neckY + 0.5)
+
+      const torsoMarked = zones.torso
+      pdf.setFillColor(torsoMarked ? markFill[0] : neutralFill[0], torsoMarked ? markFill[1] : neutralFill[1], torsoMarked ? markFill[2] : neutralFill[2])
+      pdf.setDrawColor(torsoMarked ? markStroke[0] : neutralStroke[0], torsoMarked ? markStroke[1] : neutralStroke[1], torsoMarked ? markStroke[2] : neutralStroke[2])
+      pdf.ellipse(cx, chestY + 6.2, 7.2, 11.2, 'FD')
+      setStroke(torsoMarked, 1.2)
+      pdf.line(cx, neckY + 0.8, cx, hipY + 0.5)
+      pdf.line(lShoulderX, shoulderY, rShoulderX, shoulderY)
+      pdf.line(lHipX, hipY, rHipX, hipY)
+
+      drawLimb(lShoulderX, shoulderY, lElbowX, shoulderY + 8, lHandX, shoulderY + 17.5, zones.leftArm)
+      drawLimb(rShoulderX, shoulderY, rElbowX, shoulderY + 8, rHandX, shoulderY + 17.5, zones.rightArm)
+      drawJoint(lHandX, shoulderY + 18.2, 1.8, zones.leftHand)
+      drawJoint(rHandX, shoulderY + 18.2, 1.8, zones.rightHand)
+
+      drawLimb(lHipX, hipY, lKneeX, kneeY, lAnkleX, ankleY, zones.leftLeg)
+      drawLimb(rHipX, hipY, rKneeX, kneeY, rAnkleX, ankleY, zones.rightLeg)
+      drawJoint(lKneeX, kneeY, 1.7, zones.leftLeg)
+      drawJoint(rKneeX, kneeY, 1.7, zones.rightLeg)
+
+      const lf = zones.leftFoot
+      const rf = zones.rightFoot
+      pdf.setFillColor(lf ? markFill[0] : neutralFill[0], lf ? markFill[1] : neutralFill[1], lf ? markFill[2] : neutralFill[2])
+      pdf.setDrawColor(lf ? markStroke[0] : neutralStroke[0], lf ? markStroke[1] : neutralStroke[1], lf ? markStroke[2] : neutralStroke[2])
+      pdf.ellipse(lAnkleX - 0.8, ankleY + 2.2, 3.2, 1.5, 'FD')
+      pdf.setFillColor(rf ? markFill[0] : neutralFill[0], rf ? markFill[1] : neutralFill[1], rf ? markFill[2] : neutralFill[2])
+      pdf.setDrawColor(rf ? markStroke[0] : neutralStroke[0], rf ? markStroke[1] : neutralStroke[1], rf ? markStroke[2] : neutralStroke[2])
+      pdf.ellipse(rAnkleX + 0.8, ankleY + 2.2, 3.2, 1.5, 'FD')
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(7)
+      pdf.setTextColor(115)
+      pdf.text('L', cx - 16.5, shoulderY + 1)
+      pdf.text('R', cx + 15.2, shoulderY + 1)
+
+      pdf.setLineWidth(0.2)
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(8)
       pdf.setTextColor(90)
@@ -741,8 +793,8 @@
     }
 
     const participantName = clean(document.getElementById('f-name')?.value) || 'Participant'
-    const incidentType = clean(document.querySelector('input[type="radio"][name="reporttype"]:checked')?.value) || 'Not selected'
-    const title = `Incident/Accident Form - ${participantName} (${incidentType})`
+    const titleBase = clean(formRoot.querySelector('.title-block .doc-title, .title-block h1, h1')?.textContent) || 'Form Export'
+    const title = `${titleBase} - ${participantName}`
     writeBlock(title, { size: 16, weight: 'bold', gapAfter: 1.2 })
     writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 9, gapAfter: 2.5 })
     pdf.setDrawColor(208, 216, 227)
@@ -751,6 +803,7 @@
 
     const sections = Array.from(formRoot.querySelectorAll('.section'))
     const sectionNodes = sections.length ? sections : [formRoot]
+    const twoColumnSectionTitles = new Set(['individual involved', 'date, time & location', 'sign off'])
 
     sectionNodes.forEach((section, index) => {
       const sectionTitle = clean(section.querySelector('.section-title, .section-header, h2, h3, legend')?.textContent) || `Section ${index + 1}`
@@ -834,33 +887,56 @@
         return
       }
 
+      if (twoColumnSectionTitles.has(sectionTitleLower)) {
+        const colGap = 8
+        const colW = (CONTENT_W_MM - colGap) / 2
+        const leftX = MARGIN_MM
+        const rightX = MARGIN_MM + colW + colGap
+        const splitIndex = Math.ceil(rows.length / 2)
+        const leftRows = rows.slice(0, splitIndex)
+        const rightRows = rows.slice(splitIndex)
+
+        let leftY = y
+        let rightY = y
+        leftRows.forEach(row => {
+          leftY = writeFieldRowInColumn(row.label, row.value, leftX, colW, leftY)
+        })
+        rightRows.forEach(row => {
+          rightY = writeFieldRowInColumn(row.label, row.value, rightX, colW, rightY)
+        })
+        y = Math.max(leftY, rightY) + 1.8
+        return
+      }
+
       rows.forEach(row => writeFieldRow(row.label, row.value))
       y += 1.8
     })
 
     if (filePrefix === 'incident-accident') {
+      const drawSignOffRow = (labels) => {
+        const gap = 6
+        const colW = (CONTENT_W_MM - (gap * 2)) / 3
+        const baseY = y
+        ensureSpace(18)
+
+        labels.forEach((label, idx) => {
+          const x = MARGIN_MM + (idx * (colW + gap))
+          pdf.setDrawColor(140)
+          pdf.line(x, baseY + 5.2, x + colW, baseY + 5.2)
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(9)
+          pdf.text(label, x, baseY + 9)
+        })
+
+        y = baseY + 14
+      }
+
       writeSectionHeader('Parent / Carer Sign-off')
-      ;['Parent/Carer name', 'Signature', 'Date'].forEach(label => {
-        ensureSpace(12)
-        pdf.setDrawColor(140)
-        pdf.line(MARGIN_MM, y + 3.5, PAGE_W_MM - MARGIN_MM, y + 3.5)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(9)
-        pdf.text(label, MARGIN_MM, y + 7)
-        y += 10
-      })
+      drawSignOffRow(['Parent/Carer name', 'Signature', 'Date'])
 
       y += 4
       writeSectionHeader('Camp Coordinator Sign-off')
-      ;['Coordinator name', 'Signature', 'Date'].forEach(label => {
-        ensureSpace(12)
-        pdf.setDrawColor(140)
-        pdf.line(MARGIN_MM, y + 3.5, PAGE_W_MM - MARGIN_MM, y + 3.5)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(9)
-        pdf.text(label, MARGIN_MM, y + 7)
-        y += 10
-      })
+      drawSignOffRow(['Coordinator name', 'Signature', 'Date'])
     }
 
     const totalPages = pdf.getNumberOfPages()

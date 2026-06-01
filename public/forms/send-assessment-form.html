@@ -609,7 +609,9 @@
       return clean(el.value)
     }
 
-    const title = clean(formRoot.querySelector('.title-block h1, h1')?.textContent) || 'Form Export'
+    const nameForTitle = clean(nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : '') || 'Participant'
+    const titleBase = clean(formRoot.querySelector('.title-block .doc-title, .title-block h1, h1')?.textContent) || 'Form Export'
+    const title = `${titleBase} - ${nameForTitle}`
     writeBlock(title, { size: 16, weight: 'bold', gapAfter: 1.2 })
     writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 9, gapAfter: 2.5 })
     pdf.setDrawColor(208, 216, 227)
