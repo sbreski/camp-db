@@ -677,7 +677,7 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   )
 }
 
-export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false }) {
+export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false, onView = null }) {
   const searchInputRef = useRef(null)
   const dateInputRef = useRef(null)
   const noteInputRef = useRef(null)
@@ -1620,6 +1620,13 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     win.document.close()
   }
 
+  function handleRowDoubleClick(participant, event) {
+    if (typeof onView !== 'function') return
+    const interactiveTarget = event.target?.closest?.('button, input, textarea, select, a, label')
+    if (interactiveTarget) return
+    onView(participant.id)
+  }
+
   return (
     <div className="fade-in space-y-4">
       {verifyingFor && (
@@ -2020,11 +2027,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               return (
                 <div key={p.id} id={`participant-row-${p.id}`}
                   onClick={() => setActiveParticipantId(p.id)}
+                  onDoubleClick={(event) => handleRowDoubleClick(p, event)}
                   onFocus={() => setActiveParticipantId(p.id)}
                   tabIndex={0}
-                  className={`md:grid md:grid-cols-[minmax(260px,1fr)_96px_96px_220px] md:gap-3 md:items-center px-3 md:px-4 py-3 transition-all hover:bg-stone-50/70 ${
+                  className={`md:grid md:grid-cols-[minmax(260px,1fr)_96px_96px_220px] md:gap-3 md:items-center px-3 md:px-4 py-3 transition-colors hover:bg-stone-50/70 ${
                     isFlashing ? 'bg-amber-50' : isIn ? 'bg-amber-50/40' : isOut ? 'bg-stone-50/60 opacity-75' : ''
-                  } ${enableKeyboardShortcuts && isActiveRow ? 'ring-2 ring-forest-400 ring-inset rounded-lg mx-1 my-0.5' : ''
+                  } ${enableKeyboardShortcuts && isActiveRow ? 'ring-2 ring-forest-400 ring-inset bg-forest-50/40' : ''
                   } ${enableKeyboardShortcuts ? 'cursor-pointer focus:outline-none' : ''}`}>
 
                   {/* Name + flags */}
