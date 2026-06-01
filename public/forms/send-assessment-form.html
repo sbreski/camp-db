@@ -493,144 +493,118 @@
   const params = new URLSearchParams(window.location.search)
 
   async function generateFormPdf(rootSelector, filePrefix, nameFieldId) {
-    if (!window.html2canvas || !window.jspdf) throw new Error('PDF libraries failed to load.')
+    if (!window.jspdf) throw new Error('PDF library failed to load.')
     const formRoot = document.querySelector(rootSelector)
     if (!formRoot) throw new Error('Could not find form content to export.')
 
     const { jsPDF } = window.jspdf
-    const SCALE = 2
-    const PAGE_W_MM = 210, PAGE_H_MM = 297
-    const MARGIN_MM = 0
-    const USABLE_W_MM = PAGE_W_MM - MARGIN_MM * 2
-    const USABLE_H_MM = PAGE_H_MM - MARGIN_MM * 2
-
-    // Inject a temporary stylesheet to expand inputs in the live DOM so that
-    // getBoundingClientRect() measurements match the canvas render output.
-    const tempStyle = document.createElement('style')
-    tempStyle.textContent = [
-      'input, textarea, select {',
-      '  overflow: visible !important; height: auto !important;',
-      '  padding-bottom: 4px !important; line-height: 1.6 !important;',
-      '  word-break: break-word !important; overflow-wrap: break-word !important;',
-      '  white-space: normal !important; box-sizing: border-box !important;',
-      '}',
-      'textarea { min-height: 30px !important; }',
-      '.section { box-shadow: none !important; border: 1px solid #d8d8d8 !important; border-radius: 4px !important; }',
-      '.action-bar, #saved_note, .intro, .title-block .subtitle { display: none !important; }',
-    ].join('\n')
-    document.head.appendChild(tempStyle)
-
-    // Force reflow so measurements reflect the expanded-input layout.
-    formRoot.getBoundingClientRect()
-    const rootRect = formRoot.getBoundingClientRect()
-
-    // Collect "atom" bounding rects — elements that must not be split across pages.
-    // Page breaks are allowed between atoms (e.g. between fields in a section)
-    // but never within one. Grid containers are treated as single atoms so their
-    // cells are always kept on the same row.
-    const ATOM_SEL = [
-      '.field', '.section-title', '.section-header', '.header-banner', '.title-block',
-      '.consideration', '.criterion', '.conclusion-option', '.section-note',
-      '.body-diagram-wrapper', '.checklist', '.signoff-row',
-      '.two-col', '.three-col', '.four-col',
-    ].join(', ')
-
-    const atoms = Array.from(formRoot.querySelectorAll(ATOM_SEL)).filter(el => {
-      const s = window.getComputedStyle(el)
-      if (s.display === 'none' || s.visibility === 'hidden') return false
-      // Keep only the outermost atom — skip elements nested inside another atom
-      // (e.g. .field inside .two-col; .two-col is the atom that matters).
-      return !el.parentElement || !el.parentElement.closest(ATOM_SEL)
-    }).map(el => {
-      const r = el.getBoundingClientRect()
-      return {
-        top_px: (r.top - rootRect.top) * SCALE,
-        bottom_px: (r.bottom - rootRect.top) * SCALE,
-      }
-    })
-
-    // Render the entire form root to one tall canvas.
-    const canvas = await window.html2canvas(formRoot, {
-      scale: SCALE,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      scrollY: -window.scrollY,
-      onclone: (doc) => {
-        doc.querySelectorAll('.action-bar, #saved_note, .intro, .title-block .subtitle').forEach(e => e.style.display = 'none')
-        doc.querySelectorAll('.section').forEach(e => {
-          e.style.boxShadow = 'none'
-          e.style.border = '1px solid #d8d8d8'
-          e.style.borderRadius = '4px'
-        })
-        doc.querySelectorAll('input, textarea, select').forEach(e => {
-          e.style.background = '#fff'
-          e.style.overflow = 'visible'
-          e.style.height = 'auto'
-          e.style.minHeight = e.tagName === 'TEXTAREA' ? '30px' : ''
-          e.style.paddingBottom = '4px'
-          e.style.lineHeight = '1.6'
-          e.style.wordBreak = 'break-word'
-          e.style.overflowWrap = 'break-word'
-          e.style.whiteSpace = 'normal'
-          e.style.boxSizing = 'border-box'
-        })
-      },
-    })
-
-    // Remove the temporary measurement style.
-    document.head.removeChild(tempStyle)
-
-    // Derive canvas-px to mm scale for full-width A4 portrait output.
-    const cssW_mm = (canvas.width / SCALE) * (25.4 / 96)
-    const pxToMm = ((25.4 / 96) / SCALE) * (USABLE_W_MM / cssW_mm)
-    const USABLE_H_px = USABLE_H_MM / pxToMm
-
+    const PAGE_W_MM = 210
+    const PAGE_H_MM = 297
+    const MARGIN_MM = 12
+    const CONTENT_W_MM = PAGE_W_MM - (MARGIN_MM * 2)
+    const BOTTOM_MM = 12
     const pdf = new jsPDF('p', 'mm', 'a4')
-    const totalH_px = canvas.height
-    let pageStartPx = 0
-    let isFirst = true
 
-    while (pageStartPx < totalH_px - 1) {
-      if (!isFirst) pdf.addPage()
-      isFirst = false
+    let y = 14
+    const lineStep = 4.6
 
-      const idealCutPx = pageStartPx + USABLE_H_px
-      let cutPx
+    const clean = (text) => String(text || '').replace(/\s+/g, ' ').trim()
 
-      if (idealCutPx >= totalH_px) {
-        cutPx = totalH_px
-      } else {
-        const fullyFitting = atoms.filter(a => a.top_px >= pageStartPx && a.bottom_px <= idealCutPx)
-        if (fullyFitting.length > 0) {
-          cutPx = fullyFitting[fullyFitting.length - 1].bottom_px
-        } else {
-          const nextAtom = atoms.find(a => a.top_px > pageStartPx + 1)
-          cutPx = (nextAtom && nextAtom.top_px < idealCutPx) ? nextAtom.top_px : idealCutPx
+    const ensureSpace = (neededMm = lineStep) => {
+      if ((y + neededMm) > (PAGE_H_MM - BOTTOM_MM)) {
+        pdf.addPage()
+        y = 14
+      }
+    }
+
+    const writeBlock = (text, opts = {}) => {
+      const value = clean(text)
+      if (!value) return
+      const size = opts.size || 10
+      const weight = opts.weight || 'normal'
+      const gapAfter = opts.gapAfter ?? 1.5
+      pdf.setFont('helvetica', weight)
+      pdf.setFontSize(size)
+      const lines = pdf.splitTextToSize(value, CONTENT_W_MM)
+      for (const line of lines) {
+        ensureSpace(lineStep)
+        pdf.text(line, MARGIN_MM, y)
+        y += lineStep
+      }
+      y += gapAfter
+    }
+
+    const extractLabel = (el) => {
+      if (el.id) {
+        const linked = formRoot.querySelector(`label[for="${el.id}"]`)
+        if (linked) {
+          const text = clean(linked.textContent)
+          if (text) return text
         }
       }
-
-      if (cutPx <= pageStartPx) cutPx = Math.min(pageStartPx + USABLE_H_px, totalH_px)
-
-      const sliceTopPx = Math.max(0, Math.floor(pageStartPx))
-      let sliceBottomPx = Math.min(totalH_px, Math.floor(cutPx))
-      if (sliceBottomPx <= sliceTopPx) {
-        sliceBottomPx = Math.min(totalH_px, sliceTopPx + Math.max(1, Math.floor(USABLE_H_px)))
+      const wrapLabel = el.closest('label')
+      if (wrapLabel) {
+        const clone = wrapLabel.cloneNode(true)
+        clone.querySelectorAll('input, textarea, select').forEach(n => n.remove())
+        const text = clean(clone.textContent)
+        if (text) return text
       }
-
-      const sliceH_px = sliceBottomPx - sliceTopPx
-      const sliceCanvas = document.createElement('canvas')
-      sliceCanvas.width = canvas.width
-      sliceCanvas.height = sliceH_px
-      const ctx = sliceCanvas.getContext('2d')
-      ctx.fillStyle = '#fff'
-      ctx.fillRect(0, 0, canvas.width, sliceH_px)
-      ctx.drawImage(canvas, 0, sliceTopPx, canvas.width, sliceH_px, 0, 0, canvas.width, sliceH_px)
-
-      const sliceH_mm = sliceH_px * pxToMm
-      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', MARGIN_MM, MARGIN_MM, USABLE_W_MM, sliceH_mm)
-
-      pageStartPx = sliceBottomPx
+      const field = el.closest('.field, .criterion, .consideration')
+      if (field) {
+        const text = clean(field.querySelector('label, .field-label, .section-note')?.textContent)
+        if (text) return text
+      }
+      return clean(el.name || el.id || 'Field')
     }
+
+    const extractControlValue = (el) => {
+      const tag = (el.tagName || '').toLowerCase()
+      const type = (el.type || '').toLowerCase()
+      if (type === 'hidden' || type === 'button' || type === 'submit' || type === 'reset' || type === 'file') return ''
+      if (type === 'checkbox') return el.checked ? 'Yes' : ''
+      if (tag === 'select' && el.multiple) {
+        const selected = Array.from(el.selectedOptions || []).map(o => clean(o.textContent || o.value)).filter(Boolean)
+        return selected.join(', ')
+      }
+      return clean(el.value)
+    }
+
+    const title = clean(formRoot.querySelector('.title-block h1, h1')?.textContent) || 'Form Export'
+    writeBlock(title, { size: 14, weight: 'bold', gapAfter: 2 })
+    writeBlock(`Generated: ${new Date().toLocaleString()}`, { size: 9, gapAfter: 3 })
+
+    const sections = Array.from(formRoot.querySelectorAll('.section'))
+    const sectionNodes = sections.length ? sections : [formRoot]
+
+    sectionNodes.forEach((section, index) => {
+      const sectionTitle = clean(section.querySelector('.section-title, .section-header, h2, h3, legend')?.textContent) || `Section ${index + 1}`
+      const controls = Array.from(section.querySelectorAll('input, textarea, select')).filter(el => !el.disabled)
+      const rows = []
+      const seenRadio = new Set()
+
+      controls.forEach(el => {
+        const type = (el.type || '').toLowerCase()
+        if (type === 'radio') {
+          const groupName = el.name || el.id
+          if (!groupName || seenRadio.has(groupName)) return
+          seenRadio.add(groupName)
+          const checked = controls.find(c => (c.type || '').toLowerCase() === 'radio' && (c.name || c.id) === groupName && c.checked)
+          if (!checked) return
+          const label = extractLabel(checked)
+          const value = clean(checked.value) || 'Selected'
+          if (label && value) rows.push(`${label}: ${value}`)
+          return
+        }
+        const label = extractLabel(el)
+        const value = extractControlValue(el)
+        if (label && value) rows.push(`${label}: ${value}`)
+      })
+
+      if (!rows.length) return
+      writeBlock(sectionTitle, { size: 11, weight: 'bold', gapAfter: 1 })
+      rows.forEach(row => writeBlock(row, { size: 10, gapAfter: 0.8 }))
+      y += 1.5
+    })
 
     const now = new Date().toISOString().slice(0, 10)
     const nameVal = nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : ''
