@@ -85,9 +85,6 @@
     stroke-linejoin: round;
     pointer-events: none;
   }
-  .body-part { fill: rgba(255,255,255,0.01); stroke: transparent; stroke-width: 1.2; transition: fill 0.15s, stroke 0.15s; }
-  .body-part:hover { fill: rgba(231, 76, 60, 0.24); stroke: #c0392b; }
-  .body-part.marked { fill: rgba(231, 76, 60, 0.58); stroke: #922b21; }
   .diagram-hint { font-size: 10px; color: #aaa; font-style: italic; margin-top: 4px; text-align: center; }
   .area-tag { display: inline-block; background: #fdf0f0; border: 1px solid #e74c3c; color: #c0392b; border-radius: 10px; padding: 2px 8px; font-size: 11px; margin: 1px; }
   .clear-marks { background: none; border: 1px solid #ddd; color: #aaa; border-radius: 5px; padding: 3px 10px; font-size: 11px; cursor: pointer; margin-top: 4px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
@@ -281,33 +278,24 @@
       <div style="flex:0 0 auto;">
         <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
           <path class="body-outline" d="M90 20 C104 20 114 30 114 44 C114 56 104 66 90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
-          <ellipse class="body-part" cx="90" cy="44" rx="23" ry="25" data-label="Head"/>
-          <rect class="body-part" x="82" y="68" width="16" height="11" rx="4" data-label="Neck"/>
-          <ellipse class="body-part" cx="66" cy="88" rx="12" ry="10" data-label="Left shoulder"/>
-          <ellipse class="body-part" cx="114" cy="88" rx="12" ry="10" data-label="Right shoulder"/>
-          <path class="body-part" d="M70 80 L110 80 L114 126 L102 166 L78 166 L66 126 Z" data-label="Chest/torso"/>
-          <path class="body-part" d="M56 97 L68 104 L64 136 L50 132 L48 112 Z" data-label="Left upper arm"/>
-          <path class="body-part" d="M124 97 L132 112 L130 132 L116 136 L112 104 Z" data-label="Right upper arm"/>
-          <path class="body-part" d="M49 132 L63 136 L60 152 L47 160 L39 149 Z" data-label="Left forearm"/>
-          <path class="body-part" d="M117 136 L131 132 L141 149 L133 160 L120 152 Z" data-label="Right forearm"/>
-          <ellipse class="body-part" cx="44" cy="160" rx="8" ry="10" data-label="Left hand"/>
-          <ellipse class="body-part" cx="136" cy="160" rx="8" ry="10" data-label="Right hand"/>
-          <path class="body-part" d="M78 146 L102 146 L100 176 L80 176 Z" data-label="Abdomen"/>
-          <path class="body-part" d="M80 176 L90 176 L85 220 L68 252 L58 252 L72 210 Z" data-label="Left thigh"/>
-          <path class="body-part" d="M90 176 L100 176 L108 210 L122 252 L112 252 L95 220 Z" data-label="Right thigh"/>
-          <ellipse class="body-part" cx="70" cy="224" rx="8" ry="7" data-label="Left knee"/>
-          <ellipse class="body-part" cx="110" cy="224" rx="8" ry="7" data-label="Right knee"/>
-          <path class="body-part" d="M58 252 L68 252 L66 271 L52 271 Z" data-label="Left shin"/>
-          <path class="body-part" d="M112 252 L122 252 L128 271 L114 271 Z" data-label="Right shin"/>
-          <ellipse class="body-part" cx="51" cy="262" rx="15" ry="10" data-label="Left foot"/>
-          <ellipse class="body-part" cx="129" cy="262" rx="15" ry="10" data-label="Right foot"/>
-          <text x="90" y="310" text-anchor="middle" font-size="9" fill="#bbb" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Click to mark</text>
+          <text x="90" y="310" text-anchor="middle" font-size="9" fill="#888" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Mark on printed copy</text>
         </svg>
-        <div class="diagram-hint">Click areas to mark</div>
-        <div id="markedAreas" style="margin-top:5px;"></div>
-        <button class="clear-marks" onclick="clearMarks()">Clear</button>
+        <div class="diagram-hint">Body map is for handwritten annotation on the printed report.</div>
       </div>
       <div style="flex:1;">
+        <div class="field">
+          <label>Body parts affected (select all that apply)</label>
+          <div class="check-group">
+            <label><input type="checkbox"/> Head/face</label>
+            <label><input type="checkbox"/> Neck</label>
+            <label><input type="checkbox"/> Left arm/hand</label>
+            <label><input type="checkbox"/> Right arm/hand</label>
+            <label><input type="checkbox"/> Chest/back</label>
+            <label><input type="checkbox"/> Abdomen/hips</label>
+            <label><input type="checkbox"/> Left leg/foot</label>
+            <label><input type="checkbox"/> Right leg/foot</label>
+          </div>
+        </div>
         <div class="field">
           <label>Injury type(s)</label>
           <div class="check-group">
@@ -459,7 +447,6 @@
       .map((el, index) => (el.checked ? index : -1))
       .filter(index => index >= 0)
 
-    data.markedParts = Array.from(markedParts)
     return data
   }
 
@@ -470,20 +457,6 @@
         val.forEach(index => {
           if (checkboxes[index]) checkboxes[index].checked = true
         })
-        return
-      }
-
-      if (key === 'markedParts' && Array.isArray(val)) {
-        clearMarks()
-        val.forEach(label => {
-          const part = document.querySelector(`.body-part[data-label="${label}"]`)
-          if (part) {
-            markedParts.add(label)
-            part.classList.add('marked')
-          }
-        })
-        const c = document.getElementById('markedAreas')
-        c.innerHTML = [...markedParts].map(p => `<span class="area-tag">${p}</span>`).join('')
         return
       }
 
@@ -746,22 +719,8 @@
     }
   }
 
-  // ── Body diagram ──
-  const markedParts = new Set();
-  document.querySelectorAll('.body-part').forEach(p => {
-    p.addEventListener('click', function() {
-      const label = this.getAttribute('data-label');
-      if (markedParts.has(label)) { markedParts.delete(label); this.classList.remove('marked'); }
-      else { markedParts.add(label); this.classList.add('marked'); }
-      const c = document.getElementById('markedAreas');
-      c.innerHTML = [...markedParts].map(p => `<span class="area-tag">${p}</span>`).join('');
-    });
-  });
-  function clearMarks() {
-    markedParts.clear();
-    document.querySelectorAll('.body-part.marked').forEach(p => p.classList.remove('marked'));
-    document.getElementById('markedAreas').innerHTML = '';
-  }
+  // Body map is intentionally static and completed by hand after printing.
+  function clearMarks() {}
 
   // ── Section D toggle ──
   // Uses inline style with !important so print CSS cannot override it

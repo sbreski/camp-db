@@ -85,9 +85,6 @@
     stroke-linejoin: round;
     pointer-events: none;
   }
-  .body-part { fill: rgba(255,255,255,0.01); stroke: transparent; stroke-width: 1.2; transition: fill 0.15s, stroke 0.15s; }
-  .body-part:hover { fill: rgba(231, 76, 60, 0.24); stroke: #c0392b; }
-  .body-part.marked { fill: rgba(231, 76, 60, 0.58); stroke: #922b21; }
   .diagram-hint { font-size: 10px; color: #aaa; font-style: italic; margin-top: 4px; text-align: center; }
   .area-tag { display: inline-block; background: #fdf0f0; border: 1px solid #e74c3c; color: #c0392b; border-radius: 10px; padding: 2px 8px; font-size: 11px; margin: 1px; }
   .clear-marks { background: none; border: 1px solid #ddd; color: #aaa; border-radius: 5px; padding: 3px 10px; font-size: 11px; cursor: pointer; margin-top: 4px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
@@ -237,33 +234,24 @@
       <div style="flex:0 0 auto;">
         <svg id="bodySvg" class="body-svg" width="140" height="248" viewBox="0 0 180 320" xmlns="http://www.w3.org/2000/svg">
           <path class="body-outline" d="M90 20 C104 20 114 30 114 44 C114 56 104 66 90 66 C82 66 74 69 68 75 L56 88 C52 92 50 97 52 102 L38 136 C35 143 37 149 43 152 C49 155 55 152 58 146 L67 125 L70 176 L48 248 C42 248 36 253 36 260 C36 267 42 272 49 272 L72 272 C76 272 79 269 81 265 L90 212 L99 265 C101 269 104 272 108 272 L131 272 C138 272 144 267 144 260 C144 253 138 248 132 248 L110 176 L113 125 L122 146 C125 152 131 155 137 152 C143 149 145 143 142 136 L128 102 C130 97 128 92 124 88 L112 75 C106 69 98 66 90 66 Z"/>
-          <ellipse class="body-part" cx="90" cy="44" rx="23" ry="25" data-label="Head"/>
-          <rect class="body-part" x="82" y="68" width="16" height="11" rx="4" data-label="Neck"/>
-          <ellipse class="body-part" cx="66" cy="88" rx="12" ry="10" data-label="Left shoulder"/>
-          <ellipse class="body-part" cx="114" cy="88" rx="12" ry="10" data-label="Right shoulder"/>
-          <path class="body-part" d="M70 80 L110 80 L114 126 L102 166 L78 166 L66 126 Z" data-label="Chest/torso"/>
-          <path class="body-part" d="M56 97 L68 104 L64 136 L50 132 L48 112 Z" data-label="Left upper arm"/>
-          <path class="body-part" d="M124 97 L132 112 L130 132 L116 136 L112 104 Z" data-label="Right upper arm"/>
-          <path class="body-part" d="M49 132 L63 136 L60 152 L47 160 L39 149 Z" data-label="Left forearm"/>
-          <path class="body-part" d="M117 136 L131 132 L141 149 L133 160 L120 152 Z" data-label="Right forearm"/>
-          <ellipse class="body-part" cx="44" cy="160" rx="8" ry="10" data-label="Left hand"/>
-          <ellipse class="body-part" cx="136" cy="160" rx="8" ry="10" data-label="Right hand"/>
-          <path class="body-part" d="M78 146 L102 146 L100 176 L80 176 Z" data-label="Abdomen"/>
-          <path class="body-part" d="M80 176 L90 176 L85 220 L68 252 L58 252 L72 210 Z" data-label="Left thigh"/>
-          <path class="body-part" d="M90 176 L100 176 L108 210 L122 252 L112 252 L95 220 Z" data-label="Right thigh"/>
-          <ellipse class="body-part" cx="70" cy="224" rx="8" ry="7" data-label="Left knee"/>
-          <ellipse class="body-part" cx="110" cy="224" rx="8" ry="7" data-label="Right knee"/>
-          <path class="body-part" d="M58 252 L68 252 L66 271 L52 271 Z" data-label="Left shin"/>
-          <path class="body-part" d="M112 252 L122 252 L128 271 L114 271 Z" data-label="Right shin"/>
-          <ellipse class="body-part" cx="51" cy="262" rx="15" ry="10" data-label="Left foot"/>
-          <ellipse class="body-part" cx="129" cy="262" rx="15" ry="10" data-label="Right foot"/>
-          <text x="90" y="310" text-anchor="middle" font-size="9" fill="#bbb" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Click to mark</text>
+          <text x="90" y="310" text-anchor="middle" font-size="9" fill="#888" font-family="Helvetica Neue,Helvetica,Arial,sans-serif">Mark on printed copy</text>
         </svg>
-        <div class="diagram-hint">Click areas to mark</div>
-        <div id="markedAreas" style="margin-top:5px;"></div>
-        <button class="clear-marks" onclick="clearMarks()">Clear</button>
+        <div class="diagram-hint">Body map is for handwritten annotation on the printed report.</div>
       </div>
       <div style="flex:1;">
+        <div class="field">
+          <label>Body parts affected (select all that apply)</label>
+          <div class="check-group">
+            <label><input type="checkbox"/> Head/face</label>
+            <label><input type="checkbox"/> Neck</label>
+            <label><input type="checkbox"/> Left arm/hand</label>
+            <label><input type="checkbox"/> Right arm/hand</label>
+            <label><input type="checkbox"/> Chest/back</label>
+            <label><input type="checkbox"/> Abdomen/hips</label>
+            <label><input type="checkbox"/> Left leg/foot</label>
+            <label><input type="checkbox"/> Right leg/foot</label>
+          </div>
+        </div>
         <div class="field">
           <label>Injury type(s)</label>
           <div class="check-group">
@@ -393,7 +381,6 @@
       .map((el, index) => (el.checked ? index : -1))
       .filter(index => index >= 0)
 
-    data.markedParts = Array.from(markedParts)
     return data
   }
 
@@ -404,20 +391,6 @@
         val.forEach(index => {
           if (checkboxes[index]) checkboxes[index].checked = true
         })
-        return
-      }
-
-      if (key === 'markedParts' && Array.isArray(val)) {
-        clearMarks()
-        val.forEach(label => {
-          const part = document.querySelector(`.body-part[data-label="${label}"]`)
-          if (part) {
-            markedParts.add(label)
-            part.classList.add('marked')
-          }
-        })
-        const c = document.getElementById('markedAreas')
-        c.innerHTML = [...markedParts].map(p => `<span class="area-tag">${p}</span>`).join('')
         return
       }
 
@@ -594,42 +567,7 @@
       return extractLabel(checkedEl)
     }
 
-    const buildBodyMapZones = (markedLabels) => {
-      const zones = {
-        head: false,
-        neck: false,
-        torso: false,
-        leftArm: false,
-        rightArm: false,
-        leftHand: false,
-        rightHand: false,
-        leftLeg: false,
-        rightLeg: false,
-        leftFoot: false,
-        rightFoot: false,
-      }
-
-      ;(markedLabels || []).forEach(raw => {
-        const label = clean(raw).toLowerCase()
-        if (!label) return
-        if (label.includes('head')) zones.head = true
-        if (label.includes('neck')) zones.neck = true
-        if (label.includes('chest') || label.includes('torso') || label.includes('abdomen')) zones.torso = true
-        if (label.includes('left shoulder') || label.includes('left upper arm') || label.includes('left forearm')) zones.leftArm = true
-        if (label.includes('right shoulder') || label.includes('right upper arm') || label.includes('right forearm')) zones.rightArm = true
-        if (label.includes('left hand')) zones.leftHand = true
-        if (label.includes('right hand')) zones.rightHand = true
-        if (label.includes('left thigh') || label.includes('left knee') || label.includes('left shin')) zones.leftLeg = true
-        if (label.includes('right thigh') || label.includes('right knee') || label.includes('right shin')) zones.rightLeg = true
-        if (label.includes('left foot')) zones.leftFoot = true
-        if (label.includes('right foot')) zones.rightFoot = true
-      })
-
-      return zones
-    }
-
-    const drawMiniBodyMapAt = (markedLabels, boxX, boxY, boxW = 62, boxH = 72) => {
-      const zones = buildBodyMapZones(markedLabels)
+    const drawMiniBodyMapAt = (boxX, boxY, boxW = 62, boxH = 72) => {
       const cx = boxX + (boxW / 2)
       const top = boxY + 12
 
@@ -638,37 +576,15 @@
       pdf.roundedRect(boxX, boxY, boxW, boxH, 2, 2, 'FD')
       pdf.setFont('helvetica', 'bold')
       pdf.setFontSize(9)
-      pdf.text('Body map (summary)', boxX + 2, boxY + 6)
+      pdf.text('Body map', boxX + 2, boxY + 6)
 
-      const neutralStroke = [144, 154, 166]
-      const neutralFill = [236, 240, 245]
-      const markStroke = [183, 39, 33]
-      const markFill = [231, 76, 60]
-
-      const setStroke = (isMarked, width = 1.5) => {
-        const c = isMarked ? markStroke : neutralStroke
-        pdf.setDrawColor(c[0], c[1], c[2])
-        pdf.setLineWidth(width)
-      }
-
-      const drawJoint = (x, y, r, isMarked) => {
-        const fill = isMarked ? markFill : neutralFill
-        const stroke = isMarked ? markStroke : neutralStroke
-        pdf.setFillColor(fill[0], fill[1], fill[2])
-        pdf.setDrawColor(stroke[0], stroke[1], stroke[2])
-        pdf.circle(x, y, r, 'FD')
-      }
-
-      const drawLimb = (x1, y1, x2, y2, x3, y3, isMarked) => {
-        setStroke(isMarked, 1.9)
-        pdf.line(x1, y1, x2, y2)
-        pdf.line(x2, y2, x3, y3)
-      }
+      const stroke = [35, 35, 35]
+      pdf.setDrawColor(stroke[0], stroke[1], stroke[2])
+      pdf.setLineWidth(0.7)
 
       const headY = top
       const neckY = top + 6
       const shoulderY = top + 11
-      const chestY = top + 18
       const hipY = top + 30
       const kneeY = top + 44
       const ankleY = top + 57
@@ -687,37 +603,29 @@
       const lAnkleX = cx - 5.7
       const rAnkleX = cx + 5.7
 
-      drawJoint(cx, headY, 4.4, zones.head)
-      setStroke(zones.neck, 1.5)
+      pdf.circle(cx, headY, 4.4, 'S')
       pdf.line(cx, headY + 4.6, cx, neckY + 0.5)
 
-      const torsoMarked = zones.torso
-      pdf.setFillColor(torsoMarked ? markFill[0] : neutralFill[0], torsoMarked ? markFill[1] : neutralFill[1], torsoMarked ? markFill[2] : neutralFill[2])
-      pdf.setDrawColor(torsoMarked ? markStroke[0] : neutralStroke[0], torsoMarked ? markStroke[1] : neutralStroke[1], torsoMarked ? markStroke[2] : neutralStroke[2])
-      pdf.ellipse(cx, chestY + 6.2, 7.2, 11.2, 'FD')
-      setStroke(torsoMarked, 1.2)
+      pdf.ellipse(cx, top + 24, 7.2, 11.2, 'S')
       pdf.line(cx, neckY + 0.8, cx, hipY + 0.5)
       pdf.line(lShoulderX, shoulderY, rShoulderX, shoulderY)
       pdf.line(lHipX, hipY, rHipX, hipY)
 
-      drawLimb(lShoulderX, shoulderY, lElbowX, shoulderY + 8, lHandX, shoulderY + 17.5, zones.leftArm)
-      drawLimb(rShoulderX, shoulderY, rElbowX, shoulderY + 8, rHandX, shoulderY + 17.5, zones.rightArm)
-      drawJoint(lHandX, shoulderY + 18.2, 1.8, zones.leftHand)
-      drawJoint(rHandX, shoulderY + 18.2, 1.8, zones.rightHand)
+      pdf.line(lShoulderX, shoulderY, lElbowX, shoulderY + 8)
+      pdf.line(lElbowX, shoulderY + 8, lHandX, shoulderY + 17.5)
+      pdf.line(rShoulderX, shoulderY, rElbowX, shoulderY + 8)
+      pdf.line(rElbowX, shoulderY + 8, rHandX, shoulderY + 17.5)
+      pdf.circle(lHandX, shoulderY + 18.2, 1.8, 'S')
+      pdf.circle(rHandX, shoulderY + 18.2, 1.8, 'S')
 
-      drawLimb(lHipX, hipY, lKneeX, kneeY, lAnkleX, ankleY, zones.leftLeg)
-      drawLimb(rHipX, hipY, rKneeX, kneeY, rAnkleX, ankleY, zones.rightLeg)
-      drawJoint(lKneeX, kneeY, 1.7, zones.leftLeg)
-      drawJoint(rKneeX, kneeY, 1.7, zones.rightLeg)
-
-      const lf = zones.leftFoot
-      const rf = zones.rightFoot
-      pdf.setFillColor(lf ? markFill[0] : neutralFill[0], lf ? markFill[1] : neutralFill[1], lf ? markFill[2] : neutralFill[2])
-      pdf.setDrawColor(lf ? markStroke[0] : neutralStroke[0], lf ? markStroke[1] : neutralStroke[1], lf ? markStroke[2] : neutralStroke[2])
-      pdf.ellipse(lAnkleX - 0.8, ankleY + 2.2, 3.2, 1.5, 'FD')
-      pdf.setFillColor(rf ? markFill[0] : neutralFill[0], rf ? markFill[1] : neutralFill[1], rf ? markFill[2] : neutralFill[2])
-      pdf.setDrawColor(rf ? markStroke[0] : neutralStroke[0], rf ? markStroke[1] : neutralStroke[1], rf ? markStroke[2] : neutralStroke[2])
-      pdf.ellipse(rAnkleX + 0.8, ankleY + 2.2, 3.2, 1.5, 'FD')
+      pdf.line(lHipX, hipY, lKneeX, kneeY)
+      pdf.line(lKneeX, kneeY, lAnkleX, ankleY)
+      pdf.line(rHipX, hipY, rKneeX, kneeY)
+      pdf.line(rKneeX, kneeY, rAnkleX, ankleY)
+      pdf.circle(lKneeX, kneeY, 1.7, 'S')
+      pdf.circle(rKneeX, kneeY, 1.7, 'S')
+      pdf.ellipse(lAnkleX - 0.8, ankleY + 2.2, 3.2, 1.5, 'S')
+      pdf.ellipse(rAnkleX + 0.8, ankleY + 2.2, 3.2, 1.5, 'S')
 
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(7)
@@ -725,12 +633,10 @@
       pdf.text('L', cx - 16.5, shoulderY + 1)
       pdf.text('R', cx + 15.2, shoulderY + 1)
 
-      pdf.setLineWidth(0.2)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(8)
+      pdf.setFont('helvetica', 'italic')
+      pdf.setFontSize(7.5)
       pdf.setTextColor(90)
-      const markedCount = (markedLabels || []).length
-      pdf.text(markedCount ? `${markedCount} area(s) marked` : 'No areas marked', boxX + 2, boxY + boxH - 3)
+      pdf.text('Complete by hand on printed copy', boxX + 2, boxY + boxH - 3)
       pdf.setTextColor(0)
 
       return boxH
@@ -822,15 +728,6 @@
       const rows = []
       const seenRadio = new Set()
       const seenCheckboxGroups = new Set()
-      const marked = isInjurySection ? Array.from(markedParts || []) : []
-
-      if (isInjurySection) {
-        rows.push({
-          label: 'Body map markings',
-          value: marked.length ? marked.join(', ') : 'No areas marked on body map',
-        })
-      }
-
       controls.forEach(el => {
         const type = (el.type || '').toLowerCase()
         if (type === 'radio') {
@@ -888,7 +785,7 @@
         rows.forEach(row => {
           leftY = writeFieldRowInColumn(row.label, row.value, leftX, leftW, leftY)
         })
-        const mapHeight = drawMiniBodyMapAt(marked, rightX, rowTopY, rightW, 72)
+        const mapHeight = drawMiniBodyMapAt(rightX, rowTopY, rightW, 72)
         y = Math.max(leftY, rowTopY + mapHeight + 2)
         y += 1.8
         return
@@ -1090,22 +987,8 @@
     if (btn) btn.textContent = document.fullscreenElement ? '⤢ Exit full screen' : '⤢ Full screen';
   });
 
-  // ── Body diagram ──
-  const markedParts = new Set();
-  document.querySelectorAll('.body-part').forEach(p => {
-    p.addEventListener('click', function() {
-      const label = this.getAttribute('data-label');
-      if (markedParts.has(label)) { markedParts.delete(label); this.classList.remove('marked'); }
-      else { markedParts.add(label); this.classList.add('marked'); }
-      const c = document.getElementById('markedAreas');
-      c.innerHTML = [...markedParts].map(p => `<span class="area-tag">${p}</span>`).join('');
-    });
-  });
-  function clearMarks() {
-    markedParts.clear();
-    document.querySelectorAll('.body-part.marked').forEach(p => p.classList.remove('marked'));
-    document.getElementById('markedAreas').innerHTML = '';
-  }
+  // Body map is intentionally static and completed by hand after printing.
+  function clearMarks() {}
 
   // ── Section D toggle ──
   // Uses inline style with !important so print CSS cannot override it
