@@ -637,7 +637,7 @@ export default function ParticipantDetail({
       ? participant.noteHistory
       : []
 
-  const hasMedical = participant.medicalType?.length > 0 || participant.medicalDetails
+  const hasMedical = participant.medicalType?.length > 0 || participant.medicalCondition || participant.medicalDetails
   const hasConsents = Boolean(
     participant.photoConsent
     || participant.otcConsent
@@ -667,9 +667,10 @@ export default function ParticipantDetail({
     { key: 'homePhone', label: 'Home Phone', type: 'text' },
     { key: 'can_leave_alone', label: 'Permission to Leave Unaccompanied', type: 'boolean' },
     { key: 'approvedAdults', label: 'Approved Adults', type: 'textarea' },
-    { key: 'medicalDetails', label: 'Medical Info', type: 'textarea' },
+    { key: 'medicalCondition', label: 'Medical Condition', type: 'text' },
+    { key: 'medicalDetails', label: 'Medical Details', type: 'textarea' },
     { key: 'allergyDetails', label: 'Allergy Details', type: 'textarea' },
-    { key: 'dietaryType', label: 'Dietary Requirements', type: 'text' },
+    { key: 'dietaryType', label: 'Dietary Type', type: 'text' },
     { key: 'otcNotes', label: 'Medication Details / OTC Notes', type: 'textarea' },
     { key: 'sendNeeds', label: 'Additional Needs / SEND Support', type: 'textarea' },
     { key: 'sendDiagnosed', label: 'EHCP / Diagnosed', type: 'boolean' },
@@ -700,6 +701,7 @@ export default function ParticipantDetail({
       homePhone: String(sourceParticipant?.homePhone || ''),
       can_leave_alone: Boolean(sourceParticipant?.can_leave_alone ?? sourceParticipant?.canLeaveAlone),
       approvedAdults: String(sourceParticipant?.approvedAdults || ''),
+      medicalCondition: String(sourceParticipant?.medicalCondition || ''),
       medicalDetails: String(sourceParticipant?.medicalDetails || ''),
       allergyDetails: String(sourceParticipant?.allergyDetails || ''),
       dietaryType: String(sourceParticipant?.dietaryType || ''),
@@ -734,9 +736,10 @@ export default function ParticipantDetail({
     ['Permission to Leave Unaccompanied', (participant.can_leave_alone || participant.canLeaveAlone) ? 'Yes' : 'No'],
     ['Approved Adults', participant.approvedAdults],
     ['Medical Type', Array.isArray(participant.medicalType) ? participant.medicalType.join(', ') : participant.medicalType],
-    ['Medical Info', participant.medicalDetails],
+    ['Medical Condition', participant.medicalCondition],
+    ['Medical Details', participant.medicalDetails],
     ['Allergy Details', participant.allergyDetails],
-    ['Dietary Requirements', participant.dietaryType],
+    ['Dietary Type', participant.dietaryType],
     ['Medication Details / OTC Notes', participant.otcNotes],
     ['Additional Needs / SEND Support', participant.sendNeeds],
     ['EHCP / Diagnosed', participant.sendDiagnosed ? 'Yes' : 'No'],
@@ -842,6 +845,7 @@ export default function ParticipantDetail({
         homePhone: String(uploadedDataDraft.homePhone || '').trim(),
         can_leave_alone: Boolean(uploadedDataDraft.can_leave_alone),
         approvedAdults: String(uploadedDataDraft.approvedAdults || '').trim(),
+        medicalCondition: String(uploadedDataDraft.medicalCondition || '').trim(),
         medicalDetails: String(uploadedDataDraft.medicalDetails || '').trim(),
         allergyDetails: String(uploadedDataDraft.allergyDetails || '').trim(),
         dietaryType: String(uploadedDataDraft.dietaryType || '').trim(),

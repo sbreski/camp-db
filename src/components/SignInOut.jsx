@@ -2154,7 +2154,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
 
               const hasAllergy = p.medicalType?.includes('Allergy') || Boolean(String(p.allergyDetails || '').trim())
               const hasDietary = p.medicalType?.includes('Dietary') || Boolean(String(p.dietaryType || '').trim()) || Boolean(String(p.mealAdjustments || '').trim())
-              const hasMedical = p.medicalType?.includes('Medical')
+              const hasMedical = p.medicalType?.includes('Medical') || Boolean(String(p.medicalCondition || '').trim())
               const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
               const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
               const hasSend = Boolean(String(p.sendNeeds || '').trim()) || hasDiagnosedSend
@@ -2162,10 +2162,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const pendingFollowUps = getPendingFollowUps(p.id)
               const pendingMarFollowUps = getPendingMarFollowUps(p.id)
               const allergyTooltip = String(p.allergyDetails || '').trim() || 'No details recorded'
-              const dietaryTooltip = [
-                String(p.dietaryType || '').trim(),
-                String(p.mealAdjustments || '').trim(),
-              ].filter(Boolean).join(' - ') || 'No details recorded'
+              const dietaryTooltip = String(p.dietaryType || '').trim() || 'No dietary type recorded'
+              const medicalTooltip = String(p.medicalCondition || '').trim() || 'No medical condition recorded'
+              const sendTooltip = String(p.sendDiagnosis || '').trim() || 'No diagnosis recorded'
               const collectedByLabel = collectorDisplayLabel(rec?.collectedBy)
               const signInBy = rec?.signInBy || rec?.sign_in_by || null
               const signOutBy = rec?.signOutBy || rec?.sign_out_by || null
@@ -2235,7 +2234,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       {hasMedical && (
                         <span
                           className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 cursor-help"
-                          title={String(p.medicalDetails || '').trim() || 'No medical details recorded'}
+                          title={medicalTooltip}
                         >
                           M
                         </span>
@@ -2243,11 +2242,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                       {hasSend && (
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-help ${hasDiagnosedSend ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-purple-100 text-purple-700 border-purple-200'}`}
-                          title={hasDiagnosedSend ? [
-                            p.sendDiagnosed ? 'Formally diagnosed SEND' : 'SEND diagnosis recorded',
-                            p.sendDiagnosis ? `Diagnosis: ${p.sendDiagnosis}` : '',
-                            p.sendNeeds ? `Support needs: ${p.sendNeeds}` : '',
-                          ].filter(Boolean).join('\n') : (String(p.sendNeeds || '').trim() || 'No SEND/support details recorded')}
+                          title={sendTooltip}
                         >
                           S
                         </span>

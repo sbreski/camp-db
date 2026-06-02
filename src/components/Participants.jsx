@@ -430,6 +430,7 @@ export default function Participants({ participants, setParticipants, deletePart
       approvedAdults: String(participant.approvedAdults || ''),
       photoConsent: String(participant.photoConsent || 'yes'),
       medicalTypeText: Array.isArray(participant.medicalType) ? participant.medicalType.join(', ') : String(participant.medicalType || ''),
+      medicalCondition: String(participant.medicalCondition || ''),
       medicalDetails: String(participant.medicalDetails || ''),
       allergyDetails: String(participant.allergyDetails || ''),
       dietaryType: String(participant.dietaryType || ''),
@@ -548,6 +549,7 @@ export default function Participants({ participants, setParticipants, deletePart
         approvedAdults: String(draft.approvedAdults || '').trim(),
         photoConsent: normalizedPhotoConsent === 'no' ? 'no' : normalizedPhotoConsent === 'internal' ? 'internal' : 'yes',
         medicalType: normalizeMedicalTypeFromText(draft.medicalTypeText),
+        medicalCondition: String(draft.medicalCondition || '').trim(),
         medicalDetails: String(draft.medicalDetails || '').trim(),
         allergyDetails: String(draft.allergyDetails || '').trim(),
         dietaryType: String(draft.dietaryType || '').trim(),
@@ -752,9 +754,10 @@ export default function Participants({ participants, setParticipants, deletePart
                       'Approved Adults',
                       'Photo Consent',
                       'Medical Type',
-                      'Medical Info',
+                      'Medical Condition',
+                      'Medical Details',
                       'Allergy Details',
-                      'Dietary Requirements',
+                      'Dietary Type',
                       'Medication Details / OTC Notes',
                       'Additional Needs / SEND Support',
                       'EHCP / Diagnosed',
@@ -879,6 +882,11 @@ export default function Participants({ participants, setParticipants, deletePart
                           {allTableEditing ? (
                             <input className="input py-1" value={rowDraft.medicalTypeText} onChange={e => updateAllTableDraft(p.id, 'medicalTypeText', e.target.value)} placeholder="Allergy, Medical" />
                           ) : (Array.isArray(p.medicalType) ? (p.medicalType.join(', ') || '—') : (p.medicalType || '—'))}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.medicalCondition || ''} onChange={e => updateAllTableDraft(p.id, 'medicalCondition', e.target.value)} />
+                          ) : (p.medicalCondition || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-pre-wrap">
                           {allTableEditing ? (

@@ -15,7 +15,7 @@ const EMPTY = {
   photoConsent: 'yes', otcConsent: false,
   otcAllowedItems: [], otcNotes: '',
   dietaryType: '', allergyDetails: '', mealAdjustments: '',
-  medicalType: [], medicalDetails: '',
+  medicalType: [], medicalCondition: '', medicalDetails: '',
   sendNeeds: '', sendDiagnosed: false, sendDiagnosis: '',
   isActiveThisSeason: true,
   notes: '',
@@ -539,6 +539,13 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             )}
             {form.medicalType.includes('Medical') && (
               <div>
+                <label className="label">Medical Condition</label>
+                <input
+                  className="input"
+                  value={form.medicalCondition || ''}
+                  onChange={e => set('medicalCondition', e.target.value)}
+                  placeholder="e.g. Asthma, Epilepsy"
+                />
                 <label className="label">Medical Details</label>
                 <textarea
                   className="input resize-none"

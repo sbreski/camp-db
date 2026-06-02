@@ -26,6 +26,7 @@ const FIELD_MAP = {
   approvedAdults: ['approved adults', 'approved', 'authorised adults', 'authorized adults', 'collection', 'please provide names of adults permitted to pick up my child from camp this will be separated by commas'],
   can_leave_alone: ['can leave alone', 'can_leave_alone', 'leave alone', 'can go home alone', 'self leave', 'permission to leave unaccompanied', 'permission to leave unaccompanied wording for answer is i give my child permission to travel home by themselves only relevant to pupils 11 or myself or an authorised adult named below will collect my child after each session'],
   medicalType: ['medical type', 'medical types', 'medical category', 'medical categories'],
+  medicalCondition: ['medical condition', 'condition', 'condition name', 'primary medical condition', 'medical diagnosis'],
   medicalDetails: ['medical', 'medical details', 'medical info', 'health', 'allergies', 'dietary', 'does your child have any medical conditions we should be aware of', 'medical info', 'does your child need to take medication during the camp day', 'medication details'],
   dietaryType: ['dietary type', 'dietary requirements', 'dietary'],
   allergyDetails: ['allergy details', 'allergies', 'allergy info', 'please tell us about any allergies intolerances or dietary requirements your child has'],
@@ -304,7 +305,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
     parent2Name: 'Additional Adult Name', parent2Email: 'Additional Adult Email', parent2Phone: 'Additional Adult Phone',
     homePhone: 'Home Phone',
     siblings: 'Siblings?', siblingsName: 'Siblings Name', familyGroupKey: 'Family Group Key',
-    approvedAdults: 'Approved Adults', medicalDetails: 'Medical Details',
+    approvedAdults: 'Approved Adults', medicalCondition: 'Medical Condition', medicalDetails: 'Medical Details',
     can_leave_alone: 'Can Leave Alone',
     medicalType: 'Medical Type', dietaryType: 'Dietary Type', allergyDetails: 'Allergy Details',
     sendNeeds: 'SEND / Support Needs', sendDiagnosed: 'SEND Diagnosed', sendDiagnosis: 'SEND Diagnosis',
@@ -471,7 +472,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           p[field] = parseCsvList(raw)
           return
         }
-        if (field === 'medicalDetails' || field === 'allergyDetails' || field === 'dietaryType') {
+        if (field === 'medicalCondition' || field === 'medicalDetails' || field === 'allergyDetails' || field === 'dietaryType') {
           p[field] = isExplicitNegativeText(raw) ? '' : (raw || '')
           return
         }
@@ -525,6 +526,10 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       }
 
       if (!Array.isArray(p.medicalType)) p.medicalType = []
+      if (!String(p.medicalCondition || '').trim() && String(p.medicalDetails || '').trim()) {
+        // Backward compatibility: older CSVs often only provided a single medical details/info column.
+        p.medicalCondition = String(p.medicalDetails || '').trim()
+      }
       if (p.sendDiagnosed !== true && hasMeaningfulSendText(p.sendDiagnosis)) {
         p.sendDiagnosed = true
       }
@@ -585,9 +590,10 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'Approved Adults',
       'Photo Consent',
       'Medical Type',
-      'Medical Info',
+      'Medical Condition',
+      'Medical Details',
       'Allergy Details',
-      'Dietary Requirements',
+      'Dietary Type',
       'Medication Details / OTC Notes',
       'Additional Needs / SEND Support',
       'EHCP / Diagnosed',
