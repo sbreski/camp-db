@@ -46,18 +46,36 @@ function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '')
 }
 
-function getDefaultLinkedParticipantIds(participant, allParticipants) {
-  const nameKey = normalizeText(participant.parentName)
-  const emailKey = normalizeText(participant.parentEmail)
-  const phoneKey = normalizePhone(participant.parentPhone)
+function getParticipantContactKeys(participant) {
+  return {
+    names: [participant?.parentName, participant?.parent2Name]
+      .map(normalizeText)
+      .filter(Boolean),
+    emails: [participant?.parentEmail, participant?.parent2Email]
+      .map(normalizeText)
+      .filter(Boolean),
+    phones: [participant?.parentPhone, participant?.parent2Phone, participant?.homePhone]
+      .map(normalizePhone)
+      .filter(Boolean),
+  }
+}
 
+function contactsMatch(source, target) {
+  const sourceKeys = getParticipantContactKeys(source)
+  const targetKeys = getParticipantContactKeys(target)
+
+  const sharesName = sourceKeys.names.some(value => targetKeys.names.includes(value))
+  const sharesEmail = sourceKeys.emails.some(value => targetKeys.emails.includes(value))
+  const sharesPhone = sourceKeys.phones.some(value => targetKeys.phones.includes(value))
+
+  return sharesName || sharesEmail || sharesPhone
+}
+
+function getDefaultLinkedParticipantIds(participant, allParticipants) {
   const matches = allParticipants
     .filter(p => {
       if (participant.id === p.id) return true
-      const sameName = nameKey && normalizeText(p.parentName) === nameKey
-      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
-      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
-      return sameName || sameEmail || samePhone
+      return contactsMatch(participant, p)
     })
     .map(p => p.id)
 
@@ -65,17 +83,8 @@ function getDefaultLinkedParticipantIds(participant, allParticipants) {
 }
 
 function getLikelySiblingIdsFromContact(contact, allParticipants, fallbackParticipantId) {
-  const nameKey = normalizeText(contact.parentName)
-  const emailKey = normalizeText(contact.parentEmail)
-  const phoneKey = normalizePhone(contact.parentPhone)
-
   const matches = allParticipants
-    .filter(p => {
-      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
-      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
-      const sameName = nameKey && normalizeText(p.parentName) === nameKey
-      return sameEmail || samePhone || sameName
-    })
+    .filter(p => contactsMatch(contact, p))
     .map(p => p.id)
 
   return matches.length > 0 ? matches : [fallbackParticipantId]
@@ -86,7 +95,11 @@ export default function Parents({ participants, onUpdateParticipants }) {
   const [search, setSearch] = useState('')
   const [selectedParents, setSelectedParents] = useState(new Set())
   const [editingId, setEditingId] = useState(null)
-  const [editingContact, setEditingContact] = useState({ parentName: '', parentEmail: '', parentPhone: '' })
+  const [editingContact, setEditingContact] = useState({
+    parentName: '', parentEmail: '', parentPhone: '',
+    parent2Name: '', parent2Email: '', parent2Phone: '',
+    homePhone: '',
+  })
   const [editingAdults, setEditingAdults] = useState([])
   const [editingLinkedParticipantIds, setEditingLinkedParticipantIds] = useState([])
   const [newAdultName, setNewAdultName] = useState('')
@@ -113,6 +126,10 @@ export default function Parents({ participants, onUpdateParticipants }) {
       parentName: participant.parentName || '',
       parentEmail: participant.parentEmail || '',
       parentPhone: participant.parentPhone || '',
+      parent2Name: participant.parent2Name || '',
+      parent2Email: participant.parent2Email || '',
+      parent2Phone: participant.parent2Phone || '',
+      homePhone: participant.homePhone || '',
     })
     setEditingAdults(adults.map(parseAdultEntry))
     setEditingLinkedParticipantIds(getDefaultLinkedParticipantIds(participant, participants))
@@ -122,7 +139,11 @@ export default function Parents({ participants, onUpdateParticipants }) {
 
   function cancelEdit() {
     setEditingId(null)
-    setEditingContact({ parentName: '', parentEmail: '', parentPhone: '' })
+    setEditingContact({
+      parentName: '', parentEmail: '', parentPhone: '',
+      parent2Name: '', parent2Email: '', parent2Phone: '',
+      homePhone: '',
+    })
     setEditingAdults([])
     setEditingLinkedParticipantIds([])
     setNewAdultName('')
@@ -192,12 +213,20 @@ export default function Parents({ participants, onUpdateParticipants }) {
     if (parentName && !hasSameAdult(normalizedAdults, parentName)) {
       normalizedAdults.unshift(formatParentLabel(parentName))
     }
+    const parent2Name = String(editingContact.parent2Name || '').trim()
+    if (parent2Name && !hasSameAdult(normalizedAdults, parent2Name)) {
+      normalizedAdults.unshift(formatParentLabel(parent2Name))
+    }
 
     const targetIds = editingLinkedParticipantIds.length > 0 ? editingLinkedParticipantIds : [participant.id]
     onUpdateParticipants(targetIds, {
       parentName,
       parentEmail: editingContact.parentEmail.trim(),
       parentPhone: editingContact.parentPhone.trim(),
+      parent2Name,
+      parent2Email: String(editingContact.parent2Email || '').trim(),
+      parent2Phone: String(editingContact.parent2Phone || '').trim(),
+      homePhone: String(editingContact.homePhone || '').trim(),
       approvedAdults: normalizedAdults.join(', '),
     })
     cancelEdit()
@@ -206,12 +235,13 @@ export default function Parents({ participants, onUpdateParticipants }) {
   function emailSelectedParents() {
     const selectedEmails = filtered
       .filter(p => selectedParents.has(p.id))
-      .map(p => p.parentEmail)
+      .flatMap(p => [p.parentEmail, p.parent2Email])
+      .map(email => String(email || '').trim())
       .filter(email => email)
 
     if (selectedEmails.length === 0) return
 
-    const bcc = selectedEmails.join(',')
+    const bcc = [...new Set(selectedEmails)].join(',')
     const mailtoLink = `mailto:?bcc=${encodeURIComponent(bcc)}`
     window.open(mailtoLink, '_blank')
   }
@@ -221,13 +251,17 @@ export default function Parents({ participants, onUpdateParticipants }) {
   }
 
   const filtered = participants
-    .filter(p => p.parentName || p.parentEmail || p.parentPhone)
+    .filter(p => p.parentName || p.parentEmail || p.parentPhone || p.parent2Name || p.parent2Email || p.parent2Phone || p.homePhone)
     .filter(p => {
       const query = search.toLowerCase()
       return !query ||
         p.parentName?.toLowerCase().includes(query) ||
+        p.parent2Name?.toLowerCase().includes(query) ||
         p.parentEmail?.toLowerCase().includes(query) ||
+        p.parent2Email?.toLowerCase().includes(query) ||
         p.parentPhone?.toLowerCase().includes(query) ||
+        p.parent2Phone?.toLowerCase().includes(query) ||
+        p.homePhone?.toLowerCase().includes(query) ||
         p.name.toLowerCase().includes(query)
     })
     .sort((a, b) => {
@@ -306,7 +340,8 @@ export default function Parents({ participants, onUpdateParticipants }) {
                   </th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Participant</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Pronouns</th>
-                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Parent Name</th>
+                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Primary Adult</th>
+                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Additional Adult</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Email</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Phone</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Approved Adults</th>
@@ -347,23 +382,54 @@ export default function Parents({ participants, onUpdateParticipants }) {
                       <td className="py-3 px-4 text-sm font-medium text-forest-950">
                         {p.parentName || <span className="bg-red-100 text-red-700 px-1 rounded">Missing</span>}
                       </td>
-                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.parentEmail ? 'bg-red-100 text-red-700' : ''}`}> 
-                        {p.parentEmail ? (
-                          <a
-                            href={`mailto:?bcc=${encodeURIComponent(p.parentEmail)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-forest-600 hover:text-forest-800 hover:underline"
-                          >
-                            {p.parentEmail}
-                          </a>
+                      <td className="py-3 px-4 text-sm text-stone-700">
+                        {p.parent2Name || <span className="text-stone-400">—</span>}
+                      </td>
+                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.parentEmail && !p.parent2Email ? 'bg-red-100 text-red-700' : ''}`}> 
+                        {(p.parentEmail || p.parent2Email) ? (
+                          <div className="space-y-1">
+                            {p.parentEmail && (
+                              <a
+                                href={`mailto:?bcc=${encodeURIComponent(p.parentEmail)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-forest-600 hover:text-forest-800 hover:underline"
+                              >
+                                {p.parentEmail}
+                              </a>
+                            )}
+                            {p.parent2Email && (
+                              <a
+                                href={`mailto:?bcc=${encodeURIComponent(p.parent2Email)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-forest-600 hover:text-forest-800 hover:underline"
+                              >
+                                {p.parent2Email}
+                              </a>
+                            )}
+                          </div>
                         ) : 'Missing'}
                       </td>
-                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.parentPhone ? 'bg-red-100 text-red-700' : ''}`}> 
-                        {p.parentPhone ? (
-                          <a href={`tel:${p.parentPhone}`} className="text-forest-600 hover:text-forest-800 hover:underline">
-                            {p.parentPhone}
-                          </a>
+                      <td className={`py-3 px-4 text-sm text-stone-700 ${!p.parentPhone && !p.parent2Phone && !p.homePhone ? 'bg-red-100 text-red-700' : ''}`}> 
+                        {(p.parentPhone || p.parent2Phone || p.homePhone) ? (
+                          <div className="space-y-1">
+                            {p.parentPhone && (
+                              <a href={`tel:${p.parentPhone}`} className="block text-forest-600 hover:text-forest-800 hover:underline">
+                                {p.parentPhone}
+                              </a>
+                            )}
+                            {p.parent2Phone && (
+                              <a href={`tel:${p.parent2Phone}`} className="block text-forest-600 hover:text-forest-800 hover:underline">
+                                {p.parent2Phone}
+                              </a>
+                            )}
+                            {p.homePhone && (
+                              <a href={`tel:${p.homePhone}`} className="block text-forest-600 hover:text-forest-800 hover:underline">
+                                Home: {p.homePhone}
+                              </a>
+                            )}
+                          </div>
                         ) : 'Missing'}
                       </td>
                       <td className={`py-3 px-4 text-sm text-stone-700 ${adults.length === 0 ? 'bg-red-100 text-red-700' : ''}`}> 
@@ -389,7 +455,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
                     </tr>
                     {editingId === p.id && (
                       <tr className="bg-stone-50">
-                        <td colSpan="8" className="px-4 py-3">
+                        <td colSpan="9" className="px-4 py-3">
                           <div className="rounded-2xl border border-stone-200 bg-white p-4 space-y-4">
                             <div className="flex flex-col gap-1 border-b border-stone-100 pb-3">
                               <p className="text-sm font-semibold text-forest-950">
@@ -402,7 +468,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               <div>
-                                <label className="label">Parent/Guardian Name</label>
+                                <label className="label">Primary Adult Name</label>
                                 <input
                                   className="input"
                                   value={editingContact.parentName}
@@ -411,7 +477,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
                                 />
                               </div>
                               <div>
-                                <label className="label">Parent/Guardian Email</label>
+                                <label className="label">Primary Adult Email</label>
                                 <input
                                   className="input"
                                   type="email"
@@ -421,13 +487,52 @@ export default function Parents({ participants, onUpdateParticipants }) {
                                 />
                               </div>
                               <div>
-                                <label className="label">Parent/Guardian Phone</label>
+                                <label className="label">Primary Adult Phone</label>
                                 <input
                                   className="input"
                                   type="tel"
                                   value={editingContact.parentPhone}
                                   onChange={e => setEditingContact(prev => ({ ...prev, parentPhone: e.target.value }))}
                                   placeholder="+44 7700 000000"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Additional Adult Name</label>
+                                <input
+                                  className="input"
+                                  value={editingContact.parent2Name}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parent2Name: e.target.value }))}
+                                  placeholder="Second parent / guardian"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Additional Adult Email</label>
+                                <input
+                                  className="input"
+                                  type="email"
+                                  value={editingContact.parent2Email}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parent2Email: e.target.value }))}
+                                  placeholder="adult@email.com"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Additional Adult Phone</label>
+                                <input
+                                  className="input"
+                                  type="tel"
+                                  value={editingContact.parent2Phone}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parent2Phone: e.target.value }))}
+                                  placeholder="+44 7700 000000"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Home Phone</label>
+                                <input
+                                  className="input"
+                                  type="tel"
+                                  value={editingContact.homePhone}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, homePhone: e.target.value }))}
+                                  placeholder="020 7000 0000"
                                 />
                               </div>
                             </div>

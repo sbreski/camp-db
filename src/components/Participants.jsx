@@ -421,6 +421,10 @@ export default function Participants({ participants, setParticipants, deletePart
       parentName: String(participant.parentName || ''),
       parentPhone: String(participant.parentPhone || ''),
       parentEmail: String(participant.parentEmail || ''),
+      parent2Name: String(participant.parent2Name || ''),
+      parent2Phone: String(participant.parent2Phone || ''),
+      parent2Email: String(participant.parent2Email || ''),
+      homePhone: String(participant.homePhone || ''),
       can_leave_alone: Boolean(participant.can_leave_alone ?? participant.canLeaveAlone),
       approvedAdults: String(participant.approvedAdults || ''),
       photoConsent: String(participant.photoConsent || 'yes'),
@@ -534,6 +538,10 @@ export default function Participants({ participants, setParticipants, deletePart
         parentName: String(draft.parentName || '').trim(),
         parentPhone: String(draft.parentPhone || '').trim(),
         parentEmail: String(draft.parentEmail || '').trim(),
+        parent2Name: String(draft.parent2Name || '').trim(),
+        parent2Phone: String(draft.parent2Phone || '').trim(),
+        parent2Email: String(draft.parent2Email || '').trim(),
+        homePhone: String(draft.homePhone || '').trim(),
         can_leave_alone: Boolean(draft.can_leave_alone),
         approvedAdults: String(draft.approvedAdults || '').trim(),
         photoConsent: normalizedPhotoConsent === 'no' ? 'no' : normalizedPhotoConsent === 'internal' ? 'internal' : 'yes',
@@ -733,6 +741,10 @@ export default function Participants({ participants, setParticipants, deletePart
                       'Parent Name',
                       'Parent Phone',
                       'Parent Email',
+                      'Additional Adult Name',
+                      'Additional Adult Phone',
+                      'Additional Adult Email',
+                      'Home Phone',
                       'Permission to Leave Unaccompanied',
                       'Approved Adults',
                       'Photo Consent',
@@ -815,6 +827,26 @@ export default function Participants({ participants, setParticipants, deletePart
                           {allTableEditing ? (
                             <input type="email" className="input py-1" value={rowDraft.parentEmail} onChange={e => updateAllTableDraft(p.id, 'parentEmail', e.target.value)} />
                           ) : (p.parentEmail || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.parent2Name || ''} onChange={e => updateAllTableDraft(p.id, 'parent2Name', e.target.value)} />
+                          ) : (p.parent2Name || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.parent2Phone || ''} onChange={e => updateAllTableDraft(p.id, 'parent2Phone', e.target.value)} />
+                          ) : (p.parent2Phone || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="email" className="input py-1" value={rowDraft.parent2Email || ''} onChange={e => updateAllTableDraft(p.id, 'parent2Email', e.target.value)} />
+                          ) : (p.parent2Email || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.homePhone || ''} onChange={e => updateAllTableDraft(p.id, 'homePhone', e.target.value)} />
+                          ) : (p.homePhone || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {allTableEditing ? (

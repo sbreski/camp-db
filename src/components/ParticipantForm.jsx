@@ -7,6 +7,8 @@ const EMPTY = {
   address: '', postcode: '', schoolAttending: '',
   siblings: false, siblingsName: '',
   parentName: '', parentEmail: '', parentPhone: '',
+  parent2Name: '', parent2Email: '', parent2Phone: '',
+  homePhone: '',
   approvedAdults: '',
   can_leave_alone: false,
   photoConsent: 'yes', otcConsent: false,
@@ -26,18 +28,36 @@ function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '')
 }
 
-function getDefaultLinkedParticipantIds(participant, allParticipants) {
-  const nameKey = normalizeText(participant.parentName)
-  const emailKey = normalizeText(participant.parentEmail)
-  const phoneKey = normalizePhone(participant.parentPhone)
+function getParticipantContactKeys(participant) {
+  return {
+    names: [participant?.parentName, participant?.parent2Name]
+      .map(normalizeText)
+      .filter(Boolean),
+    emails: [participant?.parentEmail, participant?.parent2Email]
+      .map(normalizeText)
+      .filter(Boolean),
+    phones: [participant?.parentPhone, participant?.parent2Phone, participant?.homePhone]
+      .map(normalizePhone)
+      .filter(Boolean),
+  }
+}
 
+function contactsMatch(source, target) {
+  const sourceKeys = getParticipantContactKeys(source)
+  const targetKeys = getParticipantContactKeys(target)
+
+  const sharesName = sourceKeys.names.some(value => targetKeys.names.includes(value))
+  const sharesEmail = sourceKeys.emails.some(value => targetKeys.emails.includes(value))
+  const sharesPhone = sourceKeys.phones.some(value => targetKeys.phones.includes(value))
+
+  return sharesName || sharesEmail || sharesPhone
+}
+
+function getDefaultLinkedParticipantIds(participant, allParticipants) {
   const matches = allParticipants
     .filter(p => {
       if (participant.id === p.id) return true
-      const sameName = nameKey && normalizeText(p.parentName) === nameKey
-      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
-      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
-      return sameName || sameEmail || samePhone
+      return contactsMatch(participant, p)
     })
     .map(p => p.id)
 
@@ -45,17 +65,8 @@ function getDefaultLinkedParticipantIds(participant, allParticipants) {
 }
 
 function getLikelySiblingIdsFromContact(contact, allParticipants, fallbackParticipantId) {
-  const nameKey = normalizeText(contact.parentName)
-  const emailKey = normalizeText(contact.parentEmail)
-  const phoneKey = normalizePhone(contact.parentPhone)
-
   const matches = allParticipants
-    .filter(p => {
-      const sameEmail = emailKey && normalizeText(p.parentEmail) === emailKey
-      const samePhone = phoneKey && normalizePhone(p.parentPhone) === phoneKey
-      const sameName = nameKey && normalizeText(p.parentName) === nameKey
-      return sameEmail || samePhone || sameName
-    })
+    .filter(p => contactsMatch(contact, p))
     .map(p => p.id)
 
   return matches.length > 0 ? matches : [fallbackParticipantId]
@@ -149,13 +160,15 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
     if (!form.name.trim()) return
 
     const normalizedAdults = [...approvedAdultsList]
-    const parentName = form.parentName.trim()
-    if (parentName) {
-      const parentLabel = formatParentLabel(parentName)
-      if (!hasSameAdult(normalizedAdults, parentName)) {
-        normalizedAdults.unshift(parentLabel)
+    ;[form.parent2Name, form.parentName].forEach((adultName) => {
+      const parentName = String(adultName || '').trim()
+      if (parentName) {
+        const parentLabel = formatParentLabel(parentName)
+        if (!hasSameAdult(normalizedAdults, parentName)) {
+          normalizedAdults.unshift(parentLabel)
+        }
       }
-    }
+    })
 
     const linkedIds = initial.id
       ? (linkedParticipantIds.length > 0 ? linkedParticipantIds : [initial.id])
@@ -267,18 +280,34 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
           <h4 className="font-display font-semibold text-sm text-forest-700 mb-3 pb-1 border-b border-stone-100">
             Parent / Guardian Contact
           </h4>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="col-span-2 sm:col-span-1">
-              <label className="label">Name</label>
+              <label className="label">Primary Adult Name</label>
               <input className="input" value={form.parentName} onChange={e => set('parentName', e.target.value)} placeholder="Parent name" />
             </div>
             <div>
-              <label className="label">Phone</label>
+              <label className="label">Primary Adult Phone</label>
               <input className="input" type="tel" value={form.parentPhone} onChange={e => set('parentPhone', e.target.value)} placeholder="+44 7700 000000" />
             </div>
-            <div className="col-span-2">
-              <label className="label">Email</label>
+            <div>
+              <label className="label">Primary Adult Email</label>
               <input className="input" type="email" value={form.parentEmail} onChange={e => set('parentEmail', e.target.value)} placeholder="parent@email.com" />
+            </div>
+            <div>
+              <label className="label">Additional Adult Name</label>
+              <input className="input" value={form.parent2Name || ''} onChange={e => set('parent2Name', e.target.value)} placeholder="Second parent / guardian" />
+            </div>
+            <div>
+              <label className="label">Additional Adult Phone</label>
+              <input className="input" type="tel" value={form.parent2Phone || ''} onChange={e => set('parent2Phone', e.target.value)} placeholder="+44 7700 000000" />
+            </div>
+            <div>
+              <label className="label">Additional Adult Email</label>
+              <input className="input" type="email" value={form.parent2Email || ''} onChange={e => set('parent2Email', e.target.value)} placeholder="adult@email.com" />
+            </div>
+            <div>
+              <label className="label">Home Phone</label>
+              <input className="input" type="tel" value={form.homePhone || ''} onChange={e => set('homePhone', e.target.value)} placeholder="020 7000 0000" />
             </div>
             {initial.id && participants.length > 0 && (
               <div className="col-span-2 space-y-2">

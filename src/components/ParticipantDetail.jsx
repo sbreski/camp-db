@@ -660,6 +660,10 @@ export default function ParticipantDetail({
     { key: 'parentName', label: 'Parent Name', type: 'text' },
     { key: 'parentPhone', label: 'Parent Phone', type: 'text' },
     { key: 'parentEmail', label: 'Parent Email', type: 'email' },
+    { key: 'parent2Name', label: 'Additional Adult Name', type: 'text' },
+    { key: 'parent2Phone', label: 'Additional Adult Phone', type: 'text' },
+    { key: 'parent2Email', label: 'Additional Adult Email', type: 'email' },
+    { key: 'homePhone', label: 'Home Phone', type: 'text' },
     { key: 'can_leave_alone', label: 'Permission to Leave Unaccompanied', type: 'boolean' },
     { key: 'approvedAdults', label: 'Approved Adults', type: 'textarea' },
     { key: 'medicalDetails', label: 'Medical Info', type: 'textarea' },
@@ -688,6 +692,10 @@ export default function ParticipantDetail({
       parentName: String(sourceParticipant?.parentName || ''),
       parentPhone: String(sourceParticipant?.parentPhone || ''),
       parentEmail: String(sourceParticipant?.parentEmail || ''),
+      parent2Name: String(sourceParticipant?.parent2Name || ''),
+      parent2Phone: String(sourceParticipant?.parent2Phone || ''),
+      parent2Email: String(sourceParticipant?.parent2Email || ''),
+      homePhone: String(sourceParticipant?.homePhone || ''),
       can_leave_alone: Boolean(sourceParticipant?.can_leave_alone ?? sourceParticipant?.canLeaveAlone),
       approvedAdults: String(sourceParticipant?.approvedAdults || ''),
       medicalDetails: String(sourceParticipant?.medicalDetails || ''),
@@ -716,6 +724,10 @@ export default function ParticipantDetail({
     ['Parent Name', participant.parentName],
     ['Parent Phone', participant.parentPhone],
     ['Parent Email', participant.parentEmail],
+    ['Additional Adult Name', participant.parent2Name],
+    ['Additional Adult Phone', participant.parent2Phone],
+    ['Additional Adult Email', participant.parent2Email],
+    ['Home Phone', participant.homePhone],
     ['Permission to Leave Unaccompanied', (participant.can_leave_alone || participant.canLeaveAlone) ? 'Yes' : 'No'],
     ['Approved Adults', participant.approvedAdults],
     ['Medical Type', Array.isArray(participant.medicalType) ? participant.medicalType.join(', ') : participant.medicalType],
@@ -820,6 +832,10 @@ export default function ParticipantDetail({
         parentName: String(uploadedDataDraft.parentName || '').trim(),
         parentPhone: String(uploadedDataDraft.parentPhone || '').trim(),
         parentEmail: String(uploadedDataDraft.parentEmail || '').trim(),
+        parent2Name: String(uploadedDataDraft.parent2Name || '').trim(),
+        parent2Phone: String(uploadedDataDraft.parent2Phone || '').trim(),
+        parent2Email: String(uploadedDataDraft.parent2Email || '').trim(),
+        homePhone: String(uploadedDataDraft.homePhone || '').trim(),
         can_leave_alone: Boolean(uploadedDataDraft.can_leave_alone),
         approvedAdults: String(uploadedDataDraft.approvedAdults || '').trim(),
         medicalDetails: String(uploadedDataDraft.medicalDetails || '').trim(),
@@ -1411,18 +1427,42 @@ export default function ParticipantDetail({
               <User size={15} className="text-forest-600" /> Contact Details
             </h3>
             <div className="space-y-2 text-sm">
-              {participant.parentName && <p className="font-medium text-forest-950">{participant.parentName}</p>}
-              {participant.parentPhone && (
-                <a href={`tel:${participant.parentPhone}`} className="flex items-center gap-2 text-forest-700 hover:underline">
-                  <Phone size={13} /> {participant.parentPhone}
+              {(participant.parentName || participant.parentPhone || participant.parentEmail) && (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  {participant.parentName && <p className="font-medium text-forest-950">{participant.parentName}</p>}
+                  {participant.parentPhone && (
+                    <a href={`tel:${participant.parentPhone}`} className="flex items-center gap-2 text-forest-700 hover:underline">
+                      <Phone size={13} /> {participant.parentPhone}
+                    </a>
+                  )}
+                  {participant.parentEmail && (
+                    <a href={`mailto:${participant.parentEmail}`} className="flex items-center gap-2 text-forest-700 hover:underline">
+                      <Mail size={13} /> {participant.parentEmail}
+                    </a>
+                  )}
+                </div>
+              )}
+              {(participant.parent2Name || participant.parent2Phone || participant.parent2Email) && (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  {participant.parent2Name && <p className="font-medium text-forest-950">{participant.parent2Name}</p>}
+                  {participant.parent2Phone && (
+                    <a href={`tel:${participant.parent2Phone}`} className="flex items-center gap-2 text-forest-700 hover:underline">
+                      <Phone size={13} /> {participant.parent2Phone}
+                    </a>
+                  )}
+                  {participant.parent2Email && (
+                    <a href={`mailto:${participant.parent2Email}`} className="flex items-center gap-2 text-forest-700 hover:underline">
+                      <Mail size={13} /> {participant.parent2Email}
+                    </a>
+                  )}
+                </div>
+              )}
+              {participant.homePhone && (
+                <a href={`tel:${participant.homePhone}`} className="flex items-center gap-2 text-forest-700 hover:underline">
+                  <Phone size={13} /> Home: {participant.homePhone}
                 </a>
               )}
-              {participant.parentEmail && (
-                <a href={`mailto:${participant.parentEmail}`} className="flex items-center gap-2 text-forest-700 hover:underline">
-                  <Mail size={13} /> {participant.parentEmail}
-                </a>
-              )}
-              {!participant.parentName && !participant.parentPhone && !participant.parentEmail && (
+              {!participant.parentName && !participant.parentPhone && !participant.parentEmail && !participant.parent2Name && !participant.parent2Phone && !participant.parent2Email && !participant.homePhone && (
                 <p className="text-stone-400 text-sm">No contact details recorded.</p>
               )}
               {participant.address && (

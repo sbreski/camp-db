@@ -394,6 +394,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
 
   async function loadShareUsers() {
     setShareUsersLoading(true)
+    setShareError('')
     try {
       const token = await getFreshAccessToken()
       const response = await fetch('/api/admin-users', { headers: { Authorization: `Bearer ${token}` } })
@@ -403,6 +404,8 @@ export default function Medical({ participants, setParticipants, actorInitials =
       setShareUsers(users)
     } catch (err) {
       console.error('Share users load error:', err)
+      setShareUsers([])
+      setShareError(err?.message || 'Unable to load staff users')
     } finally {
       setShareUsersLoading(false)
     }

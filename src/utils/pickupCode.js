@@ -24,13 +24,15 @@ export function getParticipantFamilyKey(participant) {
   const explicitFamilyGroupKey = normalizeText(participant?.familyGroupKey || participant?.family_group_key)
   if (explicitFamilyGroupKey) return `group:${explicitFamilyGroupKey}`
 
-  const emailKey = normalizeText(participant?.parentEmail)
+  const emailKey = normalizeText(participant?.parentEmail) || normalizeText(participant?.parent2Email)
   if (emailKey) return `email:${emailKey}`
 
   const phoneKey = normalizePhone(participant?.parentPhone)
+    || normalizePhone(participant?.parent2Phone)
+    || normalizePhone(participant?.homePhone)
   if (phoneKey.length >= 7) return `phone:${phoneKey}`
 
-  const parentNameKey = normalizeText(participant?.parentName)
+  const parentNameKey = normalizeText(participant?.parentName) || normalizeText(participant?.parent2Name)
   if (parentNameKey) return `name:${parentNameKey}`
 
   return `participant:${String(participant?.id || '').trim() || 'unknown'}`

@@ -1200,7 +1200,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                    {p?.parentEmail && (
+                    {(p?.parentEmail || p?.parent2Email) && (
                       <button onClick={async (e) => {
                         e.stopPropagation()
 
@@ -1226,12 +1226,15 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
                         // Step 2: open mailto with pre-filled subject and body
                         const subject = `Incident Report — ${p.name}`
-                        let body = `Dear ${p.parentName || 'Parent/Guardian'},\n\n`
+                        const recipientNames = [p.parentName, p.parent2Name].map(v => String(v || '').trim()).filter(Boolean)
+                        const greeting = recipientNames.length > 0 ? recipientNames.join(' and ') : 'Parent/Guardian'
+                        let body = `Dear ${greeting},\n\n`
                         body += `Please find attached a copy of the incident report relating to ${p.name}.\n\n`
                         body += `Incident type: ${inc.type}\nDate: ${new Date(inc.createdAt).toLocaleDateString('en-GB')}\nReported by: ${inc.staffMember || 'Staff'}\n\n`
                         body += `Please do not hesitate to get in touch if you have any questions.\n\nKind regards,\nImpact Kidz Summer Camp`
 
-                        const mailtoLink = `mailto:${encodeURIComponent(p.parentEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+                        const recipients = [...new Set([p.parentEmail, p.parent2Email].map(v => String(v || '').trim()).filter(Boolean))]
+                        const mailtoLink = `mailto:${encodeURIComponent(recipients.join(','))}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
                         window.open(mailtoLink, '_blank')
                       }}
                         className="p-1.5 text-stone-400 hover:text-blue-500 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
