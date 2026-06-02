@@ -6,7 +6,7 @@ import ParticipantNameText from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
-import { formatBirthDate } from '../utils/birthday'
+import { daysUntilBirthday, formatBirthDate, todayKey } from '../utils/birthday'
 
 function getNextDateKey(isoString) {
   const date = new Date(isoString)
@@ -641,6 +641,12 @@ export default function ParticipantDetail({
   const hasSendDiagnosis = Boolean(String(participant.sendDiagnosis || '').trim())
   const hasDiagnosedSend = Boolean(participant.sendDiagnosed) || hasSendDiagnosis
   const hasSend = Boolean(String(participant.sendNeeds || '').trim()) || hasDiagnosedSend
+  const birthdayValue = participant.birthday || participant.dob
+  const birthdayInDays = daysUntilBirthday(birthdayValue, todayKey())
+  const hasUpcomingBirthday = birthdayInDays !== null && birthdayInDays >= 0 && birthdayInDays <= 5
+  const birthdayTitle = birthdayInDays === 0
+    ? 'Birthday today'
+    : `Birthday in ${birthdayInDays} day${birthdayInDays === 1 ? '' : 's'}`
 
   const uploadedFieldSchema = [
     { key: 'name', label: 'Full Name', type: 'text' },
@@ -1367,7 +1373,19 @@ export default function ParticipantDetail({
             {participant.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-2xl font-display font-bold text-forest-950"><ParticipantNameText participant={participant} className="font-display font-bold text-forest-950" /></h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-2xl font-display font-bold text-forest-950"><ParticipantNameText participant={participant} className="font-display font-bold text-forest-950" /></h2>
+              {hasUpcomingBirthday && (
+                <span
+                  role="img"
+                  aria-label={birthdayTitle}
+                  title={birthdayTitle}
+                  className="text-lg"
+                >
+                  🎂
+                </span>
+              )}
+            </div>
             <p className="text-stone-500 text-sm">
               {[participant.pronouns, participant.age ? `Age ${participant.age}` : null, formatBirthDate(participant.birthday || participant.dob), participant.role].filter(Boolean).join(' · ')}
             </p>
