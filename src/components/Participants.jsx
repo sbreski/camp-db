@@ -5,6 +5,7 @@ import ImportParticipants from './ImportParticipants'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
+import { daysUntilBirthday, formatBirthDate, todayKey } from '../utils/birthday'
 import { hasMeaningfulSendText } from '../utils/send'
 
 function photoConsentMode(value) {
@@ -792,7 +793,7 @@ export default function Participants({ participants, setParticipants, deletePart
                         <td className="px-3 py-2 whitespace-nowrap">
                           {allTableEditing ? (
                             <input type="date" className="input py-1" value={rowDraft.birthday} onChange={e => updateAllTableDraft(p.id, 'birthday', e.target.value)} />
-                          ) : (p.birthday || p.dob || '—')}
+                          ) : (formatBirthDate(p.birthday || p.dob) || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {allTableEditing ? (
@@ -1072,6 +1073,17 @@ export default function Participants({ participants, setParticipants, deletePart
           {visibleParticipants.map(p => {
             const g = genderOf(p)
             const gc = GENDER_COLORS[g]
+            const birthdayValue = p.birthday || p.dob
+            const birthdayInDays = daysUntilBirthday(birthdayValue, todayKey())
+            const hasUpcomingBirthday = birthdayInDays !== null && birthdayInDays >= 0 && birthdayInDays <= 5
+            const birthdayTitle = birthdayInDays === 0
+              ? 'Birthday today'
+              : `Birthday in ${birthdayInDays} day${birthdayInDays === 1 ? '' : 's'}`
+            const avatarClass = g === 'm'
+              ? 'bg-blue-600 text-white border-blue-700'
+              : g === 'f'
+                ? 'bg-pink-600 text-white border-pink-700'
+                : 'bg-violet-600 text-white border-violet-700'
             return (
               <div
                 key={p.id}
@@ -1086,13 +1098,23 @@ export default function Participants({ participants, setParticipants, deletePart
                 />
                 <div
                   onClick={() => onView(p.id)}
-                  className={`w-10 h-10 rounded-full border flex items-center justify-center font-display font-bold text-sm flex-shrink-0 cursor-pointer ${gc.bg} ${gc.text} ${gc.border}`}
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center font-display font-bold text-sm flex-shrink-0 cursor-pointer ${avatarClass}`}
                 >
                   {participantDisplayName(p).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onView(p.id)}>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <ParticipantNameText participant={p} showDiagnosedHighlight={false} className="font-display font-semibold text-forest-950 group-hover:text-forest-700" />
+                    {hasUpcomingBirthday && (
+                      <span
+                        role="img"
+                        aria-label={birthdayTitle}
+                        title={birthdayTitle}
+                        className="text-sm"
+                      >
+                        🎂
+                      </span>
+                    )}
                     {photoConsentMode(p.photoConsent) === 'no' && (
                       <CameraOff size={12} className="text-rose-700" title="No photo consent" />
                     )}

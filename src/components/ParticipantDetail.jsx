@@ -6,6 +6,7 @@ import ParticipantNameText from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
+import { formatBirthDate } from '../utils/birthday'
 
 function getNextDateKey(isoString) {
   const date = new Date(isoString)
@@ -74,14 +75,6 @@ function isAllowedLegacyDocumentUrl(value) {
 function fmt(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatBirthday(value) {
-  const iso = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!iso) return ''
-  const date = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T12:00:00`)
-  if (Number.isNaN(date.getTime())) return ''
-  return `Birthday ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
 }
 
 const TABS = ['Overview', 'Medical', 'SEND / Support', 'Attendance', 'Incidents']
@@ -721,7 +714,7 @@ export default function ParticipantDetail({
     ['Full Name', participant.name],
     ['Pronouns', participant.pronouns],
     ['Age', participant.age],
-    ['Date of Birth', participant.birthday || participant.dob],
+    ['Date of Birth', formatBirthDate(participant.birthday || participant.dob)],
     ['Address', participant.address],
     ['Postcode', participant.postcode],
     ['School Attending', participant.schoolAttending],
@@ -1376,7 +1369,7 @@ export default function ParticipantDetail({
           <div>
             <h2 className="text-2xl font-display font-bold text-forest-950"><ParticipantNameText participant={participant} className="font-display font-bold text-forest-950" /></h2>
             <p className="text-stone-500 text-sm">
-              {[participant.pronouns, participant.age ? `Age ${participant.age}` : null, formatBirthday(participant.birthday || participant.dob), participant.role].filter(Boolean).join(' · ')}
+              {[participant.pronouns, participant.age ? `Age ${participant.age}` : null, formatBirthDate(participant.birthday || participant.dob), participant.role].filter(Boolean).join(' · ')}
             </p>
             {participant.dressingRoom && (
               <p className="text-xs text-stone-400 mt-0.5">Dressing Room: {participant.dressingRoom}</p>
