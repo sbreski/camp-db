@@ -869,7 +869,7 @@ export default function ParticipantDetail({
     const key = String(category || '').toLowerCase()
     if (key === 'send') {
       return [
-        participant.sendDiagnosis ? `Diagnosis / EHCP details: ${String(participant.sendDiagnosis).trim()}` : '',
+        participant.sendDiagnosis ? `Diagnosis: ${String(participant.sendDiagnosis).trim()}` : '',
         participant.sendNeeds ? `Support needs: ${String(participant.sendNeeds).trim()}` : '',
       ].filter(Boolean).join('\n\n')
     }
