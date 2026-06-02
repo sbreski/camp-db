@@ -7,6 +7,7 @@ const EMPTY = {
   address: '', postcode: '', schoolAttending: '',
   siblings: false, siblingsName: '',
   parentName: '', parentEmail: '', parentPhone: '',
+  parentRelationship: '',
   parent2Name: '', parent2Email: '', parent2Phone: '',
   homePhone: '',
   approvedAdults: '',
@@ -169,9 +170,10 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
     return list.some(a => stripParentSuffix(a).toLowerCase() === normalized)
   }
 
-  function formatParentLabel(name) {
+  function formatParentLabel(name, relationship = 'Parent') {
     const clean = stripParentSuffix(name)
-    return clean ? `${clean} (Parent)` : ''
+    const rel = String(relationship || '').trim() || 'Parent'
+    return clean ? `${clean} (${rel})` : ''
   }
 
   function toggleMedType(type) {
@@ -199,10 +201,14 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
     if (!form.name.trim()) return
 
     const normalizedAdults = [...approvedAdultsList]
-    ;[form.parent2Name, form.parentName].forEach((adultName) => {
+    ;[
+      { name: form.parent2Name, relationship: 'Parent' },
+      { name: form.parentName, relationship: form.parentRelationship || 'Parent' },
+    ].forEach((adult) => {
+      const adultName = adult.name
       const parentName = String(adultName || '').trim()
       if (parentName) {
-        const parentLabel = formatParentLabel(parentName)
+        const parentLabel = formatParentLabel(parentName, adult.relationship)
         if (!hasSameAdult(normalizedAdults, parentName)) {
           normalizedAdults.unshift(parentLabel)
         }
@@ -323,6 +329,10 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             <div className="col-span-2 sm:col-span-1">
               <label className="label">Primary Adult Name</label>
               <input className="input" value={form.parentName} onChange={e => set('parentName', e.target.value)} placeholder="Parent name" />
+            </div>
+            <div>
+              <label className="label">Primary Adult Relationship</label>
+              <input className="input" value={form.parentRelationship || ''} onChange={e => set('parentRelationship', e.target.value)} placeholder="Mum, Dad, Guardian" />
             </div>
             <div>
               <label className="label">Primary Adult Phone</label>

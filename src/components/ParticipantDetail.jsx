@@ -658,6 +658,7 @@ export default function ParticipantDetail({
     { key: 'postcode', label: 'Postcode', type: 'text' },
     { key: 'schoolAttending', label: 'School Attending', type: 'text' },
     { key: 'parentName', label: 'Parent Name', type: 'text' },
+    { key: 'parentRelationship', label: 'Primary Adult Relationship', type: 'text' },
     { key: 'parentPhone', label: 'Parent Phone', type: 'text' },
     { key: 'parentEmail', label: 'Parent Email', type: 'email' },
     { key: 'parent2Name', label: 'Additional Adult Name', type: 'text' },
@@ -690,6 +691,7 @@ export default function ParticipantDetail({
       postcode: String(sourceParticipant?.postcode || ''),
       schoolAttending: String(sourceParticipant?.schoolAttending || ''),
       parentName: String(sourceParticipant?.parentName || ''),
+      parentRelationship: String(sourceParticipant?.parentRelationship || ''),
       parentPhone: String(sourceParticipant?.parentPhone || ''),
       parentEmail: String(sourceParticipant?.parentEmail || ''),
       parent2Name: String(sourceParticipant?.parent2Name || ''),
@@ -722,6 +724,7 @@ export default function ParticipantDetail({
     ['Postcode', participant.postcode],
     ['School Attending', participant.schoolAttending],
     ['Parent Name', participant.parentName],
+    ['Primary Adult Relationship', participant.parentRelationship],
     ['Parent Phone', participant.parentPhone],
     ['Parent Email', participant.parentEmail],
     ['Additional Adult Name', participant.parent2Name],
@@ -830,6 +833,7 @@ export default function ParticipantDetail({
         postcode: String(uploadedDataDraft.postcode || '').trim(),
         schoolAttending: String(uploadedDataDraft.schoolAttending || '').trim(),
         parentName: String(uploadedDataDraft.parentName || '').trim(),
+        parentRelationship: String(uploadedDataDraft.parentRelationship || '').trim(),
         parentPhone: String(uploadedDataDraft.parentPhone || '').trim(),
         parentEmail: String(uploadedDataDraft.parentEmail || '').trim(),
         parent2Name: String(uploadedDataDraft.parent2Name || '').trim(),
@@ -1430,6 +1434,7 @@ export default function ParticipantDetail({
               {(participant.parentName || participant.parentPhone || participant.parentEmail) && (
                 <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
                   {participant.parentName && <p className="font-medium text-forest-950">{participant.parentName}</p>}
+                  {participant.parentRelationship && <p className="text-stone-600 text-xs mb-1">Relationship: {participant.parentRelationship}</p>}
                   {participant.parentPhone && (
                     <a href={`tel:${participant.parentPhone}`} className="flex items-center gap-2 text-forest-700 hover:underline">
                       <Phone size={13} /> {participant.parentPhone}

@@ -17,9 +17,10 @@ function hasSameAdult(list, name) {
   return list.some(a => stripParentSuffix(a).toLowerCase() === normalized)
 }
 
-function formatParentLabel(name) {
+function formatParentLabel(name, relationship = 'Parent') {
   const clean = stripParentSuffix(name)
-  return clean ? `${clean} (Parent)` : ''
+  const rel = String(relationship || '').trim() || 'Parent'
+  return clean ? `${clean} (${rel})` : ''
 }
 
 function parseAdultEntry(entry) {
@@ -106,7 +107,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
   const [selectedParents, setSelectedParents] = useState(new Set())
   const [editingId, setEditingId] = useState(null)
   const [editingContact, setEditingContact] = useState({
-    parentName: '', parentEmail: '', parentPhone: '',
+    parentName: '', parentRelationship: '', parentEmail: '', parentPhone: '',
     parent2Name: '', parent2Email: '', parent2Phone: '',
     homePhone: '',
   })
@@ -130,11 +131,12 @@ export default function Parents({ participants, onUpdateParticipants }) {
   function startEditing(participant) {
     const adults = parseApprovedAdults(participant.approvedAdults)
     if (participant.parentName && !hasSameAdult(adults, participant.parentName)) {
-      adults.unshift(formatParentLabel(participant.parentName))
+      adults.unshift(formatParentLabel(participant.parentName, participant.parentRelationship || 'Parent'))
     }
     setEditingId(participant.id)
     setEditingContact({
       parentName: participant.parentName || '',
+      parentRelationship: participant.parentRelationship || '',
       parentEmail: participant.parentEmail || '',
       parentPhone: participant.parentPhone || '',
       parent2Name: participant.parent2Name || '',
@@ -152,7 +154,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
   function cancelEdit() {
     setEditingId(null)
     setEditingContact({
-      parentName: '', parentEmail: '', parentPhone: '',
+      parentName: '', parentRelationship: '', parentEmail: '', parentPhone: '',
       parent2Name: '', parent2Email: '', parent2Phone: '',
       homePhone: '',
     })
@@ -227,7 +229,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
 
     const parentName = editingContact.parentName.trim()
     if (parentName && !hasSameAdult(normalizedAdults, parentName)) {
-      normalizedAdults.unshift(formatParentLabel(parentName))
+      normalizedAdults.unshift(formatParentLabel(parentName, editingContact.parentRelationship || 'Parent'))
     }
     const parent2Name = String(editingContact.parent2Name || '').trim()
     if (parent2Name && !hasSameAdult(normalizedAdults, parent2Name)) {
@@ -237,6 +239,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
     const targetIds = editingLinkedParticipantIds.length > 0 ? editingLinkedParticipantIds : [participant.id]
     onUpdateParticipants(targetIds, {
       parentName,
+      parentRelationship: String(editingContact.parentRelationship || '').trim(),
       parentEmail: editingContact.parentEmail.trim(),
       parentPhone: editingContact.parentPhone.trim(),
       parent2Name,
@@ -272,6 +275,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
       const query = search.toLowerCase()
       return !query ||
         p.parentName?.toLowerCase().includes(query) ||
+        p.parentRelationship?.toLowerCase().includes(query) ||
         p.parent2Name?.toLowerCase().includes(query) ||
         p.parentEmail?.toLowerCase().includes(query) ||
         p.parent2Email?.toLowerCase().includes(query) ||
@@ -357,6 +361,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Participant</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Pronouns</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Primary Adult</th>
+                  <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Relationship</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Additional Adult</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Email</th>
                   <th className="text-left py-3 px-4 font-display font-semibold text-forest-950 text-sm">Phone</th>
@@ -397,6 +402,9 @@ export default function Parents({ participants, onUpdateParticipants }) {
                       </td>
                       <td className="py-3 px-4 text-sm font-medium text-forest-950">
                         {p.parentName || <span className="bg-red-100 text-red-700 px-1 rounded">Missing</span>}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-stone-700">
+                        {p.parentRelationship || <span className="text-stone-400">—</span>}
                       </td>
                       <td className="py-3 px-4 text-sm text-stone-700">
                         {p.parent2Name || <span className="text-stone-400">—</span>}
@@ -471,7 +479,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
                     </tr>
                     {editingId === p.id && (
                       <tr className="bg-stone-50">
-                        <td colSpan="9" className="px-4 py-3">
+                        <td colSpan="10" className="px-4 py-3">
                           <div className="rounded-2xl border border-stone-200 bg-white p-4 space-y-4">
                             <div className="flex flex-col gap-1 border-b border-stone-100 pb-3">
                               <p className="text-sm font-semibold text-forest-950">
@@ -490,6 +498,15 @@ export default function Parents({ participants, onUpdateParticipants }) {
                                   value={editingContact.parentName}
                                   onChange={e => setEditingContact(prev => ({ ...prev, parentName: e.target.value }))}
                                   placeholder="Parent name"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Primary Adult Relationship</label>
+                                <input
+                                  className="input"
+                                  value={editingContact.parentRelationship}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parentRelationship: e.target.value }))}
+                                  placeholder="Mum, Dad, Guardian"
                                 />
                               </div>
                               <div>
