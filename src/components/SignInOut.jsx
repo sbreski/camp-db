@@ -686,6 +686,81 @@ function CollectionModal({ participant, participants, selectedDate, signedInSibl
   )
 }
 
+function FamilySignInModal({ participant, familyTargets = [], selectedIds = [], enableKeyboardShortcuts = true, onToggleParticipant, onConfirm, onCancel, error = '' }) {
+  useEffect(() => {
+    if (!enableKeyboardShortcuts) return
+
+    function isTypingField(target) {
+      if (!target) return false
+      const tag = String(target.tagName || '').toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
+      return Boolean(target.isContentEditable)
+    }
+
+    function handleKeyDown(event) {
+      if (isTypingField(event.target)) return
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCancel()
+        return
+      }
+
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        onConfirm()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [enableKeyboardShortcuts, onCancel, onConfirm])
+
+  const selectedCount = familyTargets.filter(item => selectedIds.includes(item.id)).length
+
+  return (
+    <ViewportOverlay className="bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md fade-in">
+        <div className="flex items-center justify-between p-5 border-b border-stone-100">
+          <div>
+            <h3 className="font-display font-bold text-forest-950">Sign In Family</h3>
+            <ParticipantNameText participant={participant} className="text-sm text-stone-500 mt-0.5" showDiagnosedHighlight={false} />
+          </div>
+          <button onClick={onCancel} className="text-stone-400 hover:text-stone-600 p-1"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-sm text-stone-700">Select which siblings to sign in together.</p>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {familyTargets.map((item) => {
+              const isSelected = selectedIds.includes(item.id)
+              return (
+                <label key={item.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 cursor-pointer ${isSelected ? 'border-forest-300 bg-forest-50' : 'border-stone-200 bg-white'}`}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleParticipant(item.id)}
+                    className="h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
+                  />
+                  <div className="min-w-0">
+                    <ParticipantNameText participant={item} className="text-sm font-semibold text-forest-950" showDiagnosedHighlight={false} />
+                    <p className="text-xs text-stone-500">{item.id === participant?.id ? 'Selected child' : 'Sibling'}</p>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+          <p className="text-xs text-stone-500">{selectedCount} selected.</p>
+          {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+        </div>
+        <div className="p-5 pt-0 flex gap-2">
+          <button onClick={onConfirm} className="btn-primary flex-1">Confirm Sign In</button>
+          <button onClick={onCancel} className="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </ViewportOverlay>
+  )
+}
+
 export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false, onView = null }) {
   const searchInputRef = useRef(null)
   const dateInputRef = useRef(null)
@@ -699,6 +774,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [statusFilter, setStatusFilter] = useState('all') // all | in | not-in | follow-up
   const [flash, setFlash] = useState(null)
   const [activeParticipantId, setActiveParticipantId] = useState(null)
+  const [signingInFor, setSigningInFor] = useState(null)
+  const [familySignInSelection, setFamilySignInSelection] = useState([])
+  const [familySignInError, setFamilySignInError] = useState('')
   const [collectingFor, setCollectingFor] = useState(null)
   const [verifyingFor, setVerifyingFor] = useState(null)
   const [noteEditor, setNoteEditor] = useState(null)
@@ -777,26 +855,82 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     return selectedRecords.find(r => r.participantId === participantId) || null
   }
 
-  function signIn(participant) {
+  function signInParticipants(participantIds, flashParticipantId = null) {
+    const uniqueIds = [...new Set((participantIds || []).filter(Boolean))]
+    if (!uniqueIds.length) return
+
     const now = new Date()
     // For non-today dates, use a predictable default sign-in time on that selected day.
     const signInTime = selectedDate === today ? now : new Date(`${selectedDate}T10:00:00`)
-    
+
     setAttendance(prev => [
-      ...prev.filter(r => !(r.date === selectedDate && r.participantId === participant.id)),
-      { 
-        participantId: participant.id, 
-        date: selectedDate, 
-        signIn: signInTime.toISOString(), 
-        signOut: null, 
+      ...prev.filter(r => !(r.date === selectedDate && uniqueIds.includes(r.participantId))),
+      ...uniqueIds.map(participantId => ({
+        participantId,
+        date: selectedDate,
+        signIn: signInTime.toISOString(),
+        signOut: null,
         signInBy: actorInitials,
         signOutBy: null,
-        collectedBy: null, 
-        id: `${participant.id}-${selectedDate}` 
-      }
+        collectedBy: null,
+        id: `${participantId}-${selectedDate}`,
+      })),
     ])
-    setFlash({ id: participant.id, type: 'in' })
+    setFlash({ id: flashParticipantId || uniqueIds[0], type: 'in' })
     setTimeout(() => setFlash(null), 2000)
+  }
+
+  function getFamilySignInTargets(participant) {
+    return getFamilyParticipants(participant, seasonParticipants)
+      .filter(candidate => {
+        const record = getRecord(candidate.id)
+        return !record?.signIn
+      })
+      .sort((a, b) => {
+        if (a.id === participant.id) return -1
+        if (b.id === participant.id) return 1
+        return a.name.localeCompare(b.name)
+      })
+  }
+
+  function openFamilySignIn(participant) {
+    const targets = getFamilySignInTargets(participant)
+    const defaultSelection = targets.map(item => item.id)
+    if (defaultSelection.length <= 1) {
+      signInParticipants([participant.id], participant.id)
+      return
+    }
+    setSigningInFor(participant)
+    setFamilySignInSelection(defaultSelection)
+    setFamilySignInError('')
+  }
+
+  function toggleFamilySignInParticipant(participantId) {
+    setFamilySignInSelection(prev => (
+      prev.includes(participantId)
+        ? prev.filter(id => id !== participantId)
+        : [...prev, participantId]
+    ))
+    if (familySignInError) setFamilySignInError('')
+  }
+
+  function confirmFamilySignIn() {
+    if (!signingInFor) return
+    if (!familySignInSelection.length) {
+      setFamilySignInError('Select at least one child to sign in.')
+      return
+    }
+
+    signInParticipants(familySignInSelection, signingInFor.id)
+    setSigningInFor(null)
+    setFamilySignInSelection([])
+    setFamilySignInError('')
+  }
+
+  function cancelFamilySignIn() {
+    setSigningInFor(null)
+    setFamilySignInSelection([])
+    setFamilySignInError('')
   }
 
   function undoSignIn(participant) {
@@ -1358,7 +1492,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   useEffect(() => {
     if (!enableKeyboardShortcuts) return
 
-    const modalOpen = Boolean(collectingFor || noteEditor || editingTime || reasonEditor || editingCodeParticipant)
+    const modalOpen = Boolean(signingInFor || collectingFor || noteEditor || editingTime || reasonEditor || editingCodeParticipant)
 
     function isTypingField(target) {
       if (!target) return false
@@ -1469,7 +1603,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         const rec = getRecord(activeParticipant.id)
         if (!rec?.signIn) {
           event.preventDefault()
-          signIn(activeParticipant)
+          openFamilySignIn(activeParticipant)
         }
         return
       }
@@ -1525,7 +1659,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         const rec = getRecord(activeParticipant.id)
         event.preventDefault()
         if (!rec?.signIn) {
-          signIn(activeParticipant)
+          openFamilySignIn(activeParticipant)
           return
         }
         if (rec?.signIn && !rec?.signOut) {
@@ -1541,6 +1675,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   }, [
     enableKeyboardShortcuts,
     collectingFor,
+    signingInFor,
     verifyingFor,
     noteEditor,
     editingTime,
@@ -1638,6 +1773,18 @@ export default function SignInOut({ participants, setParticipants, attendance, s
 
   return (
     <div className="fade-in space-y-4">
+      {signingInFor && (
+        <FamilySignInModal
+          participant={signingInFor}
+          familyTargets={getFamilySignInTargets(signingInFor)}
+          selectedIds={familySignInSelection}
+          enableKeyboardShortcuts={enableKeyboardShortcuts}
+          onToggleParticipant={toggleFamilySignInParticipant}
+          onConfirm={confirmFamilySignIn}
+          onCancel={cancelFamilySignIn}
+          error={familySignInError}
+        />
+      )}
       {verifyingFor && (
         <CodeVerifyModal
           participant={verifyingFor}
@@ -2265,7 +2412,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                   {/* Buttons */}
                   <div className="flex items-center gap-1 justify-start md:justify-end md:mt-0 mt-2 flex-wrap md:flex-nowrap">
                     {!rec?.signIn && (
-                      <button onClick={() => signIn(p)}
+                      <button onClick={() => openFamilySignIn(p)}
                         className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-display font-semibold bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition-all whitespace-nowrap">
                         <LogIn size={12} /> In
                       </button>
