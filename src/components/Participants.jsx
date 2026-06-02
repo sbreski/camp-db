@@ -1086,7 +1086,7 @@ export default function Participants({ participants, setParticipants, deletePart
                 />
                 <div
                   onClick={() => onView(p.id)}
-                  className="w-10 h-10 rounded-full bg-forest-900 flex items-center justify-center text-white font-display font-bold text-sm flex-shrink-0 cursor-pointer"
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center font-display font-bold text-sm flex-shrink-0 cursor-pointer ${gc.bg} ${gc.text} ${gc.border}`}
                 >
                   {participantDisplayName(p).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
@@ -1115,12 +1115,9 @@ export default function Participants({ participants, setParticipants, deletePart
                       if (!hasSend) return null
                       return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
                     })()}
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold border ${gc.bg} ${gc.text} ${gc.border}`}>
-                      {g === 'm' ? 'M' : g === 'f' ? 'F' : 'NB'}
-                    </span>
                     {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
                     {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
-                    {p.medicalType?.includes('Medical') && <span className="badge-medical">+</span>}
+                    {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                     {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
                       {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}
@@ -1136,12 +1133,9 @@ export default function Participants({ participants, setParticipants, deletePart
                     if (!hasSend) return null
                     return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
                   })()}
-                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold border ${gc.bg} ${gc.text} ${gc.border}`}>
-                    {g === 'm' ? 'M' : g === 'f' ? 'F' : 'NB'}
-                  </span>
                   {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
                   {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
-                  {p.medicalType?.includes('Medical') && <span className="badge-medical">+</span>}
+                  {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                   {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
                     {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}
