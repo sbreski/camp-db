@@ -7,6 +7,8 @@ import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { hasMeaningfulSendText } from '../utils/send'
 
+const RECENTLY_DELETED_DAYS = 30
+
 function photoConsentMode(value) {
   const normalized = String(value || '').trim().toLowerCase()
   if (normalized === 'no') return 'no'
@@ -243,7 +245,7 @@ function DemographicsPanel({ participants, ageSplits, setAgeSplits, genderFilter
   )
 }
 
-export default function Participants({ participants, setParticipants, onView, canViewUploadedData = false, currentUserEmail = '' }) {
+export default function Participants({ participants, deletedParticipants = [], setParticipants, deleteParticipant: deleteParticipantRecord, restoreParticipant: restoreParticipantRecord, onView, canViewUploadedData = false, currentUserEmail = '' }) {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -262,11 +264,18 @@ export default function Participants({ participants, setParticipants, onView, ca
   const [subTab, setSubTab] = useState('active')
   const [sortKey, setSortKey] = useState('firstName')
   const [sortDirection, setSortDirection] = useState('asc')
+  const [restorePendingId, setRestorePendingId] = useState('')
 
   // Demographics / filter state
   const [ageSplits, setAgeSplits] = useState([10, 14, 18])
   const [genderFilter, setGenderFilter] = useState(new Set(['m', 'f', 'nb']))
   const [ageGroupFilter, setAgeGroupFilter] = useState(null)
+
+  const recentDeleteCutoff = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - RECENTLY_DELETED_DAYS)
+    return cutoff
+  }, [])
 
   function addParticipant(data) {
     setParticipants(prev => [...prev, { ...data, id: crypto.randomUUID() }])
@@ -289,10 +298,25 @@ export default function Participants({ participants, setParticipants, onView, ca
     })
   }
 
-  function deleteParticipant(id) {
+  async function deleteParticipant(id) {
     if (window.confirm('Delete this participant? This cannot be undone.')) {
-      setParticipants(prev => prev.filter(p => p.id !== id))
+      const result = await deleteParticipantRecord(id)
+      if (!result?.ok) alert(result?.error || 'Unable to delete this participant.')
     }
+  }
+
+  async function restoreParticipant(id) {
+    setRestorePendingId(id)
+    const result = await restoreParticipantRecord(id)
+    setRestorePendingId('')
+    if (!result?.ok) alert(result?.error || 'Unable to restore this participant.')
+  }
+
+  function formatDeletedAt(value) {
+    if (!value) return 'Unknown deletion time'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return 'Unknown deletion time'
+    return parsed.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
   }
 
   function isIncludedThisSeason(participant) {
@@ -357,6 +381,15 @@ export default function Participants({ participants, setParticipants, onView, ca
 
   const activeParticipants = filteredBySearch.filter(isIncludedThisSeason)
   const inactiveParticipants = filteredBySearch.filter(p => !isIncludedThisSeason(p))
+  const recentlyDeletedParticipants = useMemo(() => (
+    [...deletedParticipants]
+      .filter((participant) => {
+        const deletedAt = participant.deletedAt ? new Date(participant.deletedAt) : null
+        return deletedAt && !Number.isNaN(deletedAt.getTime()) && deletedAt >= recentDeleteCutoff
+      })
+      .filter(participant => participantDisplayName(participant).toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => new Date(b.deletedAt || 0).getTime() - new Date(a.deletedAt || 0).getTime())
+  ), [deletedParticipants, recentDeleteCutoff, search])
   let visibleParticipants = []
   if (subTab === 'active') visibleParticipants = activeParticipants
   else if (subTab === 'inactive') visibleParticipants = inactiveParticipants
@@ -620,7 +653,7 @@ export default function Participants({ participants, setParticipants, onView, ca
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-display font-bold text-forest-950">Participants</h2>
-          <p className="text-stone-500 text-sm">{participants.length} registered</p>
+          <p className="text-stone-500 text-sm">{participants.length} registered{recentlyDeletedParticipants.length > 0 ? ` · ${recentlyDeletedParticipants.length} recently deleted` : ''}</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           {canViewUploadedData && (
@@ -906,7 +939,8 @@ export default function Participants({ participants, setParticipants, onView, ca
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {subTab !== 'deleted' && (
+        <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs text-stone-500" htmlFor="participants-sort-by">Sort by</label>
         <select
           id="participants-sort-by"
@@ -927,21 +961,24 @@ export default function Participants({ participants, setParticipants, onView, ca
         >
           {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
         </button>
-      </div>
+        </div>
+      )}
 
       {/* Demographics & filter panel */}
-      <DemographicsPanel
-        participants={participants}
-        ageSplits={ageSplits}
-        setAgeSplits={setAgeSplits}
-        genderFilter={genderFilter}
-        setGenderFilter={setGenderFilter}
-        ageGroupFilter={ageGroupFilter}
-        setAgeGroupFilter={setAgeGroupFilter}
-      />
+      {subTab !== 'deleted' && (
+        <DemographicsPanel
+          participants={participants}
+          ageSplits={ageSplits}
+          setAgeSplits={setAgeSplits}
+          genderFilter={genderFilter}
+          setGenderFilter={setGenderFilter}
+          ageGroupFilter={ageGroupFilter}
+          setAgeGroupFilter={setAgeGroupFilter}
+        />
+      )}
 
       {/* Active filter indicator */}
-      {activeFilterCount > 0 && (
+      {subTab !== 'deleted' && activeFilterCount > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-stone-500">
             Filters active — showing {filteredBySearch.length} of {participants.length} participants
@@ -955,7 +992,7 @@ export default function Participants({ participants, setParticipants, onView, ca
         </div>
       )}
 
-      {participants.length > 0 && (
+      {(participants.length > 0 || recentlyDeletedParticipants.length > 0) && (
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setSubTab('active')}
@@ -987,10 +1024,20 @@ export default function Participants({ participants, setParticipants, onView, ca
           >
             All ({filteredBySearch.length})
           </button>
+          <button
+            onClick={() => setSubTab('deleted')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-display font-semibold border transition-colors ${
+              subTab === 'deleted'
+                ? 'bg-rose-700 text-white border-rose-700'
+                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+            }`}
+          >
+            Recently Deleted ({recentlyDeletedParticipants.length})
+          </button>
         </div>
       )}
 
-      {participants.length > 0 && (
+      {participants.length > 0 && subTab !== 'deleted' && (
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={toggleSelectAllFiltered} className="btn-secondary text-xs py-1.5">
             {allVisibleSelected ? 'Unselect All' : 'Select All'}
@@ -1012,11 +1059,41 @@ export default function Participants({ participants, setParticipants, onView, ca
         </div>
       )}
 
-      {participants.length === 0 ? (
+      {participants.length === 0 && recentlyDeletedParticipants.length === 0 ? (
         <div className="card text-center py-12">
           <User size={32} className="text-stone-300 mx-auto mb-3" />
           <p className="text-stone-500 font-medium">No participants yet</p>
           <p className="text-stone-400 text-sm mt-1">Add individually or import a CSV file.</p>
+        </div>
+      ) : subTab === 'deleted' ? (
+        <div className="space-y-2">
+          <div className="card border-rose-200 bg-rose-50/60">
+            <p className="text-sm font-medium text-rose-900">Recently deleted participants stay visible here for {RECENTLY_DELETED_DAYS} days.</p>
+            <p className="text-xs text-rose-800 mt-1">After that they remain in Supabase, but drop out of this recovery list until restored manually.</p>
+          </div>
+          {recentlyDeletedParticipants.length === 0 ? (
+            <div className="card text-center py-10">
+              <p className="text-stone-500 font-medium">No recently deleted participants</p>
+              <p className="text-stone-400 text-sm mt-1">Only deletions from the last {RECENTLY_DELETED_DAYS} days appear here.</p>
+            </div>
+          ) : recentlyDeletedParticipants.map((participant) => (
+            <div key={participant.id} className="card flex items-center gap-4 border-rose-100 bg-white">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-800 font-display font-bold text-sm flex-shrink-0">
+                {participantDisplayName(participant).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-semibold text-forest-950 truncate">{participantDisplayName(participant)}</p>
+                <p className="text-xs text-stone-500 truncate">Deleted {formatDeletedAt(participant.deletedAt)}</p>
+              </div>
+              <button
+                onClick={() => restoreParticipant(participant.id)}
+                disabled={restorePendingId === participant.id}
+                className={`btn-secondary text-xs py-1.5 ${restorePendingId === participant.id ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                {restorePendingId === participant.id ? 'Restoring...' : 'Restore'}
+              </button>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="space-y-2">
