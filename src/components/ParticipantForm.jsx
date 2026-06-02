@@ -28,6 +28,34 @@ function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '')
 }
 
+function parseApprovedAdultEntry(entry) {
+  const text = String(entry || '').trim()
+  if (!text) return { name: '', relationship: '', phone: '' }
+
+  const phoneMatch = text.match(/^(.*?)\s*-\s*(\+?[0-9][0-9\s()\-]{5,})\s*$/)
+  const withoutPhone = phoneMatch ? phoneMatch[1].trim() : text
+  const phone = phoneMatch ? phoneMatch[2].trim() : ''
+
+  const relationshipMatch = withoutPhone.match(/^(.*?)\s*\((.*?)\)\s*$/)
+  if (!relationshipMatch) return { name: withoutPhone, relationship: '', phone }
+
+  return {
+    name: (relationshipMatch[1] || '').trim(),
+    relationship: (relationshipMatch[2] || '').trim(),
+    phone,
+  }
+}
+
+function formatApprovedAdultEntry(entry) {
+  const name = String(entry?.name || '').trim()
+  const relationship = String(entry?.relationship || '').trim()
+  const phone = String(entry?.phone || '').trim()
+  if (!name) return ''
+
+  const nameWithRelationship = relationship ? `${name} (${relationship})` : name
+  return phone ? `${nameWithRelationship} - ${phone}` : nameWithRelationship
+}
+
 function getParticipantContactKeys(participant) {
   return {
     names: [participant?.parentName, participant?.parent2Name]
@@ -99,7 +127,9 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
   const [approvedAdultsList, setApprovedAdultsList] = useState(() => (
     initial.approvedAdults?.split(',').map(a => a.trim()).filter(Boolean) || []
   ))
-  const [newApprovedAdult, setNewApprovedAdult] = useState('')
+  const [newApprovedAdultName, setNewApprovedAdultName] = useState('')
+  const [newApprovedAdultRelationship, setNewApprovedAdultRelationship] = useState('')
+  const [newApprovedAdultPhone, setNewApprovedAdultPhone] = useState('')
   const [linkedParticipantIds, setLinkedParticipantIds] = useState(() => (
     initial.id ? getDefaultLinkedParticipantIds(initial, participants) : []
   ))
@@ -109,12 +139,19 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
   }
 
   function addApprovedAdult() {
-    const next = newApprovedAdult.trim()
+    const next = formatApprovedAdultEntry({
+      name: newApprovedAdultName,
+      relationship: newApprovedAdultRelationship,
+      phone: newApprovedAdultPhone,
+    })
     if (!next) return
+
     if (!approvedAdultsList.some(a => a.toLowerCase() === next.toLowerCase())) {
       setApprovedAdultsList(prev => [...prev, next])
     }
-    setNewApprovedAdult('')
+    setNewApprovedAdultName('')
+    setNewApprovedAdultRelationship('')
+    setNewApprovedAdultPhone('')
   }
 
   function removeApprovedAdult(index) {
@@ -122,7 +159,9 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
   }
 
   function stripParentSuffix(name) {
-    return name.trim().replace(/\s*\(parent\)$/i, '').trim()
+    const parsed = parseApprovedAdultEntry(name)
+    const base = String(parsed.name || '').trim()
+    return base.replace(/\s*\(parent\)$/i, '').trim()
   }
 
   function hasSameAdult(list, name) {
@@ -346,14 +385,31 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             )}
             <div className="col-span-2">
               <label className="label">Approved Adults for Collection</label>
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <input
-                  className="input flex-1"
-                  value={newApprovedAdult}
-                  onChange={e => setNewApprovedAdult(e.target.value)}
+                  className="input"
+                  value={newApprovedAdultName}
+                  onChange={e => setNewApprovedAdultName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addApprovedAdult() } }}
-                  placeholder="Name (Relationship)"
+                  placeholder="Adult name"
                 />
+                <input
+                  className="input"
+                  value={newApprovedAdultRelationship}
+                  onChange={e => setNewApprovedAdultRelationship(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addApprovedAdult() } }}
+                  placeholder="Relationship"
+                />
+                <input
+                  className="input"
+                  type="tel"
+                  value={newApprovedAdultPhone}
+                  onChange={e => setNewApprovedAdultPhone(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addApprovedAdult() } }}
+                  placeholder="Phone (optional)"
+                />
+              </div>
+              <div className="mt-2">
                 <button type="button" onClick={addApprovedAdult} className="btn-secondary h-11">
                   Add
                 </button>

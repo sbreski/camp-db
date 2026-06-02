@@ -63,13 +63,22 @@ function parseApprovedAdults(str) {
   return str.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+function approvedAdultBaseName(entry) {
+  const text = String(entry || '').trim()
+  if (!text) return ''
+  const phoneStripped = text.replace(/\s*-\s*\+?[0-9][0-9\s()\-]{5,}\s*$/i, '').trim()
+  const relationshipMatch = phoneStripped.match(/^(.*?)\s*\((.*?)\)\s*$/)
+  return String((relationshipMatch ? relationshipMatch[1] : phoneStripped) || '').trim().toLowerCase()
+}
+
 function formatParentLabel(parentName) {
   return `${parentName} (Parent)`
 }
 
 function hasSameAdult(adults, parentName) {
-  const formatted = formatParentLabel(parentName)
-  return adults.some(a => a.toLowerCase() === formatted.toLowerCase())
+  const parentKey = approvedAdultBaseName(formatParentLabel(parentName))
+  if (!parentKey) return false
+  return adults.some(a => approvedAdultBaseName(a) === parentKey)
 }
 
 function normalizeText(value) {

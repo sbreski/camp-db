@@ -7,7 +7,9 @@ function parseApprovedAdults(str) {
 }
 
 function stripParentSuffix(name) {
-  return name.trim().replace(/\s*\(parent\)$/i, '').trim()
+  const parsed = parseAdultEntry(name)
+  const base = String(parsed.name || '').trim()
+  return base.replace(/\s*\(parent\)$/i, '').trim()
 }
 
 function hasSameAdult(list, name) {
@@ -22,20 +24,28 @@ function formatParentLabel(name) {
 
 function parseAdultEntry(entry) {
   const text = String(entry || '').trim()
-  if (!text) return { name: '', relationship: '' }
-  const match = text.match(/^(.*?)\s*\((.*?)\)\s*$/)
-  if (!match) return { name: text, relationship: '' }
+  if (!text) return { name: '', relationship: '', phone: '' }
+
+  const phoneMatch = text.match(/^(.*?)\s*-\s*(\+?[0-9][0-9\s()\-]{5,})\s*$/)
+  const withoutPhone = phoneMatch ? phoneMatch[1].trim() : text
+  const phone = phoneMatch ? phoneMatch[2].trim() : ''
+
+  const match = withoutPhone.match(/^(.*?)\s*\((.*?)\)\s*$/)
+  if (!match) return { name: withoutPhone, relationship: '', phone }
   return {
     name: (match[1] || '').trim(),
     relationship: (match[2] || '').trim(),
+    phone,
   }
 }
 
 function formatAdultEntry(entry) {
   const name = String(entry?.name || '').trim()
   const relationship = String(entry?.relationship || '').trim()
+  const phone = String(entry?.phone || '').trim()
   if (!name) return ''
-  return relationship ? `${name} (${relationship})` : name
+  const nameWithRelationship = relationship ? `${name} (${relationship})` : name
+  return phone ? `${nameWithRelationship} - ${phone}` : nameWithRelationship
 }
 
 function normalizeText(value) {
@@ -104,6 +114,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
   const [editingLinkedParticipantIds, setEditingLinkedParticipantIds] = useState([])
   const [newAdultName, setNewAdultName] = useState('')
   const [newAdultRelationship, setNewAdultRelationship] = useState('')
+  const [newAdultPhone, setNewAdultPhone] = useState('')
   const [sortBy, setSortBy] = useState('parent') // 'parent' or 'child'
 
   function toggleParentSelection(parentId) {
@@ -135,6 +146,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
     setEditingLinkedParticipantIds(getDefaultLinkedParticipantIds(participant, participants))
     setNewAdultName('')
     setNewAdultRelationship('')
+    setNewAdultPhone('')
   }
 
   function cancelEdit() {
@@ -148,19 +160,22 @@ export default function Parents({ participants, onUpdateParticipants }) {
     setEditingLinkedParticipantIds([])
     setNewAdultName('')
     setNewAdultRelationship('')
+    setNewAdultPhone('')
   }
 
   function addAdult() {
     const name = newAdultName.trim()
     const relationship = newAdultRelationship.trim()
+    const phone = newAdultPhone.trim()
     if (!name) return
-    const nextEntry = { name, relationship }
+    const nextEntry = { name, relationship, phone }
     const nextFormatted = formatAdultEntry(nextEntry).toLowerCase()
     if (!editingAdults.some(a => formatAdultEntry(a).toLowerCase() === nextFormatted)) {
       setEditingAdults(prev => [...prev, nextEntry])
     }
     setNewAdultName('')
     setNewAdultRelationship('')
+    setNewAdultPhone('')
   }
 
   function removeAdult(index) {
@@ -204,6 +219,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
       .map(adult => ({
         name: String(adult?.name || '').trim(),
         relationship: String(adult?.relationship || '').trim(),
+        phone: String(adult?.phone || '').trim(),
       }))
       .filter(adult => adult.name)
       .map(formatAdultEntry)
@@ -596,6 +612,14 @@ export default function Parents({ participants, onUpdateParticipants }) {
                                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAdult() } }}
                                 placeholder="Relationship to child"
                               />
+                              <input
+                                className="input flex-1"
+                                type="tel"
+                                value={newAdultPhone}
+                                onChange={e => setNewAdultPhone(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAdult() } }}
+                                placeholder="Phone (optional)"
+                              />
                               <button type="button" onClick={addAdult} className="btn-secondary w-full sm:w-auto">Add</button>
                             </div>
                             <div className="space-y-2 mt-1">
@@ -618,6 +642,13 @@ export default function Parents({ participants, onUpdateParticipants }) {
                                     value={adult.relationship}
                                     onChange={e => updateAdult(i, 'relationship', e.target.value)}
                                     placeholder="Relationship"
+                                  />
+                                  <input
+                                    className="input h-9 py-1.5 sm:w-52"
+                                    type="tel"
+                                    value={adult.phone || ''}
+                                    onChange={e => updateAdult(i, 'phone', e.target.value)}
+                                    placeholder="Phone"
                                   />
                                   <div className="flex items-center gap-1">
                                     <button type="button" onClick={() => moveAdult(i, 'up')} className="btn-secondary text-xs px-2 py-1" disabled={i === 0}>↑</button>
