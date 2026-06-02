@@ -334,7 +334,7 @@ function toCamel(obj) {
     is_active_this_season: 'isActiveThisSeason', is_assigned_this_season: 'isAssignedThisSeason',
     award_date: 'awardDate',
     start_date: 'startDate', end_date: 'endDate',
-    created_at: 'createdAt', updated_at: 'updatedAt', deleted_at: 'deletedAt',
+    created_at: 'createdAt', updated_at: 'updatedAt',
     sort_order: 'sortOrder',
   }
   const result = {}
@@ -384,7 +384,6 @@ export default function App() {
   const needsStaff = ['participant', 'incidents', 'log-incidents', 'staff', 'documents', 'timetable'].includes(page) || permissionsLoading
 
   const [rawParticipants, , loadingP, reloadP] = useSupabaseTable('participants', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsParticipants, cacheScope: tableCacheScope })
-  const [rawDeletedParticipants, , loadingDeletedParticipants, reloadDeletedParticipants] = useSupabaseTable('participants', 'deleted_at', { deletedFilter: 'only', enabled: tableQueriesEnabled && page === 'participants', cacheScope: tableCacheScope })
   const [rawAttendance, , loadingA, reloadA] = useSupabaseTable('attendance', 'date', { enabled: tableQueriesEnabled && needsAttendance, cacheScope: tableCacheScope })
   const [rawIncidents, , loadingI, reloadI] = useSupabaseTable('incidents', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsIncidents, cacheScope: tableCacheScope })
   const [rawMedicationAdministration, setRawMedicationAdministration, loadingMA] = useSupabaseTable('medication_administration', 'administered_at', { enabled: tableQueriesEnabled && needsMedicationAdministration, cacheScope: tableCacheScope })
@@ -396,7 +395,6 @@ export default function App() {
   const [rawStaff, setRawStaffState, loadingS, reloadS] = useSupabaseTable('staff', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsStaff, cacheScope: tableCacheScope })
 
   const participants = rawParticipants.map(toCamel)
-  const deletedParticipants = rawDeletedParticipants.map(toCamel)
   const attendance = rawAttendance.map(toCamel)
   const incidents = rawIncidents.map(toCamel)
   const medicationAdministration = rawMedicationAdministration
@@ -408,7 +406,7 @@ export default function App() {
   const campPeriod = campPeriods[0] || { id: 'global', startDate: '', endDate: '' }
   const staffList = rawStaff.map(toCamel)
 
-  const loading = (needsParticipants && loadingP) || (page === 'participants' && loadingDeletedParticipants) || (needsAttendance && loadingA) || (needsIncidents && loadingI) || (needsBehaviourLogs && loadingBL) || (needsTimetable && (loadingT || loadingTS)) || (needsStarOfDay && loadingStar) || loadingCampPeriod || (needsStaff && loadingS)
+  const loading = (needsParticipants && loadingP) || (needsAttendance && loadingA) || (needsIncidents && loadingI) || (needsBehaviourLogs && loadingBL) || (needsTimetable && (loadingT || loadingTS)) || (needsStarOfDay && loadingStar) || loadingCampPeriod || (needsStaff && loadingS)
 
   function isMissingUpdatedAtColumnError(error) {
     const message = String(error?.message || '').toLowerCase()
@@ -503,23 +501,6 @@ export default function App() {
     }
 
     reloadP()
-    reloadDeletedParticipants()
-    return { ok: true }
-  }
-
-  async function restoreParticipant(participantId) {
-    const { error } = await supabase
-      .from('participants')
-      .update({ deleted_at: null })
-      .eq('id', participantId)
-
-    if (error) {
-      console.error('RESTORE ERROR:', error.message, error.details, error.hint)
-      return { ok: false, error: error.message || 'unknown error' }
-    }
-
-    reloadP()
-    reloadDeletedParticipants()
     return { ok: true }
   }
 
@@ -1670,7 +1651,7 @@ export default function App() {
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'star-of-day': return <StarOfTheDay participants={participants} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} campPeriods={campPeriods} />
-      case 'participants': return <Participants participants={participants} deletedParticipants={deletedParticipants} setParticipants={setParticipants} deleteParticipant={deleteParticipant} restoreParticipant={restoreParticipant} onView={(id) => navigate('participant', id)} canViewUploadedData={isOwnerUser || isAdminUser} currentUserEmail={currentUserEmail} />
+      case 'participants': return <Participants participants={participants} setParticipants={setParticipants} deleteParticipant={deleteParticipant} onView={(id) => navigate('participant', id)} canViewUploadedData={isOwnerUser || isAdminUser} currentUserEmail={currentUserEmail} />
       case 'parents': return <Parents participants={participants} onUpdateParticipants={(ids, updates) => {
         const targetIds = Array.isArray(ids) ? ids : [ids]
         setParticipants(prev => prev.map(p => (targetIds.includes(p.id) ? { ...p, ...updates } : p)))
