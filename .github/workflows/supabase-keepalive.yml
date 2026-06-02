@@ -31,12 +31,18 @@ jobs:
 
           while [ "$attempt" -le "$max_attempts" ]; do
             echo "Pinging keepalive endpoint... attempt $attempt/$max_attempts"
-            http_code=$(curl -sS --max-time 20 -H "x-keepalive-token: $KEEPALIVE_TOKEN" -o response.json -w "%{http_code}" "$KEEPALIVE_URL")
+            curl_exit_code=0
+            http_code=$(curl -sS --connect-timeout 10 --max-time 20 -H "x-keepalive-token: $KEEPALIVE_TOKEN" -o response.json -w "%{http_code}" "$KEEPALIVE_URL") || curl_exit_code=$?
 
+            echo "curl exit code: $curl_exit_code"
             echo "HTTP status: $http_code"
-            cat response.json
+            if [ -s response.json ]; then
+              cat response.json
+            else
+              echo "(no response body)"
+            fi
 
-            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            if [ "$curl_exit_code" -eq 0 ] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
               echo "Keepalive ping succeeded"
               exit 0
             fi
