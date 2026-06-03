@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Users, LogIn, LogOut, AlertTriangle, Clock, Stethoscope, RefreshCw } from 'lucide-react'
 import ParticipantNameText from './ParticipantNameText'
 import { getFollowUpsDue } from '../utils/workflow'
+import { isParticipantInSeason } from '../utils/starOfDay'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
 
@@ -98,6 +99,7 @@ export default function Dashboard({
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const canAccess = tabId => Array.isArray(allowedTabs) && allowedTabs.includes(tabId)
+  const activeParticipantsTotal = participants.filter(isParticipantInSeason).length
 
   async function loadResetRequests() {
     if (!canManageUserResets) return
@@ -215,7 +217,7 @@ export default function Dashboard({
         {[
           {
             label: 'Total Participants',
-            value: participants.length,
+            value: activeParticipantsTotal,
             icon: Users,
             color: 'bg-forest-900 text-white',
             onClick: canAccess('participants') ? () => onNavigate('participants') : null,
