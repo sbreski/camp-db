@@ -1039,6 +1039,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   const [firstAidOnly, setFirstAidOnly] = useState(false)
   const [trainingById, setTrainingById] = useState({})
   const [liveTrainingCounts, setLiveTrainingCounts] = useState({ firstAid: null, safeguarding: null })
+  // Identifiers (email/username) for soft-deleted staff, to suppress false-positive "unlinked" warnings.
+  const [deletedStaffIdentifiers, setDeletedStaffIdentifiers] = useState(new Set())
 
   const ownerEmail = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
 
@@ -1077,6 +1079,19 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       setCanManageAccess(!!payload.currentUser?.isAdmin)
       setAccessUsers(users)
       setResetRequests(Array.isArray(payload.resetRequests) ? payload.resetRequests : [])
+
+      // Fetch soft-deleted staff so their linked login accounts aren't flagged as orphaned.
+      const { data: deletedRows } = await supabase
+        .from('staff')
+        .select('name,email')
+        .not('deleted_at', 'is', null)
+      const deletedIds = new Set()
+      ;(deletedRows || []).forEach(row => {
+        if (row.email) deletedIds.add(row.email.toLowerCase())
+        if (row.name) deletedIds.add(normalizeUsername(row.name))
+        if (row.name) deletedIds.add(row.name.trim().toLowerCase())
+      })
+      setDeletedStaffIdentifiers(deletedIds)
 
       const edits = {}
       users.forEach(user => {
@@ -1539,13 +1554,19 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       const email = (user.email || '').toLowerCase()
       const username = (user.username || '').toLowerCase()
       const fullName = (user.fullName || '').toLowerCase()
-      return !staffList.some(s =>
+      // Suppress if matched by an active staff profile.
+      if (staffList.some(s =>
         (s.email && s.email.toLowerCase() === email) ||
         normalizeUsername(s.name) === username ||
         s.name?.toLowerCase() === fullName
-      )
+      )) return false
+      // Suppress if matched by a previously deleted staff profile.
+      if (email && deletedStaffIdentifiers.has(email)) return false
+      if (username && deletedStaffIdentifiers.has(username)) return false
+      if (fullName && deletedStaffIdentifiers.has(fullName)) return false
+      return true
     })
-  }, [accessUsers, staffList])
+  }, [accessUsers, staffList, deletedStaffIdentifiers])
 
   return (
     <div className="fade-in space-y-6">
