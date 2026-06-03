@@ -1821,9 +1821,16 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
             {unlinkedLoginUsers.map(user => (
               <div key={user.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700 flex items-center justify-between gap-2">
                 <span className="font-mono">{user.email || user.username || user.id}</span>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   {user.isAdmin && <span className="text-amber-700 font-semibold">Admin</span>}
                   {user.isArchived && <span className="text-stone-500">Archived</span>}
+                  <button
+                    type="button"
+                    onClick={() => deleteLoginAccount(user)}
+                    disabled={accessActionLoading}
+                    className="flex items-center gap-1 text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors border border-red-200 disabled:opacity-50">
+                    <Trash2 size={11} /> Delete
+                  </button>
                 </div>
               </div>
             ))}
