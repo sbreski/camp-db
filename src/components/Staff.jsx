@@ -793,9 +793,9 @@ function StaffDetailPanel({
             </div>
 
             <div className="pt-3 border-t border-stone-100 flex flex-wrap gap-2">
-              <button onClick={() => onDelete(member.id)}
+              <button onClick={() => onDelete(member)}
                 className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors border border-red-200">
-                <Trash2 size={13} /> Remove Staff Profile
+                <Trash2 size={13} /> {loginUser ? 'Remove Staff Profile + Login' : 'Remove Staff Profile'}
               </button>
             </div>
           </div>
@@ -1236,13 +1236,53 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function deleteStaff(id) {
-    if (!window.confirm('Remove this staff member from the system?')) return
+  async function deleteUserById(userId) {
+    const token = await withAccessToken()
+    const response = await fetch('/api/admin-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'delete_user', userId }),
+    })
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.error || 'Unable to delete account')
+  }
+
+  async function deleteStaff(memberOrId) {
+    const member = typeof memberOrId === 'object'
+      ? memberOrId
+      : staffList.find(s => s.id === memberOrId)
+
+    const linkedLogin = getLinkedLoginUser(member)
+    const profileLabel = member?.name || 'this staff member'
+
+    const confirmMessage = linkedLogin
+      ? `Remove ${profileLabel} from staff and permanently delete their login account?`
+      : `Remove ${profileLabel} from the system?`
+
+    if (!window.confirm(confirmMessage)) return
+
+    const internalEmail = (linkedLogin?.internalEmail || linkedLogin?.email || '').toLowerCase()
+    if (linkedLogin && internalEmail && internalEmail === currentUserEmail) {
+      setStaffError('You cannot delete your own login account via staff profile removal')
+      return
+    }
+
     setStaffActionLoading(true)
+    setStaffError('')
     try {
-      await setStaffList(prev => prev.filter(s => s.id !== id))
-      if (selected?.id === id) setSelected(null)
-      setStaffMessage('Staff profile removed.')
+      if (linkedLogin) {
+        await deleteUserById(linkedLogin.id)
+      }
+
+      await setStaffList(prev => prev.filter(s => s.id !== member?.id))
+      if (selected?.id === member?.id) setSelected(null)
+
+      if (linkedLogin) {
+        setStaffMessage('Staff profile and linked login account removed.')
+        await loadAccessUsers()
+      } else {
+        setStaffMessage('Staff profile removed.')
+      }
     } catch (error) {
       setStaffError(error.message || 'Unable to remove')
     } finally {
@@ -1366,14 +1406,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     setAccessActionLoading(true)
     setAccessError('')
     try {
-      const token = await withAccessToken()
-      const response = await fetch('/api/admin-users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: 'delete_user', userId: user.id }),
-      })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || 'Unable to delete account')
+      await deleteUserById(user.id)
       setAccessMessage('Login account permanently deleted.')
       await loadAccessUsers()
     } catch (error) {
