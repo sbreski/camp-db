@@ -176,6 +176,17 @@ function isTransientAuthError(error) {
     || normalized.includes('no active auth session')
 }
 
+function getActivityStatus(member, loginUser) {
+  const seasonActive = member?.isAssignedThisSeason !== false
+  const loginActive = loginUser ? !loginUser.isArchived : true
+  return {
+    seasonActive,
+    loginActive,
+    effectiveActive: seasonActive && loginActive,
+    isAligned: !loginUser || seasonActive === loginActive,
+  }
+}
+
 function ExpiryBadge({ dateStr }) {
   const status = expiryStatus(dateStr)
   if (!status) return null
@@ -322,9 +333,9 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
                 <input type="checkbox" className="h-4 w-4" checked={form.isAssignedThisSeason !== false}
                   onChange={e => set('isAssignedThisSeason', e.target.checked)} />
                 <Calendar size={14} className="text-forest-600" />
-                Active this season — can log in
+                Active this season
               </label>
-              <p className="text-xs text-stone-400 mt-1 ml-6">Uncheck to retain the profile but disable login access for this season.</p>
+              <p className="text-xs text-stone-400 mt-1 ml-6">This controls seasonal availability. Login access is synced from the main Staff panel.</p>
             </div>
 
             {/* Training */}
@@ -521,7 +532,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
 
 function StaffDetailPanel({
   member, loginUser, onEdit, onClose, onDelete,
-  onSavePermissions, onResetPassword, onToggleArchive, onDeleteAccount,
+  onSavePermissions, onResetPassword, onSetActiveStatus, onDeleteAccount,
   accessActionLoading, canManageAccess, currentUserEmail,
   accessEdits, setAccessEdit,
 }) {
@@ -646,6 +657,7 @@ function StaffDetailPanel({
   const faExpiry = expiryStatus(training.firstAidExpiresOn)
   const sgExpiry = expiryStatus(training.safeguardingExpiresOn)
   const dbsMeta = getDbsMeta(member)
+  const activity = getActivityStatus(member, loginUser)
 
   const detailTabs = [
     { id: 'overview', label: 'Overview' },
@@ -928,13 +940,16 @@ function StaffDetailPanel({
                 <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
                   <label className="flex items-center gap-2 text-sm font-medium text-stone-800 cursor-pointer">
                     <input type="checkbox" className="h-4 w-4"
-                      checked={!loginUser.isArchived}
-                      onChange={e => onToggleArchive(loginUser, !e.target.checked)}
+                      checked={activity.effectiveActive}
+                      onChange={e => onSetActiveStatus(member, e.target.checked)}
                       disabled={accessActionLoading || isCurrentUser} />
                     <Calendar size={14} className="text-forest-600" />
-                    Login account active (not archived)
+                    Active this season
                   </label>
-                  <p className="text-xs text-stone-400 mt-1 ml-6">Uncheck to archive this login without deleting the account.</p>
+                  <p className="text-xs text-stone-400 mt-1 ml-6">Single switch: updates both seasonal status and login access together.</p>
+                  {!activity.isAligned && (
+                    <p className="text-xs text-amber-700 mt-1 ml-6">Status mismatch detected from older data. Toggle once to sync.</p>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -1209,10 +1224,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
   }
 
   function isInactiveForFilter(member) {
-    const assignedThisSeason = member.isAssignedThisSeason !== false
     const linkedLogin = getLinkedLoginUser(member)
-    const loginArchived = Boolean(linkedLogin?.isArchived)
-    return !assignedThisSeason || loginArchived
+    return !getActivityStatus(member, linkedLogin).effectiveActive
   }
 
   async function attemptCreateLoginAccount({ identifier, password, allowedTabs, isAdmin, canViewSafeguarding, fullName }) {
@@ -1428,34 +1441,6 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
-  async function toggleArchive(user, shouldArchive) {
-    const internalEmail = (user.internalEmail || user.email || '').toLowerCase()
-    if (internalEmail && internalEmail === currentUserEmail) {
-      setAccessError('You cannot change archive status on your own account')
-      return
-    }
-    const confirmed = window.confirm(`${shouldArchive ? 'Archive' : 'Restore'} login account for ${accountLabel(user)}?`)
-    if (!confirmed) return
-    setAccessActionLoading(true)
-    setAccessError('')
-    try {
-      const token = await withAccessToken()
-      const response = await fetch('/api/admin-users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: shouldArchive ? 'archive_user' : 'restore_user', userId: user.id }),
-      })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || 'Unable to update account')
-      setAccessMessage(`${shouldArchive ? 'Archived' : 'Restored'} account.`)
-      await loadAccessUsers()
-    } catch (error) {
-      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to update account'))
-    } finally {
-      setAccessActionLoading(false)
-    }
-  }
-
   async function deleteLoginAccount(user) {
     const internalEmail = (user.internalEmail || user.email || '').toLowerCase()
     if (internalEmail && internalEmail === currentUserEmail) {
@@ -1479,6 +1464,58 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
 
   function accountLabel(user) {
     return user.username || user.email || user.internalEmail || ''
+  }
+
+  async function updateArchiveState(userId, shouldArchive) {
+    const token = await withAccessToken()
+    const response = await fetch('/api/admin-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: shouldArchive ? 'archive_user' : 'restore_user', userId }),
+    })
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.error || 'Unable to update account')
+  }
+
+  async function setActiveStatus(member, shouldBeActive) {
+    if (!member?.id) return
+    const linkedLogin = getLinkedLoginUser(member)
+    const internalEmail = (linkedLogin?.internalEmail || linkedLogin?.email || '').toLowerCase()
+    if (!shouldBeActive && internalEmail && internalEmail === currentUserEmail) {
+      setAccessError('You cannot mark your own account inactive while signed in')
+      return
+    }
+
+    const name = member.name || accountLabel(linkedLogin || {}) || 'this staff member'
+    const confirmed = window.confirm(`Mark ${name} as ${shouldBeActive ? 'active' : 'inactive'} this season?`)
+    if (!confirmed) return
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+    setStaffError('')
+
+    try {
+      await setStaffList(prev => prev.map(s => s.id === member.id
+        ? { ...s, isAssignedThisSeason: shouldBeActive }
+        : s))
+
+      if (linkedLogin) {
+        const shouldArchive = !shouldBeActive
+        const currentlyArchived = Boolean(linkedLogin.isArchived)
+        if (currentlyArchived !== shouldArchive) {
+          await updateArchiveState(linkedLogin.id, shouldArchive)
+        }
+        await loadAccessUsers()
+      }
+
+      const suffix = linkedLogin ? ' and synced login access.' : '.'
+      setAccessMessage(`Marked ${name} as ${shouldBeActive ? 'active' : 'inactive'}${suffix}`)
+    } catch (error) {
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to update active/inactive status'))
+    } finally {
+      setAccessActionLoading(false)
+    }
   }
 
   // Camp period helpers
@@ -1726,7 +1763,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
             const faExp = expiryStatus(training.firstAidExpiresOn)
             const sgExp = expiryStatus(training.safeguardingExpiresOn)
             const dbsMeta = getDbsMeta(s)
-            const isActive = s.isAssignedThisSeason !== false
+            const activity = getActivityStatus(s, loginUser)
+            const isActive = activity.effectiveActive
             const isExpanded = selected?.id === s.id
 
             function toggleExpanded() {
@@ -1761,6 +1799,11 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                         {hasLogin && isArchived && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
                             Login archived
+                          </span>
+                        )}
+                        {hasLogin && !activity.isAligned && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                            Status mismatch
                           </span>
                         )}
                         {!hasLogin && (
@@ -1818,6 +1861,23 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                       {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </div>
                   </button>
+                  <div className="px-4 pb-3 -mt-1">
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation()
+                        setActiveStatus(s, !isActive)
+                      }}
+                      disabled={accessActionLoading}
+                      className={`text-xs font-semibold px-2.5 py-1 rounded border transition-colors disabled:opacity-50 ${
+                        isActive
+                          ? 'text-rose-700 border-rose-200 hover:bg-rose-50'
+                          : 'text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                      }`}
+                    >
+                      {isActive ? 'Set Inactive' : 'Set Active'}
+                    </button>
+                  </div>
                 </div>
 
                 {isExpanded && editingMember?.id === s.id && (
@@ -1841,7 +1901,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                     onDelete={deleteStaff}
                     onSavePermissions={savePermissions}
                     onResetPassword={resetPassword}
-                    onToggleArchive={toggleArchive}
+                    onSetActiveStatus={setActiveStatus}
                     onDeleteAccount={deleteLoginAccount}
                     accessActionLoading={accessActionLoading}
                     canManageAccess={canManageAccess}
