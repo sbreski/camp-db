@@ -179,11 +179,14 @@ function isTransientAuthError(error) {
 function getActivityStatus(member, loginUser) {
   const seasonActive = member?.isAssignedThisSeason !== false
   const loginActive = loginUser ? !loginUser.isArchived : true
+  const isAligned = !loginUser || seasonActive === loginActive
   return {
     seasonActive,
     loginActive,
     effectiveActive: seasonActive && loginActive,
-    isAligned: !loginUser || seasonActive === loginActive,
+    isAligned,
+    // Only show warning when the user should be active but their login is blocked.
+    hasWarningMismatch: Boolean(loginUser) && seasonActive && !loginActive,
   }
 }
 
@@ -947,7 +950,7 @@ function StaffDetailPanel({
                     Active this season
                   </label>
                   <p className="text-xs text-stone-400 mt-1 ml-6">Single switch: updates both seasonal status and login access together.</p>
-                  {!activity.isAligned && (
+                  {activity.hasWarningMismatch && (
                     <p className="text-xs text-amber-700 mt-1 ml-6">Status mismatch detected from older data. Toggle once to sync.</p>
                   )}
                 </div>
@@ -1801,7 +1804,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                             Login archived
                           </span>
                         )}
-                        {hasLogin && !activity.isAligned && (
+                        {hasLogin && activity.hasWarningMismatch && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
                             Status mismatch
                           </span>
