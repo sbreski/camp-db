@@ -156,6 +156,15 @@ function getTrainingMeta(source) {
   }
 }
 
+function toFriendlyAuthErrorMessage(error, fallback = 'Unable to load users') {
+  const raw = String(error?.message || '')
+  const normalized = raw.toLowerCase()
+  if (normalized.includes('auth session missing') || normalized.includes('invalid auth token')) {
+    return 'Your session has expired. Please sign in again.'
+  }
+  return raw || fallback
+}
+
 function ExpiryBadge({ dateStr }) {
   const status = expiryStatus(dateStr)
   if (!status) return null
@@ -1143,7 +1152,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       setCanManageAccess(false)
       setAccessUsers([])
       setResetRequests([])
-      setAccessError(error.message)
+      setAccessError(toFriendlyAuthErrorMessage(error))
     } finally {
       setAccessLoading(false)
     }

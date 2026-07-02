@@ -22,6 +22,15 @@ function fmt(ts) {
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
+function toFriendlyAuthErrorMessage(error) {
+  const raw = String(error?.message || '')
+  const normalized = raw.toLowerCase()
+  if (normalized.includes('auth session missing') || normalized.includes('invalid auth token')) {
+    return 'Your session has expired. Please sign in again.'
+  }
+  return raw || 'Unable to load reset requests'
+}
+
 export default function Dashboard({
   participants,
   attendance,
@@ -119,7 +128,7 @@ export default function Dashboard({
 
       setResetRequests(Array.isArray(payload.resetRequests) ? payload.resetRequests : [])
     } catch (error) {
-      setResetRequestsError(error.message || 'Unable to load reset requests')
+      setResetRequestsError(toFriendlyAuthErrorMessage(error))
       setResetRequests([])
     } finally {
       setResetRequestsLoading(false)
