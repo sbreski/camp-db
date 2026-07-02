@@ -48,6 +48,13 @@ function normalizeUsername(value) {
     .replace(/^\.+|\.+$/g, '')
 }
 
+function generateTemporaryPassword() {
+  // Keep ASCII-only with minimum complexity for Supabase password policy.
+  const chunk = Math.random().toString(36).slice(2, 10)
+  const suffix = Math.random().toString(36).slice(2, 6)
+  return `Camp!${chunk}9A${suffix}`
+}
+
 function initials(name) {
   return String(name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 }
@@ -453,7 +460,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
                 {form.tempPassword.length > 0 && form.tempPassword.length < 8 && (
                   <p className="text-xs text-red-600 mt-1">Must be at least 8 characters</p>
                 )}
-                <p className="text-xs text-stone-400 mt-1">Leave blank to create staff profile without a login account.</p>
+                <p className="text-xs text-stone-400 mt-1">Leave blank to auto-generate a temporary password and create a login account.</p>
               </div>
             ) : (
               <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-3">
@@ -1269,24 +1276,28 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       await setStaffList(prev => [...prev, { ...staffData, id: newId }])
       setShowForm(false)
 
-      if (data.tempPassword && data.tempPassword.length >= 8 && loginIdentifier) {
+      const chosenPassword = String(data.tempPassword || '').trim()
+      const loginPassword = chosenPassword.length >= 8 ? chosenPassword : generateTemporaryPassword()
+
+      if (loginIdentifier) {
         try {
           await attemptCreateLoginAccount({
             identifier: loginIdentifier,
-            password: data.tempPassword,
+            password: loginPassword,
             allowedTabs: data.allowedTabs,
             isAdmin: data.isAdmin,
             canViewSafeguarding: data.canViewSafeguarding,
             fullName: data.name?.trim() || '',
           })
-          setStaffMessage(`Staff profile and login account created. Login: ${loginIdentifier} · Password: ${data.tempPassword}`)
+          const passwordLabel = chosenPassword.length >= 8 ? chosenPassword : `${loginPassword} (auto-generated)`
+          setStaffMessage(`Staff profile and login account created. Login: ${loginIdentifier} · Password: ${passwordLabel}`)
           await loadAccessUsers()
         } catch (accountError) {
           setStaffMessage('Staff profile added.')
           setStaffError(`Login account error: ${toFriendlyAuthErrorMessage(accountError, 'Unable to create login account')}`)
         }
       } else {
-        setStaffMessage('Staff profile added. No login account created (no password provided).')
+        setStaffMessage('Staff profile added. No login account created (missing email/username identifier).')
       }
     } catch (error) {
       setStaffError(toFriendlyAuthErrorMessage(error, 'Unable to add staff profile'))
