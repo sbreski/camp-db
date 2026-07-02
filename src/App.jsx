@@ -240,7 +240,7 @@ function toSnake(obj) {
     uploadedByInitials: 'uploaded_by_initials',
     firstAidTrained: 'first_aid_trained', safeguardingTrained: 'safeguarding_trained',
     firstAidExpiresOn: 'first_aid_expires_on', safeguardingExpiresOn: 'safeguarding_expires_on',
-    dbsOnUpdateService: 'dbs_on_update_service', dbsIssueDate: 'dbs_issue_date',
+    dbsOnUpdateService: 'dbs_on_update_service', dbsIssueDate: 'dbs_issue_date', dbsCertificateNumber: 'dbs_certificate_number',
     isActiveThisSeason: 'is_active_this_season', isAssignedThisSeason: 'is_assigned_this_season',
     awardDate: 'award_date',
     startDate: 'start_date', endDate: 'end_date',
@@ -336,7 +336,7 @@ function toCamel(obj) {
     uploaded_by_initials: 'uploadedByInitials',
     first_aid_trained: 'firstAidTrained', safeguarding_trained: 'safeguardingTrained',
     first_aid_expires_on: 'firstAidExpiresOn', safeguarding_expires_on: 'safeguardingExpiresOn',
-    dbs_on_update_service: 'dbsOnUpdateService', dbs_issue_date: 'dbsIssueDate',
+    dbs_on_update_service: 'dbsOnUpdateService', dbs_issue_date: 'dbsIssueDate', dbs_certificate_number: 'dbsCertificateNumber',
     is_active_this_season: 'isActiveThisSeason', is_assigned_this_season: 'isAssignedThisSeason',
     award_date: 'awardDate',
     start_date: 'startDate', end_date: 'endDate',
@@ -661,7 +661,7 @@ export default function App() {
   const STAFF_REQUIRED_COLUMNS = new Set([
     'first_aid_trained', 'safeguarding_trained',
     'first_aid_expires_on', 'safeguarding_expires_on',
-    'dbs_on_update_service', 'dbs_issue_date',
+    'dbs_on_update_service', 'dbs_issue_date', 'dbs_certificate_number',
     'is_assigned_this_season',
   ])
 
@@ -737,7 +737,7 @@ export default function App() {
       const dbsMissing = missingRequired.some(c => c.startsWith('dbs'))
       const migrations = [
         ...(trainingMissing ? ['db/31_staff_training_fields.sql'] : []),
-        ...(dbsMissing ? ['db/30_staff_dbs_fields.sql'] : []),
+        ...(dbsMissing ? ['db/30_staff_dbs_fields.sql', 'db/44_staff_dbs_certificate_number.sql'] : []),
       ]
       firstError = new Error(
         `Some fields were not saved because these database columns are missing: ${missingRequired.join(', ')}. ` +
@@ -1023,7 +1023,8 @@ export default function App() {
     const now = Date.now()
     let expiresAt = readLocalSessionExpiry(userId)
     if (Number.isFinite(expiresAt) && expiresAt <= now) {
-      logout()
+      removeLocalSessionExpiry(userId)
+      logout(userId)
       return
     }
 
@@ -1306,9 +1307,9 @@ export default function App() {
     }
   }, [permissionsLoading])
 
-  async function logout() {
+  async function logout(userIdOverride = null) {
     clearSessionExpiryTimer()
-    const userId = currentUser?.id
+    const userId = userIdOverride || currentUser?.id
     setSessionExpiryAt(null)
     if (userId) removeLocalSessionExpiry(userId)
     await supabase.auth.signOut()
@@ -1317,6 +1318,7 @@ export default function App() {
     setIsAdminUser(false)
     setAllowedTabIds(BASIC_TABS)
     setCanViewTimetableOverview(false)
+    setCanEditTimetable(false)
     setCanViewSafeguardingPerm(false)
   }
 
@@ -1502,8 +1504,8 @@ export default function App() {
         {
           key: 'staff_dbs_columns',
           table: 'staff',
-          columns: 'id,dbs_on_update_service,dbs_issue_date',
-          label: 'Staff DBS columns are missing (dbs_on_update_service/dbs_issue_date). Run db/30_staff_dbs_fields.sql.',
+          columns: 'id,dbs_on_update_service,dbs_issue_date,dbs_certificate_number',
+          label: 'Staff DBS columns are missing (dbs_on_update_service/dbs_issue_date/dbs_certificate_number). Run db/30_staff_dbs_fields.sql and db/44_staff_dbs_certificate_number.sql.',
         },
         {
           key: 'star_of_day_table',

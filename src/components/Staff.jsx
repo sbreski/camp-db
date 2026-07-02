@@ -96,15 +96,17 @@ function isAllowedLegacyDocumentUrl(value) {
 
 function getDbsMeta(source) {
   const issueDate = source?.dbsIssueDate || source?.dbs_issue_date || ''
+  const certificateNumber = source?.dbsCertificateNumber || source?.dbs_certificate_number || ''
   const onUpdateService = Boolean(source?.dbsOnUpdateService ?? source?.dbs_on_update_service)
-  if (!issueDate) return { issueDate: '', onUpdateService, expiryDate: '', status: null }
+  if (!issueDate) return { issueDate: '', certificateNumber, onUpdateService, expiryDate: '', status: null }
 
   const expiryDate = addYearsToDate(issueDate, 3)
-  if (!expiryDate) return { issueDate: '', onUpdateService, expiryDate: '', status: null }
-  if (onUpdateService) return { issueDate, onUpdateService, expiryDate, status: 'ok' }
+  if (!expiryDate) return { issueDate: '', certificateNumber, onUpdateService, expiryDate: '', status: null }
+  if (onUpdateService) return { issueDate, certificateNumber, onUpdateService, expiryDate, status: 'ok' }
 
   return {
     issueDate,
+    certificateNumber,
     onUpdateService,
     expiryDate,
     status: expiryStatus(expiryDate, 90),
@@ -177,7 +179,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
     emergencyContact: '', emergencyPhone: '', notes: '',
     firstAidTrained: false, safeguardingTrained: false,
     firstAidExpiresOn: '', safeguardingExpiresOn: '',
-    dbsOnUpdateService: false, dbsIssueDate: '',
+    dbsOnUpdateService: false, dbsIssueDate: '', dbsCertificateNumber: '',
     isAssignedThisSeason: true,
     // login
     tempPassword: '',
@@ -195,6 +197,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
     safeguardingExpiresOn: initialTraining.safeguardingExpiresOn,
     dbsOnUpdateService: Boolean(initial?.dbsOnUpdateService ?? initial?.dbs_on_update_service),
     dbsIssueDate: initial?.dbsIssueDate || initial?.dbs_issue_date || '',
+    dbsCertificateNumber: initial?.dbsCertificateNumber || initial?.dbs_certificate_number || '',
     isAssignedThisSeason: (initial?.isAssignedThisSeason ?? initial?.is_assigned_this_season) !== false,
     isAdmin: Boolean(initial?.isAdmin),
     canViewSafeguarding: Boolean(initial?.canViewSafeguarding),
@@ -360,11 +363,22 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
                     onChange={e => set('dbsIssueDate', e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="label">DBS certificate number</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={form.dbsCertificateNumber}
+                    onChange={e => set('dbsCertificateNumber', e.target.value)}
+                    placeholder="Certificate number"
+                  />
+                </div>
                 {dbsMeta.issueDate && (
                   <div className="text-xs text-stone-500">
                     {dbsMeta.onUpdateService
                       ? `On update service. DBS issued ${dbsMeta.issueDate}.`
                       : `DBS expires ${dbsMeta.expiryDate} (3 years from issue date). Warning starts 3 months before expiry.`}
+                    {dbsMeta.certificateNumber ? ` Certificate no: ${dbsMeta.certificateNumber}.` : ''}
                   </div>
                 )}
               </div>
@@ -786,6 +800,7 @@ function StaffDetailPanel({
                       {dbsMeta.onUpdateService
                         ? `Issue date ${dbsMeta.issueDate} · On update service`
                         : `Issue date ${dbsMeta.issueDate} · Expires ${dbsMeta.expiryDate}${dbsMeta.status === 'expired' ? ' (expired)' : dbsMeta.status === 'soon' ? ' (expiring soon)' : ''}`}
+                      {dbsMeta.certificateNumber ? ` · Cert ${dbsMeta.certificateNumber}` : ''}
                     </p>
                   )}
                 </div>
