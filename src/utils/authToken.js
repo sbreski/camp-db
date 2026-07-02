@@ -2,7 +2,7 @@ import { supabase } from '../supabase'
 
 const TOKEN_REFRESH_GRACE_MS = 30 * 1000
 const SESSION_RETRY_DELAY_MS = 120
-const MIN_TOKEN_VALIDITY_MS = 5 * 1000
+const MIN_TOKEN_VALIDITY_MS = 1000
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -60,7 +60,12 @@ export async function getFreshSession(graceMs = TOKEN_REFRESH_GRACE_MS) {
   }
 
   if (!isSessionUsable(session)) {
-    throw new Error('No active auth session. Please sign in again.')
+    // One more read to absorb auth-state timing races before failing hard.
+    await sleep(SESSION_RETRY_DELAY_MS)
+    session = await readSession()
+    if (!isSessionUsable(session, 0)) {
+      throw new Error('No active auth session. Please sign in again.')
+    }
   }
 
   return session

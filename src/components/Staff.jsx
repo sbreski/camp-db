@@ -159,10 +159,21 @@ function getTrainingMeta(source) {
 function toFriendlyAuthErrorMessage(error, fallback = 'Unable to load users') {
   const raw = String(error?.message || '')
   const normalized = raw.toLowerCase()
-  if (normalized.includes('auth session missing') || normalized.includes('invalid auth token')) {
-    return 'Your session has expired. Please sign in again.'
+  if (
+    normalized.includes('auth session missing')
+    || normalized.includes('invalid auth token')
+    || normalized.includes('no active auth session')
+  ) {
+    return 'Could not verify your admin session. Please try again. If it keeps happening, sign in again.'
   }
   return raw || fallback
+}
+
+function isTransientAuthError(error) {
+  const normalized = String(error?.message || '').toLowerCase()
+  return normalized.includes('auth session missing')
+    || normalized.includes('invalid auth token')
+    || normalized.includes('no active auth session')
 }
 
 function ExpiryBadge({ dateStr }) {
@@ -1094,10 +1105,21 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     setAccessError('')
     setAccessMessage('')
     try {
-      const token = await withAccessToken()
-      const response = await fetch('/api/admin-users', { headers: { Authorization: `Bearer ${token}` } })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || 'Unable to load users')
+      const fetchAccessPayload = async () => {
+        const token = await withAccessToken()
+        const response = await fetch('/api/admin-users', { headers: { Authorization: `Bearer ${token}` } })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || 'Unable to load users')
+        return payload
+      }
+
+      let payload
+      try {
+        payload = await fetchAccessPayload()
+      } catch (error) {
+        if (!isTransientAuthError(error)) throw error
+        payload = await fetchAccessPayload()
+      }
 
       const users = payload.users || []
       setCanManageAccess(!!payload.currentUser?.isAdmin)
@@ -1243,13 +1265,13 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
           await loadAccessUsers()
         } catch (accountError) {
           setStaffMessage('Staff profile added.')
-          setStaffError(`Login account error: ${accountError.message}`)
+          setStaffError(`Login account error: ${toFriendlyAuthErrorMessage(accountError, 'Unable to create login account')}`)
         }
       } else {
         setStaffMessage('Staff profile added. No login account created (no password provided).')
       }
     } catch (error) {
-      setStaffError(error.message || 'Unable to add staff profile')
+      setStaffError(toFriendlyAuthErrorMessage(error, 'Unable to add staff profile'))
     } finally {
       setStaffActionLoading(false)
     }
@@ -1269,7 +1291,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         setStaffMessage('Staff profile updated.')
       }
     } catch (error) {
-      setStaffError(error.message || 'Unable to update staff profile')
+      setStaffError(toFriendlyAuthErrorMessage(error, 'Unable to update staff profile'))
     } finally {
       setStaffActionLoading(false)
     }
@@ -1323,7 +1345,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
         setStaffMessage('Staff profile removed.')
       }
     } catch (error) {
-      setStaffError(error.message || 'Unable to remove')
+      setStaffError(toFriendlyAuthErrorMessage(error, 'Unable to remove'))
     } finally {
       setStaffActionLoading(false)
     }
@@ -1374,7 +1396,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       }))
       loadAccessUsers().catch(() => {})
     } catch (error) {
-      setAccessError(error.message)
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to save permissions'))
     } finally {
       setAccessActionLoading(false)
     }
@@ -1400,7 +1422,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       setAccessMessage('Password reset successfully.')
       await loadAccessUsers()
     } catch (error) {
-      setAccessError(error.message)
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to reset password'))
     } finally {
       setAccessActionLoading(false)
     }
@@ -1428,7 +1450,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       setAccessMessage(`${shouldArchive ? 'Archived' : 'Restored'} account.`)
       await loadAccessUsers()
     } catch (error) {
-      setAccessError(error.message)
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to update account'))
     } finally {
       setAccessActionLoading(false)
     }
@@ -1449,7 +1471,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       setAccessMessage('Login account permanently deleted.')
       await loadAccessUsers()
     } catch (error) {
-      setAccessError(error.message)
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to delete account'))
     } finally {
       setAccessActionLoading(false)
     }

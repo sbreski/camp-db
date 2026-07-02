@@ -22,11 +22,18 @@ function fmt(ts) {
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
+function isTransientAuthError(error) {
+  const normalized = String(error?.message || '').toLowerCase()
+  return normalized.includes('auth session missing')
+    || normalized.includes('invalid auth token')
+    || normalized.includes('no active auth session')
+}
+
 function toFriendlyAuthErrorMessage(error) {
   const raw = String(error?.message || '')
   const normalized = raw.toLowerCase()
   if (normalized.includes('auth session missing') || normalized.includes('invalid auth token')) {
-    return 'Your session has expired. Please sign in again.'
+    return 'Could not verify your admin session. Please try again. If it keeps happening, sign in again.'
   }
   return raw || 'Unable to load reset requests'
 }
@@ -116,15 +123,25 @@ export default function Dashboard({
     setResetRequestsError('')
 
     try {
-      const accessToken = await getFreshAccessToken()
+      const fetchResetRequests = async () => {
+        const accessToken = await getFreshAccessToken()
+        const response = await fetch('/api/admin-users', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || 'Unable to load reset requests')
+        return payload
+      }
 
-      const response = await fetch('/api/admin-users', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || 'Unable to load reset requests')
+      let payload
+      try {
+        payload = await fetchResetRequests()
+      } catch (error) {
+        if (!isTransientAuthError(error)) throw error
+        payload = await fetchResetRequests()
+      }
 
       setResetRequests(Array.isArray(payload.resetRequests) ? payload.resetRequests : [])
     } catch (error) {
