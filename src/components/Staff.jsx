@@ -177,7 +177,9 @@ function isTransientAuthError(error) {
 }
 
 function getActivityStatus(member, loginUser) {
-  const seasonActive = member?.isAssignedThisSeason !== false
+  const rawSeasonValue = member?.isAssignedThisSeason ?? member?.is_assigned_this_season
+  const hasSeasonValue = rawSeasonValue !== undefined && rawSeasonValue !== null
+  const seasonActive = hasSeasonValue ? asBool(rawSeasonValue) : true
   const loginActive = loginUser ? !loginUser.isArchived : true
   const isAligned = !loginUser || seasonActive === loginActive
   return {
@@ -185,8 +187,8 @@ function getActivityStatus(member, loginUser) {
     loginActive,
     effectiveActive: seasonActive && loginActive,
     isAligned,
-    // Only show warning when the user should be active but their login is blocked.
-    hasWarningMismatch: Boolean(loginUser) && seasonActive && !loginActive,
+    // Only show warning when season status is explicitly active but login is blocked.
+    hasWarningMismatch: Boolean(loginUser) && hasSeasonValue && seasonActive && !loginActive,
   }
 }
 
