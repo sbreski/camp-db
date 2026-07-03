@@ -1,8 +1,14 @@
 import { supabase } from '../supabase'
 
 const TOKEN_REFRESH_GRACE_MS = 30 * 1000
-const SESSION_RETRY_DELAY_MS = 120
 const MIN_TOKEN_VALIDITY_MS = 1000
+
+// Safari restores session from IndexedDB/localStorage significantly slower than
+// other browsers after a page load or deploy-triggered cache bust. We poll with
+// a backoff rather than a single short retry so Safari has enough time to hydrate
+// its auth state without affecting faster browsers (they resolve on attempt 1-2).
+const SESSION_POLL_ATTEMPTS = 8
+const SESSION_POLL_DELAY_MS = 300
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -26,11 +32,13 @@ function isSessionUsable(session, minValidityMs = MIN_TOKEN_VALIDITY_MS) {
 }
 
 export async function getFreshSession(graceMs = TOKEN_REFRESH_GRACE_MS) {
-  // Supabase can briefly report a null session while auth state hydrates after reload.
-  let session = await readSession()
-  if (!session) {
-    await sleep(SESSION_RETRY_DELAY_MS)
+  // Poll for the session so Safari's slow IndexedDB hydration doesn't cause
+  // a spurious "no session" error on first load after a deploy.
+  let session = null
+  for (let attempt = 0; attempt < SESSION_POLL_ATTEMPTS; attempt++) {
     session = await readSession()
+    if (session) break
+    await sleep(SESSION_POLL_DELAY_MS)
   }
 
   if (!session) {
@@ -46,7 +54,7 @@ export async function getFreshSession(graceMs = TOKEN_REFRESH_GRACE_MS) {
       const message = String(refreshError.message || '').toLowerCase()
       // If refresh raced with a pending auth-state update, re-read once before failing.
       if (message.includes('auth session missing')) {
-        await sleep(SESSION_RETRY_DELAY_MS)
+        await sleep(SESSION_POLL_DELAY_MS)
         session = await readSession()
         if (!session) {
           throw new Error('No active auth session. Please sign in again.')
@@ -61,7 +69,7 @@ export async function getFreshSession(graceMs = TOKEN_REFRESH_GRACE_MS) {
 
   if (!isSessionUsable(session)) {
     // One more read to absorb auth-state timing races before failing hard.
-    await sleep(SESSION_RETRY_DELAY_MS)
+    await sleep(SESSION_POLL_DELAY_MS)
     session = await readSession()
     if (!isSessionUsable(session, 0)) {
       throw new Error('No active auth session. Please sign in again.')
