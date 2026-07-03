@@ -72,14 +72,6 @@ export default function Dashboard({
   ).map(row => ({
     ...row,
     participant: participants.find(p => p.id === row.participant_id) || null,
-          <a
-            href={CAMP_GOOGLE_DRIVE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
-          >
-            <FolderOpen size={15} /> Camp Google Drive
-          </a>
   }))
 
   function completeFollowUp(incidentId) {
