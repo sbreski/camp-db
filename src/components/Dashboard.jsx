@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users, LogIn, LogOut, AlertTriangle, Clock, Stethoscope, RefreshCw } from 'lucide-react'
+import { Users, LogIn, LogOut, AlertTriangle, Clock, Stethoscope, RefreshCw, FolderOpen } from 'lucide-react'
 import ParticipantNameText from './ParticipantNameText'
 import { getFollowUpsDue } from '../utils/workflow'
 import { isParticipantInSeason } from '../utils/starOfDay'
@@ -7,6 +7,7 @@ import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
 
 const TIMETABLE_URL = 'https://docs.google.com/spreadsheets/d/1Ts4Z2fneVbuid-KLp8AjJzUlgEB2vUOIfs1aaLTSVGI/edit?usp=sharing'
+const CAMP_GOOGLE_DRIVE_URL = import.meta.env.VITE_CAMP_GOOGLE_DRIVE_URL || 'https://drive.google.com/drive/folders/'
 
 function isMissingTableError(error, tableName) {
   const message = String(error?.message || '').toLowerCase()
@@ -71,6 +72,14 @@ export default function Dashboard({
   ).map(row => ({
     ...row,
     participant: participants.find(p => p.id === row.participant_id) || null,
+          <a
+            href={CAMP_GOOGLE_DRIVE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
+            <FolderOpen size={15} /> Camp Google Drive
+          </a>
   }))
 
   function completeFollowUp(incidentId) {
@@ -239,7 +248,7 @@ export default function Dashboard({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
           {
             label: 'Total Participants',
@@ -281,6 +290,14 @@ export default function Dashboard({
             icon: Clock,
             color: 'bg-forest-700 text-white',
             href: TIMETABLE_URL,
+            visible: true,
+          },
+          {
+            label: 'Camp Google Drive',
+            value: null,
+            icon: FolderOpen,
+            color: 'bg-sky-600 text-white',
+            href: CAMP_GOOGLE_DRIVE_URL,
             visible: true,
           },
         ].filter(card => card.visible).map(({ label, value, icon: Icon, color, onClick, href, inactive }) => {
@@ -572,6 +589,23 @@ export default function Dashboard({
       <div className="card">
         <h3 className="font-display font-semibold text-forest-950 mb-3">Quick Actions</h3>
         <div className="flex flex-wrap gap-2">
+          {/* Timetable and Drive are always visible and prioritised */}
+          <a
+            href={TIMETABLE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
+            <Clock size={15} /> Timetable
+          </a>
+          <a
+            href={CAMP_GOOGLE_DRIVE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
+            <FolderOpen size={15} /> Camp Google Drive
+          </a>
           {canAccess('signin') && (
             <button onClick={() => onNavigate('signin')} className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto">
               <LogIn size={15} /> Sign In / Out
@@ -592,15 +626,6 @@ export default function Dashboard({
               <Stethoscope size={15} /> Medical View
             </button>
           )}
-          {/* Timetable is always visible */}
-          <a
-            href={TIMETABLE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
-          >
-            <Clock size={15} /> Timetable
-          </a>
         </div>
       </div>
 
