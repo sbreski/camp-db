@@ -189,6 +189,12 @@ export default function Medical({ participants, setParticipants, actorInitials =
     SEND: seasonFilteredParticipants.filter(p => p.sendNeeds).length,
   }
 
+  const epiPenParticipants = useMemo(() => {
+    return seasonParticipantOptions
+      .filter(participant => hasRecordedEpiPen(participant))
+      .filter(participant => participant.name.toLowerCase().includes(search.toLowerCase()))
+  }, [seasonParticipantOptions, search])
+
   function toggleFilter(filter) {
     setSelectedFilters(prev => prev.includes(filter)
       ? prev.filter(f => f !== filter)
@@ -727,6 +733,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
       <div className="flex flex-wrap gap-2">
         {[
           { id: 'overview', label: 'Needs Overview' },
+          { id: 'epipen', label: `EpiPen (${epiPenParticipants.length})` },
           { id: 'mar', label: 'Medication Administration (MAR)' },
           { id: 'forms', label: 'Medical Forms' },
         ].map(section => (
@@ -1028,6 +1035,94 @@ export default function Medical({ participants, setParticipants, actorInitials =
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeSection === 'epipen' && (
+        <div className="space-y-4">
+          <div className="card space-y-3">
+            <div>
+              <h3 className="font-display font-semibold text-forest-950">EpiPen Overview</h3>
+              <p className="text-xs text-stone-500">Participants with an EpiPen recorded in the current season filter.</p>
+            </div>
+
+            <div className="relative">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <input
+                type="text"
+                placeholder="Search participants with an EpiPen..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="input pl-9"
+              />
+            </div>
+          </div>
+
+          {epiPenParticipants.length === 0 ? (
+            <div className="card text-center py-10">
+              <p className="text-stone-400 text-sm">No participants with an EpiPen match this filter.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {epiPenParticipants.map(participant => {
+                const relatedPlans = plansByParticipant.get(participant.id) || []
+                return (
+                  <div
+                    key={participant.id}
+                    className="card hover:shadow-sm transition-shadow cursor-pointer"
+                    onClick={() => onView(participant.id)}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <ParticipantNameText participant={participant} className="font-display font-semibold text-forest-950" />
+                          <span className="badge-epipen">EpiPen</span>
+                          {participant.medicalType?.includes('Allergy') && <span className="badge-allergy">Allergy</span>}
+                        </div>
+                        <p className="text-xs text-stone-400 mt-1">{participant.pronouns}{participant.age ? ` · Age ${participant.age}` : ''}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs py-1.5 px-3"
+                        onClick={event => {
+                          event.stopPropagation()
+                          onView(participant.id)
+                        }}
+                      >
+                        Open profile
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-amber-900">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">Allergy Details</p>
+                        <p className="whitespace-pre-wrap">{participant.allergyDetails || 'No additional allergy details recorded.'}</p>
+                      </div>
+                      <div className="rounded-xl bg-stone-50 border border-stone-200 p-3 text-stone-700">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1">Medical Plans</p>
+                        {relatedPlans.length > 0 ? (
+                          <div className="space-y-1">
+                            {relatedPlans.slice(0, 3).map(plan => (
+                              <p key={plan.id}>{plan.medication_name || plan.form_name || 'Medical plan recorded'}</p>
+                            ))}
+                            {relatedPlans.length > 3 && <p className="text-xs text-stone-500">+ {relatedPlans.length - 3} more</p>}
+                          </div>
+                        ) : (
+                          <p>No medication plans recorded.</p>
+                        )}
+                      </div>
+                      <div className="rounded-xl bg-stone-50 border border-stone-200 p-3 text-stone-700 sm:col-span-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 mb-1">Parent Contacts</p>
+                        <p>
+                          {[participant.parentName, participant.parentPhone, participant.parentEmail].filter(Boolean).join(' · ') || 'No primary parent contact recorded.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
