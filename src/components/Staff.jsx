@@ -1209,6 +1209,32 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
 
   useEffect(() => { loadAccessUsers() }, [])
 
+  async function runUsernameBackfill() {
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'backfill_usernames' }),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Unable to backfill usernames')
+
+      setAccessMessage(
+        `Username backfill complete: ${payload.updated || 0} updated, ${payload.alreadyCorrect || 0} already correct, ${payload.preservedManual || 0} manual usernames kept.`
+      )
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to backfill usernames'))
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
   function setAccessEdit(userId, nextState) {
     setAccessEdits(prev => ({ ...prev, [userId]: { ...prev[userId], ...nextState } }))
   }
@@ -2051,9 +2077,20 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       {/* Refresh button for access users */}
       <div className="flex items-center justify-between text-xs text-stone-400">
         <span>{currentUserEmail ? `Signed in as: ${currentUserEmail}` : ''}</span>
-        <button className="flex items-center gap-1.5 text-stone-500 hover:text-stone-700" onClick={loadAccessUsers} disabled={accessLoading || accessActionLoading}>
-          <RefreshCw size={12} className={accessLoading ? 'animate-spin' : ''} /> Refresh accounts
-        </button>
+        <div className="flex items-center gap-3">
+          {canManageAccess && (
+            <button
+              className="flex items-center gap-1.5 text-stone-500 hover:text-stone-700"
+              onClick={runUsernameBackfill}
+              disabled={accessLoading || accessActionLoading}
+            >
+              <RefreshCw size={12} className={accessActionLoading ? 'animate-spin' : ''} /> Backfill usernames
+            </button>
+          )}
+          <button className="flex items-center gap-1.5 text-stone-500 hover:text-stone-700" onClick={loadAccessUsers} disabled={accessLoading || accessActionLoading}>
+            <RefreshCw size={12} className={accessLoading ? 'animate-spin' : ''} /> Refresh accounts
+          </button>
+        </div>
       </div>
     </div>
   )
