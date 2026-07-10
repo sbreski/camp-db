@@ -72,10 +72,23 @@ function isAllowedLegacyUrl(value) {
   }
 }
 
+function getDocumentsPublicUrl(path) {
+  const cleanPath = String(path || '').trim()
+  if (!cleanPath) return ''
+  const { data } = supabase.storage.from('documents').getPublicUrl(cleanPath)
+  return String(data?.publicUrl || '').trim()
+}
+
 async function openStoredFile(pathOrUrl) {
   if (!pathOrUrl) throw new Error('No file available')
   if (isAllowedLegacyUrl(pathOrUrl)) {
     window.open(pathOrUrl, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  const publicUrl = getDocumentsPublicUrl(pathOrUrl)
+  if (publicUrl) {
+    window.open(publicUrl, '_blank', 'noopener,noreferrer')
     return
   }
 
@@ -392,11 +405,16 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         if (isAllowedLegacyUrl(filePath)) {
           sourceUrl = filePath
         } else {
-          const { data, error } = await supabase.storage.from('documents').download(filePath)
-          if (error) throw error
-          const blobUrl = URL.createObjectURL(data)
-          sourceUrl = blobUrl
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+          const publicUrl = getDocumentsPublicUrl(filePath)
+          if (publicUrl) {
+            sourceUrl = publicUrl
+          } else {
+            const { data, error } = await supabase.storage.from('documents').download(filePath)
+            if (error) throw error
+            const blobUrl = URL.createObjectURL(data)
+            sourceUrl = blobUrl
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+          }
         }
       }
 
@@ -695,16 +713,20 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
 
   async function downloadStaffVisitorForm(filepath, filename) {
     try {
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .download(filepath)
-      if (error) throw error
-      const url = URL.createObjectURL(data)
+        const publicUrl = getDocumentsPublicUrl(filepath)
+        let url = publicUrl
+        if (!url) {
+          const { data, error } = await supabase.storage
+            .from('documents')
+            .download(filepath)
+          if (error) throw error
+          url = URL.createObjectURL(data)
+          setTimeout(() => URL.revokeObjectURL(url), 60_000)
+        }
       const a = document.createElement('a')
       a.href = url
       a.download = filename
       a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (error) {
       alert('Error downloading form: ' + error.message)
     }
