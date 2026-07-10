@@ -683,7 +683,7 @@
       }
       window.parent.postMessage(
         { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
-        getParentTargetOrigin(),
+        '*',
       )
       const note = document.getElementById('saved_note')
       note.textContent = 'PDF sent back to Camp DB. Return to reporting and click Save report.'

@@ -211,8 +211,6 @@ export default function IncidentForm({
 
   useEffect(() => {
     async function handleFormPdfMessage(event) {
-      const formFrame = formIframeRef.current
-      if (!formFrame || event.source !== formFrame.contentWindow) return
       if (!event.data || typeof event.data !== 'object') return
       if (event.data.type !== 'campdb-form-pdf') return
 

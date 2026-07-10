@@ -24,7 +24,7 @@
 [[headers]]
   for = "/forms/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-src 'self'; frame-ancestors 'self'; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' https://cdn.jsdelivr.net 'sha256-93DHsddaUquEH7tzRlm8c3xJIh3yGoOMGfNSNEiYcX8=' 'sha256-GSjEyeDxzL9f0pTUHIu7ox5z+daNxQ+RpVOe7ZVHua4=' 'sha256-KTzGAO9G7z10KEANUnC1p/7hIy0ReAhbv9e6jAtWQzM=' 'sha256-/+nYHIH3xT7d2jqQ5ZLWdlkrgJju8pyduQtbCasCQNA=' 'sha256-QNzzmMh8QujmrnhPzylE2qIrTl6x98vKhXynTSIGRjQ='; script-src-elem 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; media-src 'self' blob: data:"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-src 'self'; frame-ancestors 'self'; img-src 'self' data: blob: https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' https://cdn.jsdelivr.net 'sha256-XIbdgXWVBmh2Suj6G/Hc9u1sTAYc3+kmybtFri/joDI=' 'sha256-38keARbQIhuMKv89Wrvnszyc0oKHKBN2arK2W7gN1cM=' 'sha256-OtLtMHZ5/xkfM2bYlA2N+/UE4gUUQPoCfW8pYJZng6E=' 'sha256-ZeMhdvJaMdZmz/FfHrWrbFrJK/8XHiaZNa/2ne/V5z0=' 'sha256-kHpPgVk2nGSqQ72j/606+8zAWLzRuLGDWMzfuFMKMqQ='; script-src-elem 'self' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co wss://*.supabase.co; media-src 'self' blob: data:"
 [[headers]]
   for = "/index.html"
   [headers.values]
