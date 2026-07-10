@@ -586,11 +586,20 @@
       const type = (el.type || '').toLowerCase()
       if (type === 'hidden' || type === 'button' || type === 'submit' || type === 'reset' || type === 'file') return ''
       if (type === 'checkbox') return el.checked ? 'Yes' : ''
+      if (type === 'date') return formatDateForExport(el.value)
       if (tag === 'select' && el.multiple) {
         const selected = Array.from(el.selectedOptions || []).map(o => clean(o.textContent || o.value)).filter(Boolean)
         return selected.join(', ')
       }
       return clean(el.value)
+    }
+
+    const formatDateForExport = (value) => {
+      const raw = clean(value)
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (!match) return raw
+      const [, yyyy, mm, dd] = match
+      return `${dd}-${mm}-${yyyy}`
     }
 
     const nameForTitle = clean(nameFieldId ? (document.getElementById(nameFieldId)?.value || '') : '') || 'Participant'

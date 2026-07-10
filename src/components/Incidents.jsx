@@ -26,6 +26,12 @@ function normalizeInitials(value) {
   return String(value || '').trim().toUpperCase()
 }
 
+function isIncludedThisSeason(participant) {
+  const flag = participant?.isActiveThisSeason ?? participant?.is_active_this_season
+  if (typeof flag === 'string') return flag.toLowerCase() !== 'false'
+  return flag !== false
+}
+
 function createdInitialsForIncident(incident) {
   return normalizeInitials(incident.createdByInitials || incident.created_by_initials)
 }
@@ -895,6 +901,18 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     return Boolean(uploadedByInitials) && uploadedByInitials === actorInitialsNormalized
   })
 
+  const activeParticipants = participants.filter(isIncludedThisSeason)
+  const selectedParticipantRecord = selectedParticipant
+    ? participants.find(p => p.id === selectedParticipant)
+    : null
+
+  const participantOptions = [...activeParticipants]
+  if (selectedParticipantRecord && !participantOptions.some(p => p.id === selectedParticipantRecord.id)) {
+    participantOptions.push(selectedParticipantRecord)
+  }
+
+  participantOptions.sort((a, b) => a.name.localeCompare(b.name))
+
   const shouldShowIncidentForm = logOnly || showForm
 
   return (
@@ -1017,7 +1035,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
             <label className="label">Participant *</label>
             <select className="input" value={selectedParticipant} disabled={Boolean(editingIncident)} onChange={e => setSelectedParticipant(e.target.value)}>
               <option value="">— Choose participant —</option>
-              {[...participants].sort((a, b) => a.name.localeCompare(b.name)).map(p => (
+              {participantOptions.map(p => (
                 <option key={p.id} value={p.id}>{p.name}{p.age ? ` (Age ${p.age})` : ''}</option>
               ))}
             </select>
