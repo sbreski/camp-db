@@ -3,9 +3,7 @@ import { hasMeaningfulSendText } from '../utils/send'
 export function participantDisplayName(participant, showDiagnosedHighlight = true, forceNoDiagnosedHighlight = false) {
   if (!participant) return ''
   if (forceNoDiagnosedHighlight) return participant.name
-  const hasDiagnosisText = hasMeaningfulSendText(participant.sendDiagnosis)
-  const hasDiagnosedSend = Boolean(participant.sendDiagnosed) || hasDiagnosisText
-  return showDiagnosedHighlight && hasDiagnosedSend ? `${participant.name} *` : participant.name
+  return participant.name
 }
 
 export default function ParticipantNameText({
