@@ -25,12 +25,12 @@ export default function Login() {
       .replace(/^\.+|\.+$/g, '')
   }
 
-  async function resolveLoginEmail(rawIdentifier) {
+  async function resolveLoginEmails(rawIdentifier) {
     const value = String(rawIdentifier || '').trim()
-    if (!value) return ''
+    if (!value) return []
 
     // Real email — use directly
-    if (value.includes('@')) return value.toLowerCase()
+    if (value.includes('@')) return [value.toLowerCase()]
 
     const lowered = value.toLowerCase()
     const targetUsername = normalizeUsername(value)
@@ -45,25 +45,31 @@ export default function Login() {
     }
 
     const rows = Array.isArray(data) ? data : []
+    const candidates = []
+
+    function addCandidate(emailValue) {
+      const candidate = String(emailValue || '').trim().toLowerCase()
+      if (!candidate) return
+      if (!candidates.includes(candidate)) candidates.push(candidate)
+    }
 
     // Try exact full name match
     const exact = rows.find(row => String(row?.name || '').trim().toLowerCase() === lowered)
-    if (exact?.email) return String(exact.email).trim().toLowerCase()
+    if (exact?.email) addCandidate(exact.email)
 
     // Try normalised username match against staff with an email
     const usernameMatches = rows.filter(row => normalizeUsername(row?.name) === targetUsername && row?.email)
-    if (usernameMatches.length === 1) return String(usernameMatches[0].email).trim().toLowerCase()
-    if (usernameMatches.length > 1) {
-      throw new Error('That username matches multiple staff. Please use your email address.')
-    }
+    usernameMatches.forEach(row => addCandidate(row?.email))
 
     // Try prefix match against staff with an email
     const fallback = rows.find(row => String(row?.name || '').trim().toLowerCase().startsWith(lowered) && row?.email)
-    if (fallback?.email) return String(fallback.email).trim().toLowerCase()
+    if (fallback?.email) addCandidate(fallback.email)
 
     // No staff record found with an email — this may be a username-only account.
     // Use the @login.local internal email that Supabase Auth has stored.
-    if (targetUsername) return `${targetUsername}@login.local`
+    if (targetUsername) addCandidate(`${targetUsername}@login.local`)
+
+    if (candidates.length > 0) return candidates
 
     throw new Error('Username not found. Use format like sam.brenner, full name, or email address.')
   }
@@ -72,17 +78,19 @@ export default function Login() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    let email = ''
+    let emails = []
 
     try {
-      email = await resolveLoginEmail(identifier)
-      if (!email) {
+      emails = await resolveLoginEmails(identifier)
+      if (!emails.length) {
         setError('Please enter your username or email.')
         setLoading(false)
         return
       }
 
-      const isUsernameAccount = email.endsWith('@login.local')
+      const isUsernameInput = !String(identifier || '').trim().includes('@')
+      const isUsernameAccount = isUsernameInput || emails.some(email => email.endsWith('@login.local'))
+      const primaryEmail = emails[0]
 
       const staffQuery = isUsernameAccount
         ? supabase
@@ -92,7 +100,7 @@ export default function Login() {
         : supabase
             .from('staff')
             .select('is_assigned_this_season')
-            .eq('email', email)
+            .eq('email', primaryEmail)
             .is('deleted_at', null)
             .limit(1)
 
@@ -110,7 +118,8 @@ export default function Login() {
 
         if (isUsernameAccount) {
           // Match by normalised username derived from the @login.local email
-          const targetUsername = email.replace('@login.local', '')
+          const firstLoginLocal = emails.find(candidate => candidate.endsWith('@login.local')) || ''
+          const targetUsername = firstLoginLocal.replace('@login.local', '') || normalizeUsername(identifier)
           staffRow =
             (Array.isArray(staffRows) ? staffRows : []).find(
               row => normalizeUsername(row?.name) === targetUsername
@@ -135,10 +144,16 @@ export default function Login() {
       return
     }
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    let signInError = null
+    for (const email of emails) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (!error) {
+        signInError = null
+        break
+      }
+      signInError = error
+    }
+
     setLoading(false)
     if (signInError) {
       setError(signInError.message || 'Unable to sign in')
@@ -155,7 +170,8 @@ export default function Login() {
     setResetLoading(true)
 
     try {
-      const email = await resolveLoginEmail(identifier)
+      const emails = await resolveLoginEmails(identifier)
+      const email = emails[0] || ''
       if (!email) {
         throw new Error('Enter your username or email first.')
       }
