@@ -63,20 +63,29 @@ function isAllowedLegacyUrl(value) {
   const raw = String(value || '').trim()
   if (!raw) return false
   if (raw.startsWith('blob:')) return true
+  if (!/^https?:\/\//i.test(raw)) return false
 
   try {
-    const parsed = new URL(raw, window.location.origin)
-    return parsed.origin === window.location.origin || /(^|\.)supabase\.co$/i.test(parsed.hostname)
+    const parsed = new URL(raw)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
   } catch (_error) {
     return false
   }
 }
 
 function getDocumentsPublicUrl(path) {
-  const cleanPath = String(path || '').trim()
+  const cleanPath = String(path || '').trim().replace(/^\/+/, '')
   if (!cleanPath) return ''
   const { data } = supabase.storage.from('documents').getPublicUrl(cleanPath)
   return String(data?.publicUrl || '').trim()
+}
+
+async function getDocumentsSignedUrl(path) {
+  const cleanPath = String(path || '').trim().replace(/^\/+/, '')
+  if (!cleanPath) return ''
+  const { data, error } = await supabase.storage.from('documents').createSignedUrl(cleanPath, 60)
+  if (error) return ''
+  return String(data?.signedUrl || '').trim()
 }
 
 async function openStoredFile(pathOrUrl) {
@@ -89,6 +98,12 @@ async function openStoredFile(pathOrUrl) {
   const publicUrl = getDocumentsPublicUrl(pathOrUrl)
   if (publicUrl) {
     window.open(publicUrl, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  const signedUrl = await getDocumentsSignedUrl(pathOrUrl)
+  if (signedUrl) {
+    window.open(signedUrl, '_blank', 'noopener,noreferrer')
     return
   }
 
@@ -409,11 +424,16 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
           if (publicUrl) {
             sourceUrl = publicUrl
           } else {
-            const { data, error } = await supabase.storage.from('documents').download(filePath)
-            if (error) throw error
-            const blobUrl = URL.createObjectURL(data)
-            sourceUrl = blobUrl
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+            const signedUrl = await getDocumentsSignedUrl(filePath)
+            if (signedUrl) {
+              sourceUrl = signedUrl
+            } else {
+              const { data, error } = await supabase.storage.from('documents').download(filePath)
+              if (error) throw error
+              const blobUrl = URL.createObjectURL(data)
+              sourceUrl = blobUrl
+              setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+            }
           }
         }
       }
@@ -716,12 +736,17 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
         const publicUrl = getDocumentsPublicUrl(filepath)
         let url = publicUrl
         if (!url) {
-          const { data, error } = await supabase.storage
-            .from('documents')
-            .download(filepath)
-          if (error) throw error
-          url = URL.createObjectURL(data)
-          setTimeout(() => URL.revokeObjectURL(url), 60_000)
+          const signedUrl = await getDocumentsSignedUrl(filepath)
+          if (signedUrl) {
+            url = signedUrl
+          } else {
+            const { data, error } = await supabase.storage
+              .from('documents')
+              .download(filepath)
+            if (error) throw error
+            url = URL.createObjectURL(data)
+            setTimeout(() => URL.revokeObjectURL(url), 60_000)
+          }
         }
       const a = document.createElement('a')
       a.href = url
