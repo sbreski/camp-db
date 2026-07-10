@@ -7,6 +7,7 @@ import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
 import { formatBirthDate } from '../utils/birthday'
+import { hasRecordedEpiPen } from '../utils/medical'
 
 function getNextDateKey(isoString) {
   const date = new Date(isoString)
@@ -630,14 +631,15 @@ export default function ParticipantDetail({
       ? participant.noteHistory
       : []
 
-  const hasMedical = participant.medicalType?.length > 0 || participant.medicalCondition || participant.medicalDetails
+  const hasEpiPen = hasRecordedEpiPen(participant)
+  const hasMedical = participant.medicalType?.length > 0 || participant.medicalCondition || participant.medicalDetails || hasEpiPen
   const hasConsents = Boolean(
     participant.photoConsent
     || participant.otcConsent
     || (Array.isArray(participant.otcAllowedItems) && participant.otcAllowedItems.length > 0)
     || participant.otcNotes
   )
-  const hasDietaryAllergy = Boolean(participant.dietaryType || participant.allergyDetails || participant.mealAdjustments)
+  const hasDietaryAllergy = Boolean(participant.dietaryType || participant.allergyDetails || participant.mealAdjustments || hasEpiPen)
   const hasSendDiagnosis = Boolean(String(participant.sendDiagnosis || '').trim())
   const hasDiagnosedSend = Boolean(participant.sendDiagnosed) || hasSendDiagnosis
   const hasSend = Boolean(String(participant.sendNeeds || '').trim()) || hasDiagnosedSend
@@ -663,6 +665,7 @@ export default function ParticipantDetail({
     { key: 'medicalCondition', label: 'Medical Condition', type: 'text' },
     { key: 'medicalDetails', label: 'Medical Details', type: 'textarea' },
     { key: 'allergyDetails', label: 'Allergy Details', type: 'textarea' },
+    { key: 'hasEpiPen', label: 'Has EpiPen', type: 'boolean' },
     { key: 'dietaryType', label: 'Dietary Type', type: 'text' },
     { key: 'otcNotes', label: 'Medication Details / OTC Notes', type: 'textarea' },
     { key: 'sendNeeds', label: 'Additional Needs / SEND Support', type: 'textarea' },
@@ -697,6 +700,7 @@ export default function ParticipantDetail({
       medicalCondition: String(sourceParticipant?.medicalCondition || ''),
       medicalDetails: String(sourceParticipant?.medicalDetails || ''),
       allergyDetails: String(sourceParticipant?.allergyDetails || ''),
+      hasEpiPen: Boolean(sourceParticipant?.hasEpiPen ?? sourceParticipant?.has_epipen),
       dietaryType: String(sourceParticipant?.dietaryType || ''),
       otcNotes: String(sourceParticipant?.otcNotes || ''),
       sendNeeds: String(sourceParticipant?.sendNeeds || ''),
@@ -732,6 +736,7 @@ export default function ParticipantDetail({
     ['Medical Condition', participant.medicalCondition],
     ['Medical Details', participant.medicalDetails],
     ['Allergy Details', participant.allergyDetails],
+    ['Has EpiPen', hasEpiPen ? 'Yes' : 'No'],
     ['Dietary Type', participant.dietaryType],
     ['Medication Details / OTC Notes', participant.otcNotes],
     ['Additional Needs / SEND Support', participant.sendNeeds],
@@ -841,6 +846,7 @@ export default function ParticipantDetail({
         medicalCondition: String(uploadedDataDraft.medicalCondition || '').trim(),
         medicalDetails: String(uploadedDataDraft.medicalDetails || '').trim(),
         allergyDetails: String(uploadedDataDraft.allergyDetails || '').trim(),
+        hasEpiPen: Boolean(uploadedDataDraft.hasEpiPen),
         dietaryType: String(uploadedDataDraft.dietaryType || '').trim(),
         otcNotes: String(uploadedDataDraft.otcNotes || '').trim(),
         sendNeeds: String(uploadedDataDraft.sendNeeds || '').trim(),
@@ -874,7 +880,10 @@ export default function ParticipantDetail({
         participant.sendNeeds ? `Support needs: ${String(participant.sendNeeds).trim()}` : '',
       ].filter(Boolean).join('\n\n')
     }
-    if (key === 'allergy') return String(participant.allergyDetails || '').trim()
+    if (key === 'allergy') {
+      const parts = [hasEpiPen ? 'EpiPen required.' : '', String(participant.allergyDetails || '').trim()].filter(Boolean)
+      return parts.join(' ')
+    }
     if (key === 'medical') return String(participant.medicalDetails || '').trim()
     if (key === 'notes') return String(participant.notes || '').trim()
     if (key === 'dietary') {
@@ -1385,6 +1394,7 @@ export default function ParticipantDetail({
               ⚠ Allergy
             </span>
           )}
+          {hasEpiPen && <span className="badge-epipen">EpiPen</span>}
           {participant.medicalType?.includes('Dietary') && <span className="badge-dietary">🍽 Dietary</span>}
           {participant.medicalType?.includes('Medical') && <span className="badge-medical">+ Medical</span>}
           {hasSend && <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>★ SEND / Support</span>}
@@ -1814,6 +1824,12 @@ export default function ParticipantDetail({
                       <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
                         <p className="label mb-1">Dietary Details</p>
                         <p>{participant.mealAdjustments}</p>
+                      </div>
+                    )}
+                    {hasEpiPen && (
+                      <div className="bg-amber-50 rounded-xl p-3 text-sm text-amber-900 border border-amber-200">
+                        <p className="label mb-1 text-amber-700">EpiPen</p>
+                        <p>EpiPen recorded for this participant.</p>
                       </div>
                     )}
                     {participant.allergyDetails && (

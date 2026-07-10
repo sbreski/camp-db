@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ParticipantNameText from './ParticipantNameText'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
+import { hasRecordedEpiPen } from '../utils/medical'
 
 const ALLERGEN_OPTIONS = [
   'Milk',
@@ -1103,6 +1104,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
                       t === 'Allergy' ? 'badge-allergy' : t === 'Dietary' ? 'badge-dietary' : t === 'Medical' ? 'badge-medical' : 'badge-dietary'
                     }>{t}</span>
                   ))}
+                  {hasRecordedEpiPen(p) && <span className="badge-epipen">EpiPen</span>}
                   {(() => {
                     const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
                     const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
@@ -1120,7 +1122,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
                 const wantsDietary = showAll || selectedFilters.includes('Dietary')
                 const hasAnyShown =
                   (wantsMedical && !!p.medicalDetails) ||
-                  (wantsAllergy && !!p.allergyDetails) ||
+                  (wantsAllergy && !!(p.allergyDetails || hasRecordedEpiPen(p))) ||
                   (wantsDietary && !!(p.dietaryType || p.mealAdjustments)) ||
                   (wantsSend && !!p.sendNeeds)
 
@@ -1134,10 +1136,11 @@ export default function Medical({ participants, setParticipants, actorInitials =
                   {p.medicalDetails}
                 </div>
               )}
-              {wantsAllergy && p.allergyDetails && (
+              {wantsAllergy && (p.allergyDetails || hasRecordedEpiPen(p)) && (
                 <div className="mt-2 p-3 bg-red-50 rounded-lg text-sm text-red-900 leading-relaxed">
                   <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-1">Allergy Details</p>
-                  {p.allergyDetails}
+                  {hasRecordedEpiPen(p) && <p className="mb-2 font-semibold text-amber-800">EpiPen recorded.</p>}
+                  {p.allergyDetails || 'No additional allergy details recorded.'}
                 </div>
               )}
               {wantsDietary && (p.dietaryType || p.mealAdjustments) && (

@@ -14,7 +14,7 @@ const EMPTY = {
   can_leave_alone: false,
   photoConsent: 'yes', otcConsent: false,
   otcAllowedItems: [], otcNotes: '',
-  dietaryType: '', allergyDetails: '', mealAdjustments: '',
+  dietaryType: '', allergyDetails: '', hasEpiPen: false, mealAdjustments: '',
   medicalType: [], medicalCondition: '', medicalDetails: '',
   sendNeeds: '', sendDiagnosed: false, sendDiagnosis: '',
   isActiveThisSeason: true,
@@ -117,6 +117,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
     siblings: Boolean(initial.siblings),
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
+    hasEpiPen: Boolean(initial.hasEpiPen ?? initial.has_epipen),
     isActiveThisSeason: (initial.isActiveThisSeason ?? initial.is_active_this_season) !== false,
     can_leave_alone: Boolean(initial.can_leave_alone),
   })
@@ -558,6 +559,15 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             )}
             {form.medicalType.includes('Allergy') && (
               <div>
+                <label className="inline-flex items-center gap-2 text-sm text-stone-700 mb-3">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.hasEpiPen)}
+                    onChange={e => set('hasEpiPen', e.target.checked)}
+                    className="rounded"
+                  />
+                  Has an EpiPen
+                </label>
                 <label className="label">Allergy Details</label>
                 <textarea
                   className="input resize-none"

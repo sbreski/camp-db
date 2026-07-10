@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Upload, X, CheckCircle, AlertCircle, FileText, Download } from 'lucide-react'
 import ViewportOverlay from './ViewportOverlay'
 import { hasMeaningfulSendText } from '../utils/send'
+import { hasRecordedEpiPen } from '../utils/medical'
 
 // Map common header names to our field keys
 const FIELD_MAP = {
@@ -30,6 +31,7 @@ const FIELD_MAP = {
   medicalDetails: ['medical', 'medical details', 'medical info', 'health', 'allergies', 'dietary', 'does your child have any medical conditions we should be aware of', 'medical info', 'does your child need to take medication during the camp day', 'medication details'],
   dietaryType: ['dietary type', 'dietary requirements', 'dietary'],
   allergyDetails: ['allergy details', 'allergies', 'allergy info', 'please tell us about any allergies intolerances or dietary requirements your child has'],
+  hasEpiPen: ['has epipen', 'epi pen', 'epipen', 'epipen required'],
   sendNeeds: ['send', 'send needs', 'support', 'support needs', 'additional needs', 'sen', 'does your child have any additional needs or require adjustments to take part fully in the camp', 'additional needs send support'],
   sendDiagnosed: ['send diagnosed', 'send_diagnosed', 'diagnosed send', 'does your child have an ehcp or receive additional support in school for example learning support or regular adult support', 'ehcp diagnosed'],
   sendDiagnosis: ['send diagnosis', 'send_diagnosis', 'diagnosis', 'if yes or not sure please tell us more', 'diagnosis if yes or not sure'],
@@ -464,7 +466,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           p.isActiveThisSeason = parseBoolean(raw, true)
           return
         }
-        if (field === 'sendDiagnosed' || field === 'otcConsent') {
+        if (field === 'sendDiagnosed' || field === 'otcConsent' || field === 'hasEpiPen') {
           p[field] = field === 'sendDiagnosed' ? parseSendDiagnosed(raw) : parseBoolean(raw, false)
           return
         }
@@ -526,6 +528,9 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       }
 
       if (!Array.isArray(p.medicalType)) p.medicalType = []
+      if (p.hasEpiPen !== true && hasRecordedEpiPen(p)) {
+        p.hasEpiPen = true
+      }
       if (!String(p.medicalCondition || '').trim() && String(p.medicalDetails || '').trim()) {
         // Backward compatibility: older CSVs often only provided a single medical details/info column.
         p.medicalCondition = String(p.medicalDetails || '').trim()

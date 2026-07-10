@@ -6,6 +6,7 @@ import ParticipantNameText, { participantDisplayName } from './ParticipantNameTe
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { daysUntilBirthday, formatBirthDate, todayKey } from '../utils/birthday'
+import { hasRecordedEpiPen } from '../utils/medical'
 import { hasMeaningfulSendText } from '../utils/send'
 
 function photoConsentMode(value) {
@@ -434,6 +435,7 @@ export default function Participants({ participants, setParticipants, deletePart
       medicalCondition: String(participant.medicalCondition || ''),
       medicalDetails: String(participant.medicalDetails || ''),
       allergyDetails: String(participant.allergyDetails || ''),
+      hasEpiPen: Boolean(participant.hasEpiPen ?? participant.has_epipen),
       dietaryType: String(participant.dietaryType || ''),
       otcNotes: String(participant.otcNotes || ''),
       sendNeeds: String(participant.sendNeeds || ''),
@@ -553,6 +555,7 @@ export default function Participants({ participants, setParticipants, deletePart
         medicalCondition: String(draft.medicalCondition || '').trim(),
         medicalDetails: String(draft.medicalDetails || '').trim(),
         allergyDetails: String(draft.allergyDetails || '').trim(),
+        hasEpiPen: Boolean(draft.hasEpiPen),
         dietaryType: String(draft.dietaryType || '').trim(),
         otcNotes: String(draft.otcNotes || '').trim(),
         sendNeeds: String(draft.sendNeeds || '').trim(),
@@ -758,6 +761,7 @@ export default function Participants({ participants, setParticipants, deletePart
                       'Medical Condition',
                       'Medical Details',
                       'Allergy Details',
+                      'Has EpiPen',
                       'Dietary Type',
                       'Medication Details / OTC Notes',
                       'Additional Needs / SEND Support',
@@ -898,6 +902,11 @@ export default function Participants({ participants, setParticipants, deletePart
                           {allTableEditing ? (
                             <textarea className="input resize-none" rows={2} value={rowDraft.allergyDetails} onChange={e => updateAllTableDraft(p.id, 'allergyDetails', e.target.value)} />
                           ) : (p.allergyDetails || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input type="checkbox" className="h-4 w-4" checked={Boolean(rowDraft.hasEpiPen)} onChange={e => updateAllTableDraft(p.id, 'hasEpiPen', e.target.checked)} />
+                          ) : (hasRecordedEpiPen(p) ? 'Yes' : 'No')}
                         </td>
                         <td className="px-3 py-2 whitespace-pre-wrap">
                           {allTableEditing ? (
@@ -1138,6 +1147,7 @@ export default function Participants({ participants, setParticipants, deletePart
                       return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
                     })()}
                     {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
+                    {hasRecordedEpiPen(p) && <span className="badge-epipen">EP</span>}
                     {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
                     {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                     {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
@@ -1156,6 +1166,7 @@ export default function Participants({ participants, setParticipants, deletePart
                     return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
                   })()}
                   {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
+                  {hasRecordedEpiPen(p) && <span className="badge-epipen">EP</span>}
                   {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
                   {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                   {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}

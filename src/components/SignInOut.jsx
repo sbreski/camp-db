@@ -6,6 +6,7 @@ import ViewportOverlay from './ViewportOverlay'
 import { getPendingFollowUpsForParticipant } from '../utils/workflow'
 import { buildDailyFamilyPickupCode, getParticipantFamilyKey, getParticipantPickupCode, isValidParticipantPickupCode, normalizePickupCodeInput } from '../utils/pickupCode'
 import { daysUntilBirthday, todayKey } from '../utils/birthday'
+import { hasRecordedEpiPen } from '../utils/medical'
 
 function fmt(ts) {
   if (!ts) return '—'
@@ -2115,6 +2116,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const isLatePickup = selectedDate === today && signOutTime && (signOutTime.getHours() > 16 || (signOutTime.getHours() === 16 && signOutTime.getMinutes() > 15))
 
               const hasAllergy = p.medicalType?.includes('Allergy') || Boolean(String(p.allergyDetails || '').trim())
+              const hasEpiPen = hasRecordedEpiPen(p)
               const hasDietary = p.medicalType?.includes('Dietary') || Boolean(String(p.dietaryType || '').trim()) || Boolean(String(p.mealAdjustments || '').trim())
               const hasMedical = p.medicalType?.includes('Medical') || Boolean(String(p.medicalCondition || '').trim())
               const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
@@ -2124,6 +2126,9 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const pendingFollowUps = getPendingFollowUps(p.id)
               const pendingMarFollowUps = getPendingMarFollowUps(p.id)
               const allergyTooltip = String(p.allergyDetails || '').trim() || 'No details recorded'
+              const epiPenTooltip = hasEpiPen
+                ? 'EpiPen recorded for this participant'
+                : ''
               const dietaryTooltip = String(p.dietaryType || '').trim() || 'No dietary type recorded'
               const medicalTooltip = String(p.medicalCondition || '').trim() || 'No medical condition recorded'
               const sendTooltip = String(p.sendDiagnosis || '').trim() || 'No diagnosis recorded'
@@ -2183,6 +2188,14 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                           title={allergyTooltip}
                         >
                           A
+                        </span>
+                      )}
+                      {hasEpiPen && (
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 cursor-help"
+                          title={epiPenTooltip}
+                        >
+                          EP
                         </span>
                       )}
                       {hasDietary && (
@@ -2426,6 +2439,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       {/* Key */}
       <div className="flex gap-3 flex-wrap text-xs text-stone-500">
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-red-100 text-red-700 border border-red-200">A</span> Allergy</span>
+        <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-amber-100 text-amber-800 border border-amber-200">EP</span> EpiPen</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-green-100 text-green-800 border border-green-200">D</span> Dietary</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-blue-100 text-blue-700 border border-blue-200">M</span> Medical</span>
         <span className="flex items-center gap-1"><span className="font-bold px-1 rounded bg-purple-100 text-purple-700 border border-purple-200">S</span> Support Needs</span>
