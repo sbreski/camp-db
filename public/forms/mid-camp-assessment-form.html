@@ -667,7 +667,7 @@
       }
       window.parent.postMessage(
         { type: 'campdb-form-pdf', payload: { base64Pdf: pdf.output('dataurlstring'), fileName, mimeType: 'application/pdf' } },
-        window.location.origin,
+        getParentTargetOrigin(),
       )
       const note = document.getElementById('saved_note')
       note.textContent = 'PDF sent back to Camp DB. Return to reporting and click Save report.'
@@ -675,6 +675,17 @@
     } catch (error) {
       alert('Failed to send PDF: ' + error.message)
     }
+  }
+
+  function getParentTargetOrigin() {
+    const fromQuery = (params.get('parentOrigin') || '').trim()
+    if (fromQuery) return fromQuery
+
+    try {
+      if (document.referrer) return new URL(document.referrer).origin
+    } catch (_error) {}
+
+    return window.location.origin
   }
 
   function getFormData() {

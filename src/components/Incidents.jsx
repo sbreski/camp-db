@@ -766,7 +766,6 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
     async function handleStaffVisitorFormPdfMessage(event) {
       const staffVisitorFrame = staffVisitorFormRef.current
       if (!staffVisitorFrame || event.source !== staffVisitorFrame.contentWindow) return
-      if (event.origin !== window.location.origin) return
       if (!event.data || typeof event.data !== 'object') return
       if (event.data.type !== 'campdb-form-pdf') return
 
@@ -1021,7 +1020,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                 <iframe
                   ref={staffVisitorFormRef}
                   title="Staff and Visitor Incident Form"
-                  src="/forms/staff-visitor-incident-reporting-form.html"
+                  src={`/forms/staff-visitor-incident-reporting-form.html?parentOrigin=${encodeURIComponent(window.location.origin)}`}
                   sandbox="allow-scripts allow-forms allow-same-origin"
                   className="w-full h-[560px] border-0"
                 />
@@ -1983,7 +1982,7 @@ export default function Incidents({ incidents, setIncidents, participants, setPa
                 <iframe
                   ref={staffVisitorFormRef}
                   title="Staff and Visitor Incident Form"
-                  src="/forms/staff-visitor-incident-reporting-form.html"
+                  src={`/forms/staff-visitor-incident-reporting-form.html?parentOrigin=${encodeURIComponent(window.location.origin)}`}
                   sandbox="allow-scripts allow-forms allow-same-origin"
                   className="w-full h-[560px] border-0"
                 />

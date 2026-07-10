@@ -47,6 +47,7 @@ export default function IncidentForm({
     return window.localStorage.getItem(WALKTHROUGH_KEY) !== '1'
   })
   const formTypeRef = useRef(form.type)
+  const formIframeRef = useRef(null)
   function dismissWalkthrough() {
     setShowWalkthrough(false)
     if (typeof window !== 'undefined') {
@@ -210,7 +211,8 @@ export default function IncidentForm({
 
   useEffect(() => {
     async function handleFormPdfMessage(event) {
-      if (event.origin !== window.location.origin) return
+      const formFrame = formIframeRef.current
+      if (!formFrame || event.source !== formFrame.contentWindow) return
       if (!event.data || typeof event.data !== 'object') return
       if (event.data.type !== 'campdb-form-pdf') return
 
@@ -260,8 +262,9 @@ export default function IncidentForm({
   const selectedTemplate = templates.find(t => t.key === selectedTemplateKey)
   const hasAttachment = Boolean(form.pdfName || form.pdfData || form.pdfPayload)
   const isNewIncident = !initial?.id
+  const parentOrigin = typeof window !== 'undefined' ? window.location.origin : ''
   const iframeSrc = selectedTemplate
-    ? `${selectedTemplate.path}?participantId=${encodeURIComponent(participantId)}&participantName=${encodeURIComponent(participantName || '')}&participantAge=${encodeURIComponent(participantAge === null || participantAge === undefined ? '' : String(participantAge))}&staffMember=${encodeURIComponent(form.staffMember || '')}&new=${isNewIncident ? '1' : '0'}`
+    ? `${selectedTemplate.path}?participantId=${encodeURIComponent(participantId)}&participantName=${encodeURIComponent(participantName || '')}&participantAge=${encodeURIComponent(participantAge === null || participantAge === undefined ? '' : String(participantAge))}&staffMember=${encodeURIComponent(form.staffMember || '')}&new=${isNewIncident ? '1' : '0'}&parentOrigin=${encodeURIComponent(parentOrigin)}`
     : ''
 
   async function handleSubmit(e) {
@@ -433,6 +436,7 @@ export default function IncidentForm({
                   : 'Complete the form, then use its "Save Form" button to attach it automatically.'}
               </div>
               <iframe
+                ref={formIframeRef}
                 title={selectedTemplate.label}
                 src={iframeSrc}
                 sandbox="allow-scripts allow-forms allow-same-origin"
