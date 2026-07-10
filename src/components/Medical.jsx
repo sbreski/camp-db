@@ -31,9 +31,16 @@ function isMissingColumnError(error, columnName) {
   return message.includes(String(columnName || '').toLowerCase()) && message.includes('does not exist')
 }
 
+function isIncludedThisSeason(participant) {
+  const flag = participant?.isActiveThisSeason ?? participant?.is_active_this_season
+  if (typeof flag === 'string') return flag.toLowerCase() !== 'false'
+  return flag !== false
+}
+
 export default function Medical({ participants, setParticipants, actorInitials = 'ST', onView, medicationAdministration: medicationAdministrationProp, setMedicationAdministration: setMedicationAdministrationProp, canManageShares = false }) {
   const [selectedFilters, setSelectedFilters] = useState([])
   const [search, setSearch] = useState('')
+  const [subTab, setSubTab] = useState('active')
   const [activeSection, setActiveSection] = useState('overview')
   const [loadingOps, setLoadingOps] = useState(false)
   const [savingMar, setSavingMar] = useState(false)
@@ -89,17 +96,29 @@ export default function Medical({ participants, setParticipants, actorInitials =
     notes: '',
   }))
 
+  const seasonParticipantOptions = useMemo(() => {
+    if (subTab === 'active') return participants.filter(isIncludedThisSeason)
+    if (subTab === 'inactive') return participants.filter(participant => !isIncludedThisSeason(participant))
+    return participants
+  }, [participants, subTab])
+
   useEffect(() => {
     if (!selectedMatrixParticipantId && participants.length > 0) {
       setSelectedMatrixParticipantId(participants[0].id)
     }
-    if (!formParticipantId && participants.length > 0) {
-      setFormParticipantId(participants[0].id)
+  }, [participants, selectedMatrixParticipantId])
+
+  useEffect(() => {
+    const firstVisibleParticipantId = seasonParticipantOptions[0]?.id || ''
+
+    if (!formParticipantId || !seasonParticipantOptions.some(participant => participant.id === formParticipantId)) {
+      setFormParticipantId(firstVisibleParticipantId)
     }
-    if (!marDraft.participantId && participants.length > 0) {
-      setMarDraft(prev => ({ ...prev, participantId: participants[0].id }))
+
+    if (!marDraft.participantId || !seasonParticipantOptions.some(participant => participant.id === marDraft.participantId)) {
+      setMarDraft(prev => ({ ...prev, participantId: firstVisibleParticipantId, linkedFormId: '' }))
     }
-  }, [participants, selectedMatrixParticipantId, formParticipantId, marDraft.participantId])
+  }, [seasonParticipantOptions, formParticipantId, marDraft.participantId])
 
   useEffect(() => {
     loadMedicalOperations()
@@ -150,16 +169,24 @@ export default function Medical({ participants, setParticipants, actorInitials =
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  const activeMedParticipants = medParticipants.filter(isIncludedThisSeason)
+  const inactiveMedParticipants = medParticipants.filter(p => !isIncludedThisSeason(p))
+  const seasonFilteredParticipants = subTab === 'active'
+    ? activeMedParticipants
+    : subTab === 'inactive'
+      ? inactiveMedParticipants
+      : medParticipants
+
   const filtered = selectedFilters.length === 0
-    ? medParticipants
-    : medParticipants.filter(p => selectedFilters.some(filter => matchesMedicalFilter(p, filter)))
+    ? seasonFilteredParticipants
+    : seasonFilteredParticipants.filter(p => selectedFilters.some(filter => matchesMedicalFilter(p, filter)))
 
   const counts = {
-    All: participants.filter(p => p.medicalType?.length > 0 || p.sendNeeds).length,
-    Allergy: participants.filter(p => p.medicalType?.includes('Allergy')).length,
-    Dietary: participants.filter(p => p.medicalType?.includes('Dietary')).length,
-    Medical: participants.filter(p => p.medicalType?.includes('Medical')).length,
-    SEND: participants.filter(p => p.sendNeeds).length,
+    All: seasonFilteredParticipants.length,
+    Allergy: seasonFilteredParticipants.filter(p => p.medicalType?.includes('Allergy')).length,
+    Dietary: seasonFilteredParticipants.filter(p => p.medicalType?.includes('Dietary')).length,
+    Medical: seasonFilteredParticipants.filter(p => p.medicalType?.includes('Medical')).length,
+    SEND: seasonFilteredParticipants.filter(p => p.sendNeeds).length,
   }
 
   function toggleFilter(filter) {
@@ -579,8 +606,8 @@ export default function Medical({ participants, setParticipants, actorInitials =
 
   function printMedicalReport(filters = selectedFilters) {
     const list = filters.length === 0
-      ? medParticipants
-      : medParticipants.filter(p => filters.some(filter => matchesMedicalFilter(p, filter)))
+      ? seasonFilteredParticipants
+      : seasonFilteredParticipants.filter(p => filters.some(filter => matchesMedicalFilter(p, filter)))
 
     const showAll = filters.length === 0
     const includeAllergy = showAll || filters.includes('Allergy')
@@ -677,6 +704,26 @@ export default function Medical({ participants, setParticipants, actorInitials =
         <p className="text-stone-500 text-sm">{counts.All} participants with flagged needs</p>
       </div>
 
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { id: 'active', label: `Active (${activeMedParticipants.length})` },
+          { id: 'inactive', label: `Inactive (${inactiveMedParticipants.length})` },
+          { id: 'all', label: `All (${medParticipants.length})` },
+        ].map(option => (
+          <button
+            key={option.id}
+            onClick={() => setSubTab(option.id)}
+            className={`px-3.5 py-1.5 rounded-full text-sm font-display font-medium transition-all ${
+              subTab === option.id
+                ? 'bg-forest-900 text-white'
+                : 'bg-white text-stone-600 border border-stone-200 hover:border-stone-400'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {[
           { id: 'overview', label: 'Needs Overview' },
@@ -709,10 +756,13 @@ export default function Medical({ participants, setParticipants, actorInitials =
               <div>
                 <label className="label">Participant *</label>
                 <select className="input" value={marDraft.participantId} onChange={e => updateMarDraft('participantId', e.target.value)} required>
-                  {participants.map(participant => (
+                  {seasonParticipantOptions.map(participant => (
                     <option key={participant.id} value={participant.id}>{participant.name}</option>
                   ))}
                 </select>
+                {seasonParticipantOptions.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No participants match the current season filter.</p>
+                )}
               </div>
               <div>
                 <label className="label">Linked Medical Form</label>
@@ -913,10 +963,13 @@ export default function Medical({ participants, setParticipants, actorInitials =
               <div>
                 <label className="label">Participant *</label>
                 <select className="input" value={formParticipantId} onChange={e => setFormParticipantId(e.target.value)}>
-                  {participants.map(participant => (
+                  {seasonParticipantOptions.map(participant => (
                     <option key={participant.id} value={participant.id}>{participant.name}</option>
                   ))}
                 </select>
+                {seasonParticipantOptions.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No participants match the current season filter.</p>
+                )}
               </div>
               <div>
                 <label className="label">Form Type *</label>

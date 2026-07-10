@@ -104,6 +104,7 @@ function getLikelySiblingIdsFromContact(contact, allParticipants, fallbackPartic
 
 export default function Parents({ participants, onUpdateParticipants }) {
   const [search, setSearch] = useState('')
+  const [subTab, setSubTab] = useState('active')
   const [selectedParents, setSelectedParents] = useState(new Set())
   const [editingId, setEditingId] = useState(null)
   const [editingContact, setEditingContact] = useState({
@@ -269,7 +270,13 @@ export default function Parents({ participants, onUpdateParticipants }) {
     setSelectedParents(new Set())
   }
 
-  const filtered = participants
+  function isIncludedThisSeason(participant) {
+    const flag = participant.isActiveThisSeason ?? participant.is_active_this_season
+    if (typeof flag === 'string') return flag.toLowerCase() !== 'false'
+    return flag !== false
+  }
+
+  const filteredBySearch = participants
     .filter(p => p.parentName || p.parentEmail || p.parentPhone || p.parent2Name || p.parent2Email || p.parent2Phone || p.homePhone)
     .filter(p => {
       const query = search.toLowerCase()
@@ -292,6 +299,14 @@ export default function Parents({ participants, onUpdateParticipants }) {
       }
     })
 
+  const activeParticipants = filteredBySearch.filter(isIncludedThisSeason)
+  const inactiveParticipants = filteredBySearch.filter(p => !isIncludedThisSeason(p))
+  const filtered = subTab === 'active'
+    ? activeParticipants
+    : subTab === 'inactive'
+      ? inactiveParticipants
+      : filteredBySearch
+
 
   return (
     <div className="fade-in space-y-5">
@@ -301,6 +316,26 @@ export default function Parents({ participants, onUpdateParticipants }) {
           <p className="text-stone-500 text-sm">{filtered.length} parent contacts</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { id: 'active', label: `Active (${activeParticipants.length})` },
+              { id: 'inactive', label: `Inactive (${inactiveParticipants.length})` },
+              { id: 'all', label: `All (${filteredBySearch.length})` },
+            ].map(option => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setSubTab(option.id)}
+                className={`px-3.5 py-1.5 rounded-full text-sm font-display font-medium transition-all ${
+                  subTab === option.id
+                    ? 'bg-forest-900 text-white'
+                    : 'bg-white text-stone-600 border border-stone-200 hover:border-stone-400'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           <label className="text-sm text-stone-700 flex items-center gap-1">
             Sort by:
             <select
