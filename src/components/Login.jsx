@@ -29,11 +29,15 @@ export default function Login() {
     const value = String(rawIdentifier || '').trim()
     if (!value) return []
 
-    // Real email — use directly
-    if (value.includes('@')) return [value.toLowerCase()]
+    // Real email — use directly, except @login.local which should still resolve username fallbacks.
+    if (value.includes('@')) {
+      const loweredEmail = value.toLowerCase()
+      if (!loweredEmail.endsWith('@login.local')) return [loweredEmail]
+    }
 
     const lowered = value.toLowerCase()
-    const targetUsername = normalizeUsername(value)
+    const rawUsername = lowered.endsWith('@login.local') ? lowered.replace('@login.local', '') : value
+    const targetUsername = normalizeUsername(rawUsername)
 
     const { data, error: lookupError } = await supabase
       .from('staff')
@@ -67,6 +71,7 @@ export default function Login() {
 
     // No staff record found with an email — this may be a username-only account.
     // Use the @login.local internal email that Supabase Auth has stored.
+    if (lowered.endsWith('@login.local')) addCandidate(lowered)
     if (targetUsername) addCandidate(`${targetUsername}@login.local`)
 
     if (candidates.length > 0) return candidates
