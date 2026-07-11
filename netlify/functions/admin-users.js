@@ -622,6 +622,8 @@ export async function handler(event) {
 
       const targetUser = targetData?.user
       if (!targetUser) return json(404, { error: 'User not found' })
+      const targetEmail = String(targetUser.email || '').toLowerCase()
+      const targetUsername = normalizeUsername(targetUser.user_metadata?.username || '')
 
       const { error } = await admin.auth.admin.updateUserById(userId, {
         password: newPassword,
@@ -635,16 +637,79 @@ export async function handler(event) {
         return json(500, { error: error.message })
       }
 
+      const resolvePayload = {
+        status: 'resolved',
+        resolved_at: new Date().toISOString(),
+        resolved_by_user_id: currentUser.id,
+        resolution_note: 'Reset completed by admin in user access management.',
+      }
+
       if (requestId) {
         await admin
           .from('password_reset_requests')
-          .update({
-            status: 'resolved',
-            resolved_at: new Date().toISOString(),
-            resolved_by_user_id: currentUser.id,
-            resolution_note: 'Reset completed by admin in user access management.',
-          })
+          .update(resolvePayload)
           .eq('id', requestId)
+          .eq('status', 'open')
+      } else {
+        // Reset performed from account management (no explicit request id).
+        // Resolve matching open requests so notifications clear automatically.
+        let resolvedAny = false
+
+        const { error: byUserError, data: byUserRows } = await admin
+          .from('password_reset_requests')
+          .update(resolvePayload)
+          .eq('status', 'open')
+          .eq('requester_user_id', userId)
+          .select('id')
+
+        if (!byUserError && Array.isArray(byUserRows) && byUserRows.length > 0) {
+          resolvedAny = true
+        }
+
+        if (!resolvedAny && targetEmail) {
+          const { error: byEmailError, data: byEmailRows } = await admin
+            .from('password_reset_requests')
+            .update(resolvePayload)
+            .eq('status', 'open')
+            .eq('requester_email', targetEmail)
+            .select('id')
+
+          if (!byEmailError && Array.isArray(byEmailRows) && byEmailRows.length > 0) {
+            resolvedAny = true
+          }
+        }
+
+        if (!resolvedAny && targetUsername) {
+          await admin
+            .from('password_reset_requests')
+            .update(resolvePayload)
+            .eq('status', 'open')
+            .eq('requester_identifier', targetUsername)
+        }
+      }
+
+      return json(200, { ok: true })
+    }
+
+    if (action === 'resolve_reset_request') {
+      const requestId = String(body.requestId || '')
+      const resolutionNote = String(body.resolutionNote || 'Request resolved by admin.').trim()
+
+      if (!requestId) return json(400, { error: 'requestId is required' })
+
+      const { error } = await admin
+        .from('password_reset_requests')
+        .update({
+          status: 'resolved',
+          resolved_at: new Date().toISOString(),
+          resolved_by_user_id: currentUser.id,
+          resolution_note: resolutionNote,
+        })
+        .eq('id', requestId)
+        .eq('status', 'open')
+
+      if (error) {
+        return json(500, { error: error.message })
       }
 
       return json(200, { ok: true })

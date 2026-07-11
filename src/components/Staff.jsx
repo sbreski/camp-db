@@ -1561,6 +1561,33 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
     }
   }
 
+  async function resolveResetRequest(requestId) {
+    if (!requestId) return
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'resolve_reset_request',
+          requestId,
+          resolutionNote: 'Resolved by admin from open request list.',
+        }),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Unable to resolve reset request')
+      setAccessMessage('Reset request resolved.')
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to resolve reset request'))
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
   async function deleteLoginAccount(user) {
     const internalEmail = (user.internalEmail || user.email || '').toLowerCase()
     if (internalEmail && internalEmail === currentUserEmail) {
@@ -2071,10 +2098,20 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
           <p className="text-sm font-semibold text-amber-900">Open Password Reset Requests</p>
           <div className="space-y-2">
             {resetRequests.map(req => (
-              <div key={req.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700">
-                <p><span className="font-semibold">Email:</span> {req.requester_email}</p>
-                {req.requester_identifier && <p><span className="font-semibold">Identifier:</span> {req.requester_identifier}</p>}
-                {req.reason && <p><span className="font-semibold">Reason:</span> {req.reason}</p>}
+              <div key={req.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-stone-700 flex items-start justify-between gap-3">
+                <div>
+                  <p><span className="font-semibold">Email:</span> {req.requester_email}</p>
+                  {req.requester_identifier && <p><span className="font-semibold">Identifier:</span> {req.requester_identifier}</p>}
+                  {req.reason && <p><span className="font-semibold">Reason:</span> {req.reason}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => resolveResetRequest(req.id)}
+                  disabled={accessActionLoading}
+                  className="btn-secondary text-xs"
+                >
+                  Resolve
+                </button>
               </div>
             ))}
           </div>
