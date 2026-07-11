@@ -544,7 +544,7 @@ function StaffProfileForm({ initial, onSave, onCancel, isNew }) {
 
 function StaffDetailPanel({
   member, loginUser, onEdit, onClose, onDelete,
-  onSavePermissions, onResetPassword, onSetActiveStatus, onDeleteAccount,
+  onSavePermissions, onResetPassword, onSetActiveStatus, onDeleteAccount, onSaveLoginIdentifiers,
   accessActionLoading, canManageAccess, currentUserEmail,
   accessEdits, setAccessEdit,
 }) {
@@ -888,10 +888,41 @@ function StaffDetailPanel({
                 <div className="rounded-xl border border-forest-200 bg-forest-50 p-4 space-y-1">
                   <p className="text-xs font-semibold text-forest-700 uppercase tracking-wide">Login Account</p>
                   <p className="font-mono text-sm text-forest-900">{loginUser.email || loginUser.username || '—'}</p>
+                  {Array.isArray(loginUser.usernameAliases) && loginUser.usernameAliases.length > 0 && (
+                    <p className="text-xs text-stone-600">Aliases: {loginUser.usernameAliases.join(', ')}</p>
+                  )}
                   <p className="text-xs text-stone-500">User ID: {loginUser.id}</p>
                   {loginUser.isArchived && (
                     <p className="text-xs text-amber-700 font-medium">⚠ Login currently archived (disabled)</p>
                   )}
+                </div>
+
+                {/* Login identifiers */}
+                <div className="pt-4 border-t border-stone-100 space-y-2">
+                  <p className="label">Login Usernames</p>
+                  <input
+                    className="input"
+                    placeholder="Primary username (e.g. firstname.lastname)"
+                    value={edit.username || ''}
+                    onChange={e => setEdit({ username: normalizeUsername(e.target.value) })}
+                    disabled={accessActionLoading}
+                  />
+                  <textarea
+                    className="input min-h-[74px] resize-y"
+                    placeholder="Alias usernames (comma or new line separated)"
+                    value={edit.usernameAliasesText || ''}
+                    onChange={e => setEdit({ usernameAliasesText: e.target.value })}
+                    disabled={accessActionLoading}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="btn-secondary text-sm"
+                      onClick={() => onSaveLoginIdentifiers(loginUser.id)}
+                      disabled={accessActionLoading}
+                    >
+                      Save Login Names
+                    </button>
+                  </div>
                 </div>
 
                 {/* Admin / safeguarding toggles */}
@@ -1170,6 +1201,8 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       users.forEach(user => {
         edits[user.id] = {
           identifier: user.username || user.email || '',
+          username: user.username || normalizeUsername(user.fullName || ''),
+          usernameAliasesText: Array.isArray(user.usernameAliases) ? user.usernameAliases.join(', ') : '',
           isAdmin: !!user.isAdmin,
           canViewSafeguarding: !!user.canViewSafeguarding,
           allowedTabs: sanitizeAllowedTabs(user.allowedTabs),
@@ -1478,6 +1511,51 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
       await loadAccessUsers()
     } catch (error) {
       setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to reset password'))
+    } finally {
+      setAccessActionLoading(false)
+    }
+  }
+
+  async function saveLoginIdentifiers(userId) {
+    const edit = accessEdits[userId]
+    if (!edit) return
+
+    const username = normalizeUsername(edit.username || '')
+    if (!username) {
+      setAccessError('Primary username is required')
+      return
+    }
+
+    const usernameAliases = String(edit.usernameAliasesText || '')
+      .split(/[\n,]/)
+      .map(value => normalizeUsername(value))
+      .filter(Boolean)
+      .filter(value => value !== username)
+
+    setAccessActionLoading(true)
+    setAccessError('')
+    setAccessMessage('')
+
+    try {
+      const token = await withAccessToken()
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'update_login_identifiers',
+          userId,
+          username,
+          usernameAliases,
+        }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Unable to save login names')
+
+      setAccessMessage('Login usernames updated.')
+      await loadAccessUsers()
+    } catch (error) {
+      setAccessError(toFriendlyAuthErrorMessage(error, 'Unable to save login names'))
     } finally {
       setAccessActionLoading(false)
     }
@@ -1943,6 +2021,7 @@ export default function Staff({ staffList, setStaffList, campPeriods, setCampPer
                     onDelete={deleteStaff}
                     onSavePermissions={savePermissions}
                     onResetPassword={resetPassword}
+                    onSaveLoginIdentifiers={saveLoginIdentifiers}
                     onSetActiveStatus={setActiveStatus}
                     onDeleteAccount={deleteLoginAccount}
                     accessActionLoading={accessActionLoading}

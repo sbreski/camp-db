@@ -57,6 +57,21 @@ export default function Login() {
       if (!candidates.includes(candidate)) candidates.push(candidate)
     }
 
+    // Alias-aware resolver (service role endpoint) augments local candidate generation.
+    try {
+      const response = await fetch('/api/login-identifiers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: value }),
+      })
+      if (response.ok) {
+        const payload = await response.json()
+        ;(Array.isArray(payload.candidates) ? payload.candidates : []).forEach(addCandidate)
+      }
+    } catch (_error) {
+      // Ignore endpoint failures; keep local resolver working.
+    }
+
     // Try exact full name match
     const exact = rows.find(row => String(row?.name || '').trim().toLowerCase() === lowered)
     if (exact?.email) addCandidate(exact.email)
