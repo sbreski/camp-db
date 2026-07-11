@@ -149,19 +149,32 @@ export default function Login() {
       return
     }
 
-    let signInError = null
-    for (const email of emails) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (!error) {
-        signInError = null
-        break
+    async function trySignInWith(passwordCandidate) {
+      let lastError = null
+      for (const email of emails) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password: passwordCandidate })
+        if (!error) return null
+        lastError = error
       }
-      signInError = error
+      return lastError
+    }
+
+    let signInError = await trySignInWith(password)
+
+    // Common autofill/copy issue: accidental leading/trailing spaces.
+    const trimmedPassword = String(password || '').trim()
+    if (signInError && trimmedPassword && trimmedPassword !== password) {
+      signInError = await trySignInWith(trimmedPassword)
     }
 
     setLoading(false)
     if (signInError) {
-      setError(signInError.message || 'Unable to sign in')
+      const message = String(signInError.message || '')
+      if (message.toLowerCase().includes('invalid login credentials')) {
+        setError('Invalid login credentials. If this keeps happening, request a password reset from admin.')
+      } else {
+        setError(message || 'Unable to sign in')
+      }
       setShake(true)
       setTimeout(() => setShake(false), 500)
       setPassword('')
