@@ -80,6 +80,46 @@ function fmt(ts) {
 
 const TABS = ['Overview', 'Medical', 'Allergy', 'Dietary', 'SEND', 'Attendance', 'Incidents']
 
+const TAB_TO_SHARE_CATEGORY = {
+  Overview: 'notes',
+  Medical: 'medical',
+  Allergy: 'allergy',
+  Dietary: 'dietary',
+  SEND: 'send',
+}
+
+const SHARE_FIELD_OPTIONS = {
+  medical: [
+    { id: 'medicalCondition', label: 'Medical Condition' },
+    { id: 'medicalDetails', label: 'Medical Details' },
+    { id: 'otcNotes', label: 'OTC Notes' },
+  ],
+  allergy: [
+    { id: 'hasEpiPen', label: 'EpiPen Status' },
+    { id: 'allergyDetails', label: 'Allergy Details' },
+  ],
+  dietary: [
+    { id: 'dietaryType', label: 'Dietary Type' },
+    { id: 'mealAdjustments', label: 'Dietary Details' },
+  ],
+  send: [
+    { id: 'sendDiagnosed', label: 'SEND Diagnosed' },
+    { id: 'sendDiagnosis', label: 'SEND Diagnosis' },
+    { id: 'sendNeeds', label: 'Support Needs Details' },
+  ],
+  notes: [
+    { id: 'notes', label: 'Additional Notes' },
+  ],
+}
+
+const DEFAULT_SHARE_FIELD_SELECTION = {
+  medical: ['medicalCondition', 'medicalDetails'],
+  allergy: ['hasEpiPen', 'allergyDetails'],
+  dietary: ['dietaryType', 'mealAdjustments'],
+  send: ['sendDiagnosed', 'sendDiagnosis', 'sendNeeds'],
+  notes: ['notes'],
+}
+
 export default function ParticipantDetail({
   participant, participants, setParticipants,
   attendance, setAttendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, canViewUploadedData = false, currentUserEmail = '', onNavigate, onBack
@@ -96,6 +136,7 @@ export default function ParticipantDetail({
   const [shareUsers, setShareUsers] = useState([])
   const [shareItems, setShareItems] = useState([])
   const [shareCategories, setShareCategories] = useState(['send'])
+  const [shareFieldSelection, setShareFieldSelection] = useState(DEFAULT_SHARE_FIELD_SELECTION)
   const [shareSummary, setShareSummary] = useState('')
   const [shareTargetUserIds, setShareTargetUserIds] = useState([])
   const [shareLoading, setShareLoading] = useState(false)
@@ -644,6 +685,13 @@ export default function ParticipantDetail({
   const hasDietary = flags.hasDietary
   const hasDiagnosedSend = flags.sendDiagnosed
   const hasSend = flags.hasSend
+  const activeShareCategory = TAB_TO_SHARE_CATEGORY[activeTab] || null
+  const activeShareFields = activeShareCategory
+    ? (SHARE_FIELD_OPTIONS[activeShareCategory] || [])
+    : []
+  const selectedShareFields = activeShareCategory
+    ? (shareFieldSelection[activeShareCategory] || [])
+    : []
 
   const uploadedFieldSchema = [
     { key: 'name', label: 'Full Name', type: 'text' },
@@ -878,28 +926,63 @@ export default function ParticipantDetail({
     }
   }
 
+  function summaryLineForField(fieldId) {
+    const id = String(fieldId || '')
+    if (id === 'medicalCondition') {
+      const value = String(participant.medicalCondition || '').trim()
+      return value ? `Medical condition: ${value}` : ''
+    }
+    if (id === 'medicalDetails') {
+      const value = String(participant.medicalDetails || '').trim()
+      return value ? `Medical details: ${value}` : ''
+    }
+    if (id === 'otcNotes') {
+      const value = String(participant.otcNotes || '').trim()
+      return value ? `OTC notes: ${value}` : ''
+    }
+    if (id === 'hasEpiPen') {
+      return hasEpiPen ? 'EpiPen required.' : ''
+    }
+    if (id === 'allergyDetails') {
+      const value = String(participant.allergyDetails || '').trim()
+      return value ? `Allergy details: ${value}` : ''
+    }
+    if (id === 'dietaryType') {
+      const value = String(participant.dietaryType || '').trim()
+      return value ? `Dietary type: ${value}` : ''
+    }
+    if (id === 'mealAdjustments') {
+      const value = String(participant.mealAdjustments || '').trim()
+      return value ? `Dietary details: ${value}` : ''
+    }
+    if (id === 'sendDiagnosed') {
+      return `SEND diagnosed: ${participant.sendDiagnosed ? 'Yes' : 'No'}`
+    }
+    if (id === 'sendDiagnosis') {
+      const value = String(participant.sendDiagnosis || '').trim()
+      return value ? `SEND diagnosis: ${value}` : ''
+    }
+    if (id === 'sendNeeds') {
+      const value = String(participant.sendNeeds || '').trim()
+      return value ? `Support needs: ${value}` : ''
+    }
+    if (id === 'notes') {
+      const value = String(participant.notes || '').trim()
+      return value || ''
+    }
+    return ''
+  }
+
   function defaultSummaryForCategory(category) {
     if (!participant) return ''
     const key = String(category || '').toLowerCase()
-    if (key === 'send') {
-      return [
-        participant.sendDiagnosis ? `Diagnosis: ${String(participant.sendDiagnosis).trim()}` : '',
-        participant.sendNeeds ? `Support needs: ${String(participant.sendNeeds).trim()}` : '',
-      ].filter(Boolean).join('\n\n')
-    }
-    if (key === 'allergy') {
-      const parts = [hasEpiPen ? 'EpiPen required.' : '', String(participant.allergyDetails || '').trim()].filter(Boolean)
-      return parts.join(' ')
-    }
-    if (key === 'medical') return String(participant.medicalDetails || '').trim()
-    if (key === 'notes') return String(participant.notes || '').trim()
-    if (key === 'dietary') {
-      return [participant.dietaryType, participant.mealAdjustments]
-        .map(value => String(value || '').trim())
-        .filter(Boolean)
-        .join(' - ')
-    }
-    return ''
+    const selectedFields = Array.isArray(shareFieldSelection[key])
+      ? shareFieldSelection[key]
+      : []
+    return selectedFields
+      .map(summaryLineForField)
+      .filter(Boolean)
+      .join('\n')
   }
 
   async function uploadDocumentFile(file) {
@@ -1218,11 +1301,14 @@ export default function ParticipantDetail({
   }
 
   async function createShareItem() {
+    const activeShareCategory = TAB_TO_SHARE_CATEGORY[activeTab] || null
+    const categoriesToShare = activeShareCategory ? [activeShareCategory] : shareCategories
+
     if (shareTargetUserIds.length === 0) {
       setShareError('Choose at least one staff account.')
       return
     }
-    if (shareCategories.length === 0) {
+    if (categoriesToShare.length === 0) {
       setShareError('Choose at least one info type.')
       return
     }
@@ -1234,7 +1320,7 @@ export default function ParticipantDetail({
       const rows = []
 
       for (const targetUserId of shareTargetUserIds) {
-        for (const category of shareCategories) {
+        for (const category of categoriesToShare) {
           const resolvedSummary = baseSummary || defaultSummaryForCategory(category)
           if (!resolvedSummary) continue
 
@@ -1334,6 +1420,16 @@ export default function ParticipantDetail({
         ? prev.filter(value => value !== category)
         : [...prev, category]
     ))
+  }
+
+  function toggleShareField(category, fieldId) {
+    setShareFieldSelection(prev => {
+      const current = Array.isArray(prev[category]) ? prev[category] : []
+      const next = current.includes(fieldId)
+        ? current.filter(value => value !== fieldId)
+        : [...current, fieldId]
+      return { ...prev, [category]: next }
+    })
   }
 
   function toggleShareTargetUser(userId) {
@@ -2026,29 +2122,34 @@ export default function ParticipantDetail({
           </div>
         )}
 
-        {canManageShares && activeTab === 'Overview' && (
+        {canManageShares && activeShareCategory && (
           <div className="card mt-4 space-y-3">
             <div>
               <h3 className="font-display font-semibold text-forest-950 flex items-center gap-2">
                 <Share2 size={15} className="text-forest-600" /> Share With Specific Staff
               </h3>
-              <p className="text-xs text-stone-500 mt-1">Share only targeted SEND/Allergy/Medical/Dietary information with selected staff accounts.</p>
+              <p className="text-xs text-stone-500 mt-1">Share selected fields from this tab only with selected staff accounts.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="label">Info Type(s)</label>
+                <label className="label">Fields To Share</label>
                 <div className="rounded-xl border border-stone-200 p-2 space-y-1.5">
-                  {['send', 'allergy', 'medical', 'dietary', 'notes'].map(category => (
-                    <label key={category} className="inline-flex items-center gap-2 text-sm text-forest-900 mr-3">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={shareCategories.includes(category)}
-                        onChange={() => toggleShareCategory(category)}
-                      />
-                      {category === 'send' ? 'SEND' : category === 'notes' ? 'Additional Notes' : category[0].toUpperCase() + category.slice(1)}
-                    </label>
+                  {activeShareFields.map(field => (
+                    <div key={field.id} className="rounded-lg px-1 py-1">
+                      <label className="inline-flex items-center gap-2 text-sm text-forest-900 mr-3">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={selectedShareFields.includes(field.id)}
+                          onChange={() => toggleShareField(activeShareCategory, field.id)}
+                        />
+                        {field.label}
+                      </label>
+                      <p className="text-[11px] text-stone-500 ml-6 whitespace-pre-wrap">
+                        {summaryLineForField(field.id) || 'No current value recorded.'}
+                      </p>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -2078,11 +2179,11 @@ export default function ParticipantDetail({
                 className="input min-h-[96px]"
                 value={shareSummary}
                 onChange={e => setShareSummary(e.target.value)}
-                placeholder="Leave blank to use the participant's stored diagnosis/details for each selected type, or add custom text here to override what gets shared."
+                placeholder="Leave blank to use selected fields from this tab, or add custom text here to override what gets shared."
               />
-              {!String(shareSummary || '').trim() && shareCategories.length === 1 && (
+              {!String(shareSummary || '').trim() && (
                 <p className="text-xs text-stone-500 mt-2 whitespace-pre-wrap">
-                  Default share preview: {defaultSummaryForCategory(shareCategories[0]) || 'No details available for this category yet.'}
+                  Default share preview: {defaultSummaryForCategory(activeShareCategory) || 'No details available for selected fields yet.'}
                 </p>
               )}
             </div>
