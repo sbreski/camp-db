@@ -78,7 +78,7 @@ function fmt(ts) {
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-const TABS = ['Overview', 'Medical', 'Allergy', 'Dietary', 'SEND', 'Attendance', 'Incidents', 'Safeguarding']
+const TABS = ['Overview', 'Medical', 'Allergy', 'Dietary', 'SEND', 'Attendance', 'Behaviour Log', 'Incidents', 'Safeguarding']
 
 const TAB_TO_SHARE_CATEGORY = {
   Overview: 'notes',
@@ -122,13 +122,22 @@ const DEFAULT_SHARE_FIELD_SELECTION = {
 
 export default function ParticipantDetail({
   participant, participants, setParticipants,
-  attendance, setAttendance, incidents, setIncidents, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, canViewUploadedData = false, currentUserEmail = '', onNavigate, onBack
+  attendance, setAttendance, incidents, setIncidents, behaviourLogs = [], setBehaviourLogs = null, staffList = [], actorInitials = 'ST', actorUserId = '', currentStaffName = '', canViewSafeguarding = false, canViewSendDiagnosis = false, canManageShares = false, canViewUploadedData = false, currentUserEmail = '', onNavigate, onBack
 }) {
   const [editing, setEditing] = useState(false)
   const [showIncident, setShowIncident] = useState(false)
   const [editingIncidentId, setEditingIncidentId] = useState(null)
   const [saveNotice, setSaveNotice] = useState('')
   const [activeTab, setActiveTab] = useState('Overview')
+  const [showBehaviourForm, setShowBehaviourForm] = useState(false)
+  const [editingBehaviourId, setEditingBehaviourId] = useState('')
+  const [behaviourSaveError, setBehaviourSaveError] = useState('')
+  const [behaviourDraft, setBehaviourDraft] = useState({
+    overview: '',
+    rating: '-',
+    severity: 'medium',
+    followUpRequired: false,
+  })
   const [medicationForms, setMedicationForms] = useState([])
   const [medicationAdministration, setMedicationAdministration] = useState([])
   const [medicationPlans, setMedicationPlans] = useState([])
@@ -655,6 +664,107 @@ export default function ParticipantDetail({
   const participantAttendance = attendance
     .filter(a => a.participantId === participantId)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
+
+  const participantBehaviourLogs = behaviourLogs
+    .filter(entry => (entry.participantId || entry.participant_id) === participantId)
+    .sort((a, b) => {
+      const aTs = a.loggedAt || a.logged_at || a.createdAt || a.created_at || ''
+      const bTs = b.loggedAt || b.logged_at || b.createdAt || b.created_at || ''
+      return new Date(bTs) - new Date(aTs)
+    })
+  const canManageBehaviourLogs = typeof setBehaviourLogs === 'function'
+
+  function resetBehaviourDraft() {
+    setBehaviourDraft({
+      overview: '',
+      rating: '-',
+      severity: 'medium',
+      followUpRequired: false,
+    })
+    setEditingBehaviourId('')
+    setBehaviourSaveError('')
+  }
+
+  function beginCreateBehaviourEntry() {
+    resetBehaviourDraft()
+    setShowBehaviourForm(true)
+  }
+
+  function beginEditBehaviourEntry(entry) {
+    setEditingBehaviourId(entry.id)
+    setBehaviourDraft({
+      overview: String(entry.overview || entry.outcome || entry.triggerText || entry.trigger_text || entry.actionTaken || entry.action_taken || ''),
+      rating: String(entry.rating || entry.category || '-'),
+      severity: String(entry.severity || 'medium').toLowerCase(),
+      followUpRequired: Boolean(entry.followUpRequired ?? entry.follow_up_required),
+    })
+    setShowBehaviourForm(true)
+    setBehaviourSaveError('')
+  }
+
+  function cancelBehaviourEdit() {
+    setShowBehaviourForm(false)
+    resetBehaviourDraft()
+  }
+
+  async function saveBehaviourEntry() {
+    if (!canManageBehaviourLogs || !participantId) return
+    const overview = String(behaviourDraft.overview || '').trim()
+    if (!overview) {
+      setBehaviourSaveError('Overview is required.')
+      return
+    }
+
+    try {
+      if (editingBehaviourId) {
+        await setBehaviourLogs(prev => prev.map(entry => (
+          entry.id !== editingBehaviourId
+            ? entry
+            : {
+                ...entry,
+                overview,
+                outcome: overview,
+                rating: behaviourDraft.rating,
+                category: behaviourDraft.rating,
+                severity: behaviourDraft.severity,
+                follow_up_required: Boolean(behaviourDraft.followUpRequired),
+                staffInitials: actorInitials,
+              }
+        )))
+      } else {
+        await setBehaviourLogs(prev => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            participantId,
+            loggedAt: new Date().toISOString(),
+            overview,
+            outcome: overview,
+            rating: behaviourDraft.rating,
+            category: behaviourDraft.rating,
+            severity: behaviourDraft.severity,
+            follow_up_required: Boolean(behaviourDraft.followUpRequired),
+            staffInitials: actorInitials,
+          },
+        ])
+      }
+
+      cancelBehaviourEdit()
+    } catch (error) {
+      setBehaviourSaveError(error?.message || 'Unable to save behaviour log entry.')
+    }
+  }
+
+  async function deleteBehaviourEntry(entryId) {
+    if (!canManageBehaviourLogs) return
+    if (!window.confirm('Delete this behaviour log entry?')) return
+
+    try {
+      await setBehaviourLogs(prev => prev.filter(entry => entry.id !== entryId))
+    } catch (error) {
+      setBehaviourSaveError(error?.message || 'Unable to delete behaviour log entry.')
+    }
+  }
 
   const participantIncidents = incidents
     .filter(i => i.participantId === participantId)
@@ -1517,6 +1627,7 @@ export default function ParticipantDetail({
             (tab === 'Allergy' && hasAllergy) ||
             (tab === 'Dietary' && hasDietary) ||
             (tab === 'SEND' && hasSend) ||
+            (tab === 'Behaviour Log' && participantBehaviourLogs.length > 0) ||
             (tab === 'Incidents' && participantStandardIncidents.length > 0) ||
             (tab === 'Safeguarding' && (participantSafeguardingIncidents.length > 0 || participant.safeguardingFlag))
           return (
@@ -2283,6 +2394,147 @@ export default function ParticipantDetail({
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BEHAVIOUR LOG */}
+        {activeTab === 'Behaviour Log' && (
+          <div className="card space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-display font-semibold text-forest-950">Behaviour Log</h3>
+              <div className="flex items-center gap-2">
+                {canManageBehaviourLogs && (
+                  <button type="button" className="btn-secondary text-xs" onClick={beginCreateBehaviourEntry}>
+                    New Entry
+                  </button>
+                )}
+                <button type="button" className="btn-secondary text-xs" onClick={() => onNavigate?.('behaviour')}>
+                  Open Full Behaviour Log
+                </button>
+              </div>
+            </div>
+
+            {showBehaviourForm && canManageBehaviourLogs && (
+              <div className="rounded-xl border border-forest-200 bg-forest-50/40 p-3 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Rating</label>
+                    <select
+                      className="input"
+                      value={behaviourDraft.rating}
+                      onChange={(event) => setBehaviourDraft(prev => ({ ...prev, rating: event.target.value }))}
+                    >
+                      <option value="P">P (Positive)</option>
+                      <option value="N">N (Negative)</option>
+                      <option value="-">- (Neutral / Information)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Severity</label>
+                    <select
+                      className="input"
+                      value={behaviourDraft.severity}
+                      onChange={(event) => setBehaviourDraft(prev => ({ ...prev, severity: event.target.value }))}
+                    >
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label">Overview</label>
+                  <textarea
+                    className="input min-h-[96px]"
+                    placeholder="Overview of why this log is being made"
+                    value={behaviourDraft.overview}
+                    onChange={(event) => {
+                      setBehaviourDraft(prev => ({ ...prev, overview: event.target.value }))
+                      if (behaviourSaveError) setBehaviourSaveError('')
+                    }}
+                  />
+                </div>
+
+                <label className="flex items-start gap-2 text-sm text-stone-700">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 rounded border-stone-300"
+                    checked={behaviourDraft.followUpRequired}
+                    onChange={(event) => setBehaviourDraft(prev => ({ ...prev, followUpRequired: event.target.checked }))}
+                  />
+                  Require register follow-up on Sign In/Out
+                </label>
+
+                {behaviourSaveError && <p className="text-xs text-red-700">{behaviourSaveError}</p>}
+
+                <div className="flex items-center gap-2">
+                  <button type="button" className="btn-primary text-xs" onClick={saveBehaviourEntry}>
+                    {editingBehaviourId ? 'Save Changes' : 'Save Entry'}
+                  </button>
+                  <button type="button" className="btn-secondary text-xs" onClick={cancelBehaviourEdit}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {participantBehaviourLogs.length === 0 ? (
+              <p className="text-stone-400 text-sm text-center py-6">No behaviour logs recorded for this participant yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {participantBehaviourLogs.map(entry => {
+                  const when = entry.loggedAt || entry.logged_at || entry.createdAt || entry.created_at || null
+                  const overview = entry.overview || entry.outcome || entry.triggerText || entry.trigger_text || entry.actionTaken || entry.action_taken || ''
+                  const rating = entry.rating || entry.category || '-'
+                  const severity = String(entry.severity || 'medium').toLowerCase()
+
+                  return (
+                    <div key={entry.id} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            severity === 'high' ? 'bg-red-100 text-red-700' :
+                            severity === 'medium' ? 'bg-amber-100 text-amber-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {severity.toUpperCase()}
+                          </span>
+                          <span className="text-xs bg-stone-200 text-stone-700 px-2 py-0.5 rounded-full">Rating: {rating}</span>
+                          {Boolean(entry.followUpRequired ?? entry.follow_up_required) && (
+                            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Follow Up Required</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-stone-500">
+                            {when ? new Date(when).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            {' · '}
+                            {entry.staffInitials || entry.staff_initials || 'ST'}
+                          </span>
+                          {canManageBehaviourLogs && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => beginEditBehaviourEntry(entry)}
+                                className="text-xs underline text-forest-700 hover:text-forest-900"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteBehaviourEntry(entry.id)}
+                                className="text-xs underline text-red-700 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-sm text-stone-800 mt-2 whitespace-pre-wrap">{overview || 'No overview provided.'}</p>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

@@ -38,6 +38,7 @@ export default function BehaviourLogs({
     overview: '',
     rating: '-',
     severity: 'medium',
+    followUpRequired: false,
   })
 
   const visibleLogs = useMemo(() => {
@@ -68,6 +69,7 @@ export default function BehaviourLogs({
           rating: form.rating,
           category: form.rating,
           severity: form.severity,
+          followUpRequired: form.followUpRequired,
           outcome: form.overview.trim(),
           staffInitials: actorInitials,
         },
@@ -78,6 +80,7 @@ export default function BehaviourLogs({
         overview: '',
         rating: '-',
         severity: 'medium',
+        followUpRequired: false,
       })
       setShowForm(false)
     } catch (error) {
@@ -142,6 +145,17 @@ export default function BehaviourLogs({
               <label className="label">Overview *</label>
               <textarea className="input resize-none" rows={4} value={form.overview} onChange={e => setField('overview', e.target.value)} placeholder="Overview of why this log is being made" required />
             </div>
+            <div className="sm:col-span-2">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.followUpRequired}
+                  onChange={e => setField('followUpRequired', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-stone-300 text-forest-900 cursor-pointer"
+                />
+                <span className="text-sm text-stone-700">Mark for register follow up</span>
+              </label>
+            </div>
           </div>
           <div className="flex gap-2">
             <button type="submit" className="btn-primary">Save Entry</button>
@@ -189,6 +203,7 @@ export default function BehaviourLogs({
                 <p><span className="font-semibold text-stone-900">Rating:</span> {entry.rating || entry.category || '-'}</p>
                 <p><span className="font-semibold text-stone-900">Severity:</span> {entry.severity ? `${entry.severity.charAt(0).toUpperCase()}${entry.severity.slice(1)}` : 'Medium'}</p>
                 <p><span className="font-semibold text-stone-900">Overview:</span> {entry.overview || entry.outcome || entry.triggerText || entry.actionTaken || '—'}</p>
+                {(entry.followUpRequired || entry.follow_up_required) && <p><span className="font-semibold text-stone-900">Register Follow Up:</span> Yes</p>}
               </div>
             </div>
           )

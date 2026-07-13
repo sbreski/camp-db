@@ -725,7 +725,7 @@ function FamilySignInModal({ participant, familyTargets = [], selectedIds = [], 
   )
 }
 
-export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false, canViewSafeguarding = false, currentUserId = '', onView = null }) {
+export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, behaviourLogs = [], setBehaviourLogs, canViewAdminFollowUps = false, canViewSafeguarding = false, currentUserId = '', onView = null }) {
   const searchInputRef = useRef(null)
   const dateInputRef = useRef(null)
   const noteInputRef = useRef(null)
@@ -863,6 +863,12 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     )
   }
 
+  function getPendingBehaviourFollowUps(participantId) {
+    return (behaviourLogs || [])
+      .filter(row => (row.participantId || row.participant_id) === participantId && (row.followUpRequired || row.follow_up_required))
+      .sort((a, b) => new Date(b.loggedAt || b.logged_at || 0) - new Date(a.loggedAt || a.logged_at || 0))
+  }
+
   async function completeMarFollowUp(marId) {
     const completedAt = new Date().toISOString()
     // Optimistic update locally
@@ -882,6 +888,25 @@ export default function SignInOut({ participants, setParticipants, attendance, s
         .eq('id', marId)
     } catch (_) {
       // Supabase update is best-effort; local state already updated
+    }
+  }
+
+  async function completeBehaviourFollowUp(logId) {
+    if (typeof setBehaviourLogs === 'function') {
+      await setBehaviourLogs(prev => prev.map(row => (
+        row.id === logId
+          ? { ...row, followUpRequired: false, follow_up_required: false }
+          : row
+      )))
+      return
+    }
+    try {
+      await supabase
+        .from('behaviour_logs')
+        .update({ follow_up_required: false })
+        .eq('id', logId)
+    } catch (_) {
+      // Best-effort fallback if app-level setter is unavailable
     }
   }
 
@@ -1475,7 +1500,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
       const hasIncidentFollowUp = getPendingFollowUps(participant.id).length > 0
       const hasNoteFollowUp = canViewAdminFollowUps && hasParticipantNoteFollowUp(participant.id)
       const hasMarFollowUp = getPendingMarFollowUps(participant.id).length > 0
-      return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
+      const hasBehaviourFollowUp = getPendingBehaviourFollowUps(participant.id).length > 0
+      return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp || hasBehaviourFollowUp
     }
     const rec = getRecord(participant.id)
     const isInNow = !!(rec?.signIn && !rec?.signOut)
@@ -1494,7 +1520,8 @@ export default function SignInOut({ participants, setParticipants, attendance, s
     const hasIncidentFollowUp = getPendingFollowUps(p.id).length > 0
     const hasNoteFollowUp = canViewAdminFollowUps && hasParticipantNoteFollowUp(p.id)
     const hasMarFollowUp = getPendingMarFollowUps(p.id).length > 0
-    return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp
+    const hasBehaviourFollowUp = getPendingBehaviourFollowUps(p.id).length > 0
+    return hasIncidentFollowUp || hasNoteFollowUp || hasMarFollowUp || hasBehaviourFollowUp
   }).length
 
   function shiftSelectedDate(days) {
@@ -2196,6 +2223,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const hasSafeguarding = !!p.safeguardingFlag
               const pendingFollowUps = getPendingFollowUps(p.id)
               const pendingMarFollowUps = getPendingMarFollowUps(p.id)
+              const pendingBehaviourFollowUps = getPendingBehaviourFollowUps(p.id)
               const allergyTooltip = sharedTooltipFor(
                 p.id,
                 'allergy',
@@ -2387,6 +2415,33 @@ export default function SignInOut({ participants, setParticipants, attendance, s
                               <button
                                 type="button"
                                 onClick={() => completeMarFollowUp(row.id)}
+                                className="ml-auto rounded bg-white/80 px-2 py-0.5 text-[11px] font-semibold hover:bg-white"
+                              >
+                                Mark done
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {pendingBehaviourFollowUps.length > 0 && (
+                      <div className="mt-2 space-y-1.5">
+                        {pendingBehaviourFollowUps.map(row => {
+                          const when = row.loggedAt || row.logged_at
+                            ? new Date(row.loggedAt || row.logged_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            : '—'
+                          const overview = String(row.overview || row.outcome || '').trim() || 'No overview'
+                          return (
+                            <div
+                              key={row.id}
+                              className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs text-indigo-900"
+                            >
+                              <span>
+                                Behaviour Follow Up ({row.rating || row.category || '-'}/{String(row.severity || 'medium').toUpperCase()}): {formatRegisterInlineText(overview)}{when !== '—' ? ` (${when})` : ''}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => completeBehaviourFollowUp(row.id)}
                                 className="ml-auto rounded bg-white/80 px-2 py-0.5 text-[11px] font-semibold hover:bg-white"
                               >
                                 Mark done

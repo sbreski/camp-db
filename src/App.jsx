@@ -387,7 +387,7 @@ export default function App() {
   const needsAttendance = ['dashboard', 'signin', 'attendance', 'participant'].includes(page)
   const needsIncidents = ['dashboard', 'signin', 'participant', 'incidents', 'log-incidents', 'behaviour'].includes(page)
   const needsMedicationAdministration = ['signin', 'medical', 'dashboard'].includes(page)
-  const needsBehaviourLogs = ['behaviour'].includes(page)
+  const needsBehaviourLogs = ['behaviour', 'participant', 'signin'].includes(page)
   const needsTimetable = ['timetable'].includes(page)
   const needsStarOfDay = ['star-of-day'].includes(page)
   const needsStaff = ['participant', 'incidents', 'log-incidents', 'staff', 'documents', 'timetable'].includes(page) || permissionsLoading
@@ -1674,7 +1674,7 @@ export default function App() {
           canManageUserResets={isOwnerUser || isAdminUser}
         />
       )
-      case 'signin': return <SignInOut participants={participants} setParticipants={setParticipants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} canViewAdminFollowUps={isOwnerUser || isAdminUser} canViewSafeguarding={canViewSafeguarding} currentUserId={currentUser?.id || ''} onView={allowedTabIds.includes('participants') ? (id) => navigate('participant', id) : null} />
+      case 'signin': return <SignInOut participants={participants} setParticipants={setParticipants} attendance={attendance} setAttendance={setAttendance} actorInitials={actorInitials} incidents={incidents} setIncidents={setIncidents} medicationAdministration={medicationAdministration} setMedicationAdministration={setMedicationAdministration} behaviourLogs={behaviourLogs} setBehaviourLogs={setBehaviourLogs} canViewAdminFollowUps={isOwnerUser || isAdminUser} canViewSafeguarding={canViewSafeguarding} currentUserId={currentUser?.id || ''} onView={allowedTabIds.includes('participants') ? (id) => navigate('participant', id) : null} />
       case 'shared-info': return <SharedInfo currentUser={currentUser} participants={participants} />
       case 'attendance': return <AttendanceOverview participants={participants} attendance={attendance} setAttendance={setAttendance} campPeriod={campPeriod} campPeriods={campPeriods} />
       case 'star-of-day': return <StarOfTheDay participants={participants} attendance={attendance} starAwards={starAwards} setStarAwards={setStarAwards} campPeriod={campPeriod} campPeriods={campPeriods} />
@@ -1694,6 +1694,8 @@ export default function App() {
           setAttendance={setAttendance}
           incidents={incidents}
           setIncidents={setIncidents}
+          behaviourLogs={behaviourLogs}
+          setBehaviourLogs={setBehaviourLogs}
           staffList={staffList}
           actorInitials={actorInitials}
           actorUserId={currentUser?.id || ''}
