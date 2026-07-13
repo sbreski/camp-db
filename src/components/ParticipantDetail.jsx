@@ -78,7 +78,7 @@ function fmt(ts) {
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-const TABS = ['Overview', 'Medical', 'SEND / Support', 'Attendance', 'Incidents']
+const TABS = ['Overview', 'Medical', 'Allergy', 'Dietary', 'SEND', 'Attendance', 'Incidents']
 
 export default function ParticipantDetail({
   participant, participants, setParticipants,
@@ -633,14 +633,15 @@ export default function ParticipantDetail({
 
   const flags = participantFlags(participant)
   const hasEpiPen = flags.hasEpiPen
-  const hasMedical = flags.hasMedical || flags.hasAllergy || flags.hasDietary
+  const hasMedical = flags.hasMedical
   const hasConsents = Boolean(
     participant.photoConsent
     || participant.otcConsent
     || (Array.isArray(participant.otcAllowedItems) && participant.otcAllowedItems.length > 0)
     || participant.otcNotes
   )
-  const hasDietaryAllergy = flags.hasDietary || flags.hasAllergy
+  const hasAllergy = flags.hasAllergy
+  const hasDietary = flags.hasDietary
   const hasDiagnosedSend = flags.sendDiagnosed
   const hasSend = flags.hasSend
 
@@ -1392,18 +1393,11 @@ export default function ParticipantDetail({
           </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-4">
-          {flags.hasAllergy && (
-            <span 
-              className="badge-allergy cursor-help" 
-              title={participant.allergyDetails || 'Allergy recorded (no details specified)'}
-            >
-              ⚠ Allergy
-            </span>
-          )}
+          {flags.hasMedical && <span className="badge-medical">M</span>}
+          {flags.hasAllergy && <span className="badge-allergy">A</span>}
+          {flags.hasDietary && <span className="badge-dietary">D</span>}
+          {hasSend && <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>}
           {flags.hasEpiPen && <span className="badge-epipen">EpiPen</span>}
-          {flags.hasDietary && <span className="badge-dietary">🍽 Dietary</span>}
-          {flags.hasMedical && <span className="badge-medical">+ Medical</span>}
-          {hasSend && <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>★ SEND / Support</span>}
           {participant.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={12} />}
         </div>
       </div>
@@ -1413,7 +1407,9 @@ export default function ParticipantDetail({
         {TABS.map(tab => {
           const hasAlert =
             (tab === 'Medical' && hasMedical) ||
-            (tab === 'SEND / Support' && hasSend) ||
+            (tab === 'Allergy' && hasAllergy) ||
+            (tab === 'Dietary' && hasDietary) ||
+            (tab === 'SEND' && hasSend) ||
             (tab === 'Incidents' && participantIncidents.length > 0)
           return (
             <button
@@ -1801,52 +1797,24 @@ export default function ParticipantDetail({
         {activeTab === 'Medical' && (
           <div className="space-y-4">
             <div className="card">
-            <h3 className="font-display font-semibold text-forest-950 mb-4">Medical, Allergy & Dietary</h3>
+            <h3 className="font-display font-semibold text-forest-950 mb-4">Medical</h3>
             {hasMedical ? (
-  <div className="space-y-4">
-    <div className="flex flex-wrap gap-2">
-      {flags.hasMedical && <span className="badge-medical text-sm px-3 py-1">M</span>}
-      {flags.hasDietary && <span className="badge-dietary text-sm px-3 py-1">D</span>}
-      {flags.hasAllergy && <span className="badge-allergy text-sm px-3 py-1">A</span>}
-      {flags.hasSend && <span className={flags.sendDiagnosed ? 'badge-send-diagnosed text-sm px-3 py-1' : 'badge-send text-sm px-3 py-1'}>S</span>}
-    </div>
-    {participant.medicalDetails && (
-      <div className="bg-stone-50 rounded-xl p-4 text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
-        {participant.medicalDetails}
-      </div>
-    )}
-    {hasDietaryAllergy && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {participant.dietaryType && (
-          <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
-            <p className="label mb-1">Dietary Type</p>
-            <p>{participant.dietaryType}</p>
-          </div>
-        )}
-                    {participant.mealAdjustments && (
-                      <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
-                        <p className="label mb-1">Dietary Details</p>
-                        <p>{participant.mealAdjustments}</p>
-                      </div>
-                    )}
-                    {hasEpiPen && (
-                      <div className="bg-amber-50 rounded-xl p-3 text-sm text-amber-900 border border-amber-200">
-                        <p className="label mb-1 text-amber-700">EpiPen</p>
-                        <p>EpiPen recorded for this participant.</p>
-                      </div>
-                    )}
-                    {participant.allergyDetails && (
-                      <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700 sm:col-span-2">
-                        <p className="label mb-1">Allergy Details</p>
-                        <p className="whitespace-pre-wrap">{participant.allergyDetails}</p>
-                      </div>
-                    )}
+              <div className="space-y-3">
+                {participant.medicalCondition && (
+                  <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
+                    <p className="label mb-1">Medical Condition</p>
+                    <p>{participant.medicalCondition}</p>
+                  </div>
+                )}
+                {participant.medicalDetails && (
+                  <div className="bg-stone-50 rounded-xl p-4 text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
+                    {participant.medicalDetails}
                   </div>
                 )}
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-stone-400 text-sm">No medical, allergy, or dietary requirements recorded.</p>
+                <p className="text-stone-400 text-sm">No medical information recorded.</p>
                 <button onClick={() => setEditing(true)} className="mt-3 text-xs text-forest-600 hover:underline">
                   Add via Edit →
                 </button>
@@ -1962,8 +1930,68 @@ export default function ParticipantDetail({
           </div>
         )}
 
+        {/* ALLERGY */}
+        {activeTab === 'Allergy' && (
+          <div className="card">
+            <h3 className="font-display font-semibold text-forest-950 mb-4">Allergy</h3>
+            {hasAllergy ? (
+              <div className="space-y-3">
+                {hasEpiPen && (
+                  <div className="bg-amber-50 rounded-xl p-3 text-sm text-amber-900 border border-amber-200">
+                    <p className="label mb-1 text-amber-700">EpiPen</p>
+                    <p>EpiPen recorded for this participant.</p>
+                  </div>
+                )}
+                {participant.allergyDetails && (
+                  <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
+                    <p className="label mb-1">Allergy Details</p>
+                    <p className="whitespace-pre-wrap">{participant.allergyDetails}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-stone-400 text-sm">No allergy information recorded.</p>
+                <button onClick={() => setEditing(true)} className="mt-3 text-xs text-forest-600 hover:underline">
+                  Add via Edit →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* DIETARY */}
+        {activeTab === 'Dietary' && (
+          <div className="card">
+            <h3 className="font-display font-semibold text-forest-950 mb-4">Dietary</h3>
+            {hasDietary ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {participant.dietaryType && (
+                  <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
+                    <p className="label mb-1">Dietary Type</p>
+                    <p>{participant.dietaryType}</p>
+                  </div>
+                )}
+                {participant.mealAdjustments && (
+                  <div className="bg-stone-50 rounded-xl p-3 text-sm text-stone-700">
+                    <p className="label mb-1">Dietary Details</p>
+                    <p className="whitespace-pre-wrap">{participant.mealAdjustments}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-stone-400 text-sm">No dietary information recorded.</p>
+                <button onClick={() => setEditing(true)} className="mt-3 text-xs text-forest-600 hover:underline">
+                  Add via Edit →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* SEND */}
-        {activeTab === 'SEND / Support' && (
+        {activeTab === 'SEND' && (
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display font-semibold text-forest-950">SEND & Support Needs</h3>
