@@ -59,6 +59,14 @@ export default function BehaviourLogs({
       .sort((a, b) => new Date(b.loggedAt || b.logged_at || b.createdAt || b.created_at) - new Date(a.loggedAt || a.logged_at || a.createdAt || a.created_at))
   }, [behaviourLogs, participantFilter, participantScope, participants])
 
+  const participantOptions = useMemo(() => {
+    const inScope = participants.filter(p => {
+      if (participantScope === 'all') return true
+      return (p.isActiveThisSeason ?? p.is_active_this_season) !== false
+    })
+    return [...inScope].sort((a, b) => a.name.localeCompare(b.name))
+  }, [participants, participantScope])
+
   const groupedByParticipant = useMemo(() => {
     const grouped = new Map()
     for (const entry of visibleLogs) {
@@ -121,6 +129,20 @@ export default function BehaviourLogs({
     window.addEventListener('keydown', onShortcutKey)
     return () => window.removeEventListener('keydown', onShortcutKey)
   }, [showForm])
+
+  useEffect(() => {
+    if (!participantFilter) return
+    const stillVisible = participantOptions.some(p => p.id === participantFilter)
+    if (!stillVisible) setParticipantFilter('')
+  }, [participantFilter, participantOptions])
+
+  useEffect(() => {
+    if (!form.participantId) return
+    const stillVisible = participantOptions.some(p => p.id === form.participantId)
+    if (!stillVisible) {
+      setForm(prev => ({ ...prev, participantId: '' }))
+    }
+  }, [form.participantId, participantOptions])
 
   async function createEntry(e) {
     e.preventDefault()
@@ -248,7 +270,7 @@ export default function BehaviourLogs({
               <label className="label">Participant *</label>
               <select className="input" value={form.participantId} onChange={e => setField('participantId', e.target.value)} required>
                 <option value="">Select participant...</option>
-                {[...participants].sort((a, b) => a.name.localeCompare(b.name)).map(participant => (
+                {participantOptions.map(participant => (
                   <option key={participant.id} value={participant.id}>{participant.name}</option>
                 ))}
               </select>
@@ -343,7 +365,7 @@ export default function BehaviourLogs({
             <label className="label">Filter by participant</label>
             <select className="input" value={participantFilter} onChange={e => setParticipantFilter(e.target.value)}>
               <option value="">All participants</option>
-              {[...participants].sort((a, b) => a.name.localeCompare(b.name)).map(participant => (
+              {participantOptions.map(participant => (
                 <option key={participant.id} value={participant.id}>{participant.name}</option>
               ))}
             </select>
