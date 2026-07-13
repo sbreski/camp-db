@@ -7,6 +7,7 @@ import { getPendingFollowUpsForParticipant } from '../utils/workflow'
 import { buildDailyFamilyPickupCode, getParticipantFamilyKey, getParticipantPickupCode, isValidParticipantPickupCode, normalizePickupCodeInput } from '../utils/pickupCode'
 import { daysUntilBirthday, todayKey } from '../utils/birthday'
 import { hasRecordedEpiPen } from '../utils/medical'
+import { supabase } from '../supabase'
 
 function fmt(ts) {
   if (!ts) return '—'
@@ -724,7 +725,7 @@ function FamilySignInModal({ participant, familyTargets = [], selectedIds = [], 
   )
 }
 
-export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false, onView = null }) {
+export default function SignInOut({ participants, setParticipants, attendance, setAttendance, actorInitials = 'ST', incidents, setIncidents, medicationAdministration = [], setMedicationAdministration, canViewAdminFollowUps = false, canViewSafeguarding = false, currentUserId = '', onView = null }) {
   const searchInputRef = useRef(null)
   const dateInputRef = useRef(null)
   const noteInputRef = useRef(null)
@@ -757,6 +758,7 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const [codeEditFieldArmed, setCodeEditFieldArmed] = useState(false)
   const [codeEditMessage, setCodeEditMessage] = useState('')
   const [showKeyboardKey, setShowKeyboardKey] = useState(false)
+  const [sharedBadgeDetails, setSharedBadgeDetails] = useState({})
   const today = todayKey()
   const seasonParticipants = participants.filter(p => {
     const seasonFlag = p.isActiveThisSeason ?? p.is_active_this_season
@@ -767,6 +769,75 @@ export default function SignInOut({ participants, setParticipants, attendance, s
   const liveNoteEditorParticipant = noteEditor
     ? participants.find(item => item.id === noteEditor.id) || noteEditor
     : null
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadSharedBadgeDetails() {
+      if (canViewSafeguarding || !currentUserId) {
+        if (!cancelled) setSharedBadgeDetails({})
+        return
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('participant_staff_shares')
+          .select('participant_id, category, summary, created_at, updated_at')
+          .eq('target_user_id', currentUserId)
+          .eq('status', 'active')
+          .order('updated_at', { ascending: false })
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        const next = {}
+        for (const row of Array.isArray(data) ? data : []) {
+          const participantId = row?.participant_id
+          const category = String(row?.category || '').trim().toLowerCase()
+          const summary = String(row?.summary || '').trim()
+          if (!participantId || !category) continue
+
+          if (!next[participantId]) next[participantId] = {}
+          if (!next[participantId][category]) next[participantId][category] = []
+
+          if (summary && !next[participantId][category].includes(summary)) {
+            next[participantId][category].push(summary)
+          }
+        }
+
+        if (!cancelled) setSharedBadgeDetails(next)
+      } catch (_) {
+        if (!cancelled) setSharedBadgeDetails({})
+      }
+    }
+
+    loadSharedBadgeDetails()
+    return () => {
+      cancelled = true
+    }
+  }, [canViewSafeguarding, currentUserId])
+
+  function sharedTooltipFor(participantId, categories, fallback) {
+    if (canViewSafeguarding) return fallback
+
+    const participantDetails = sharedBadgeDetails[participantId] || {}
+    const categoryList = Array.isArray(categories) ? categories : [categories]
+    const summaries = []
+    let hasSharedCategory = false
+
+    for (const category of categoryList) {
+      const entries = participantDetails[String(category || '').toLowerCase()]
+      if (!entries) continue
+      hasSharedCategory = true
+      for (const summary of entries) {
+        if (summary && !summaries.includes(summary)) summaries.push(summary)
+      }
+    }
+
+    if (summaries.length > 0) return summaries.join(' | ')
+    if (hasSharedCategory) return 'Shared information available (no summary provided).'
+    return 'Not shared with your account.'
+  }
 
   function getPendingFollowUps(participantId) {
     return getPendingFollowUpsForParticipant(incidents, participantId, selectedDate)
@@ -2125,13 +2196,29 @@ export default function SignInOut({ participants, setParticipants, attendance, s
               const hasSafeguarding = !!p.safeguardingFlag
               const pendingFollowUps = getPendingFollowUps(p.id)
               const pendingMarFollowUps = getPendingMarFollowUps(p.id)
-              const allergyTooltip = String(p.allergyDetails || '').trim() || 'No details recorded'
+              const allergyTooltip = sharedTooltipFor(
+                p.id,
+                'allergy',
+                String(p.allergyDetails || '').trim() || 'No details recorded'
+              )
               const epiPenTooltip = hasEpiPen
-                ? 'EpiPen recorded for this participant'
+                ? sharedTooltipFor(p.id, ['allergy', 'medical'], 'EpiPen recorded for this participant')
                 : ''
-              const dietaryTooltip = String(p.dietaryType || '').trim() || 'No dietary type recorded'
-              const medicalTooltip = String(p.medicalCondition || '').trim() || 'No medical condition recorded'
-              const sendTooltip = String(p.sendDiagnosis || '').trim() || 'No diagnosis recorded'
+              const dietaryTooltip = sharedTooltipFor(
+                p.id,
+                'dietary',
+                String(p.dietaryType || '').trim() || 'No dietary type recorded'
+              )
+              const medicalTooltip = sharedTooltipFor(
+                p.id,
+                'medical',
+                String(p.medicalCondition || '').trim() || 'No medical condition recorded'
+              )
+              const sendTooltip = sharedTooltipFor(
+                p.id,
+                'send',
+                String(p.sendDiagnosis || '').trim() || 'No diagnosis recorded'
+              )
               const collectedByLabel = collectorDisplayLabel(rec?.collectedBy)
               const signInBy = rec?.signInBy || rec?.sign_in_by || null
               const signOutBy = rec?.signOutBy || rec?.sign_out_by || null

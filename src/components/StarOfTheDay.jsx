@@ -31,9 +31,9 @@ function defaultCustomRanges(today) {
   return [{ id: `${startKey}-${today}`, startKey, endKey: today }]
 }
 
-function totalBadgeClass(total) {
-  const tone = getStarTotalTone(total)
+function totalBadgeClass(tone) {
   if (tone === 'high') return 'bg-red-100 text-red-700 border-red-200'
+  if (tone === 'low') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
   if (tone === 'positive') return 'bg-green-100 text-green-700 border-green-200'
   return 'bg-stone-100 text-stone-600 border-stone-200'
 }
@@ -47,9 +47,9 @@ const RANGE_OPTIONS = [
   { id: 'custom', label: 'Camp Period' },
 ]
 
-export default function StarOfTheDay({ participants, starAwards, setStarAwards, campPeriod, campPeriods }) {
+export default function StarOfTheDay({ participants, attendance = [], starAwards, setStarAwards, campPeriod, campPeriods }) {
   const [search, setSearch] = useState('')
-  const [rangeKey, setRangeKey] = useState('week')
+  const [rangeKey, setRangeKey] = useState('custom')
   const [customRanges, setCustomRanges] = useState(() => defaultCustomRanges(todayKey()))
   const [rangeStartInput, setRangeStartInput] = useState(() => defaultCustomRanges(todayKey())[0].startKey)
   const [rangeEndInput, setRangeEndInput] = useState(() => defaultCustomRanges(todayKey())[0].endKey)
@@ -77,6 +77,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
     return []
   }, [campPeriod, campPeriods])
   const hasCampPeriod = campPeriodRanges.length > 0
+  const isAllTimeView = rangeKey === 'all'
 
   // Define campStart and campEnd for use in JSX
   let campStart = null, campEnd = null;
@@ -85,19 +86,21 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
     campEnd = campPeriodRanges.reduce((max, r) => !max || r.endKey > max ? r.endKey : max, null)
   }
 
-  const inSeasonParticipants = useMemo(() => (
-    [...participants]
-      .filter(isParticipantInSeason)
-      .sort((a, b) => a.name.localeCompare(b.name))
-  ), [participants])
+  const visibleParticipants = useMemo(() => {
+    const source = isAllTimeView
+      ? [...participants]
+      : [...participants].filter(isParticipantInSeason)
+    return source.sort((a, b) => a.name.localeCompare(b.name))
+  }, [participants, isAllTimeView])
 
   const filteredParticipants = useMemo(() => (
-    inSeasonParticipants.filter(participant =>
+    visibleParticipants.filter(participant =>
       participantDisplayName(participant).toLowerCase().includes(search.toLowerCase())
     )
-  ), [inSeasonParticipants, search])
+  ), [visibleParticipants, search])
 
   const dateKeys = useMemo(() => {
+    if (isAllTimeView) return []
     if (rangeKey === 'custom') {
       if (hasCampPeriod) {
         return buildDatesFromRanges(campPeriodRanges)
@@ -105,12 +108,37 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
       return buildDatesFromRanges(customRanges)
     }
     return buildStarRangeDates(rangeKey, today, starAwards)
-  }, [rangeKey, today, starAwards, customRanges, hasCampPeriod, campPeriodRanges])
+  }, [rangeKey, today, starAwards, customRanges, hasCampPeriod, campPeriodRanges, isAllTimeView])
   const dateSet = useMemo(() => new Set(dateKeys), [dateKeys])
 
   const awardsInRange = useMemo(() => (
-    starAwards.filter(award => dateSet.has(award.awardDate || award.award_date))
-  ), [starAwards, dateSet])
+    isAllTimeView
+      ? starAwards
+      : starAwards.filter(award => dateSet.has(award.awardDate || award.award_date))
+  ), [starAwards, dateSet, isAllTimeView])
+
+  const attendanceDaysByParticipant = useMemo(() => {
+    const daySets = new Map()
+    for (const participant of filteredParticipants) {
+      daySets.set(participant.id, new Set())
+    }
+
+    for (const row of attendance || []) {
+      const participantId = row.participantId || row.participant_id
+      if (!daySets.has(participantId)) continue
+      if (!row.signIn && !row.sign_in) continue
+      const dateKey = String(row.date || '').slice(0, 10)
+      if (!dateKey) continue
+      if (!isAllTimeView && !dateSet.has(dateKey)) continue
+      daySets.get(participantId).add(dateKey)
+    }
+
+    const counts = new Map()
+    for (const [participantId, set] of daySets.entries()) {
+      counts.set(participantId, set.size)
+    }
+    return counts
+  }, [attendance, filteredParticipants, isAllTimeView, dateSet])
 
   const awardLookup = useMemo(() => {
     const map = new Map()
@@ -132,7 +160,27 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
     return totals
   }, [filteredParticipants, awardsInRange])
 
+  const awardRateByParticipant = useMemo(() => {
+    const rates = new Map()
+    for (const participant of filteredParticipants) {
+      const total = totalsByParticipant.get(participant.id) || 0
+      const attendedDays = attendanceDaysByParticipant.get(participant.id) || 0
+      const rate = attendedDays > 0 ? (total / attendedDays) * 100 : 0
+      rates.set(participant.id, rate)
+    }
+    return rates
+  }, [filteredParticipants, totalsByParticipant, attendanceDaysByParticipant])
+
+  const averageAwardRate = useMemo(() => {
+    const values = filteredParticipants
+      .map(participant => awardRateByParticipant.get(participant.id) || 0)
+      .filter(rate => rate > 0)
+    if (values.length === 0) return 0
+    return values.reduce((sum, value) => sum + value, 0) / values.length
+  }, [filteredParticipants, awardRateByParticipant])
+
   const visiblePeriodLabel = useMemo(() => {
+    if (isAllTimeView) return 'All Time'
     if (rangeKey !== 'custom') return formatRangeLabel(dateKeys)
     if (hasCampPeriod) {
       return `Camp Period: ${campPeriodRanges.map(range => range.label || `${formatShortDate(range.startKey)} - ${formatShortDate(range.endKey)}`).join(', ')}`
@@ -143,7 +191,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
         ? formatShortDate(range.startKey)
         : `${formatShortDate(range.startKey)} - ${formatShortDate(range.endKey)}`)
       .join(', ')
-  }, [rangeKey, dateKeys, customRanges, hasCampPeriod, campPeriodRanges])
+  }, [rangeKey, dateKeys, customRanges, hasCampPeriod, campPeriodRanges, isAllTimeView])
 
   function selectRange(optionId) {
     setRangeKey(optionId)
@@ -213,15 +261,24 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
 
   function printReport() {
     const rows = filteredParticipants.map(participant => {
+      const total = totalsByParticipant.get(participant.id) || 0
+      const attendedDays = attendanceDaysByParticipant.get(participant.id) || 0
+      const awardRate = awardRateByParticipant.get(participant.id) || 0
+
+      if (isAllTimeView) {
+        return `<tr><td>${participantDisplayName(participant)}</td><td>${total}</td><td>${attendedDays}</td><td>${total}/${attendedDays || 0} (${awardRate.toFixed(1)}%)</td></tr>`
+      }
+
       const cells = dateKeys.map(dateKey => {
         const hasStar = awardLookup.has(`${participant.id}|${dateKey}`)
         return `<td>${hasStar ? '★' : ''}</td>`
       }).join('')
-      const total = totalsByParticipant.get(participant.id) || 0
       return `<tr><td>${participantDisplayName(participant)}</td>${cells}<td>${total}</td></tr>`
     }).join('')
 
-    const headerCells = dateKeys.map(dateKey => `<th>${formatColumnDate(dateKey)}</th>`).join('')
+    const headerCells = isAllTimeView
+      ? '<th>Total Stars</th><th>Days Attended</th><th>Award Rate</th>'
+      : dateKeys.map(dateKey => `<th>${formatColumnDate(dateKey)}</th>`).join('')
     const popup = window.open('', '_blank', 'width=1200,height=800')
     if (!popup) {
       alert('Allow pop-ups to print the Star of the Day report.')
@@ -252,7 +309,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
               <tr>
                 <th>Child</th>
                 ${headerCells}
-                <th>Total</th>
+                <th>${isAllTimeView ? 'Summary' : 'Total'}</th>
               </tr>
             </thead>
             <tbody>
@@ -274,7 +331,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            In Season Only
+            {isAllTimeView ? 'All Participants' : 'In Season Only'}
           </span>
           <button onClick={printReport} className="btn-secondary text-xs flex items-center gap-1.5">
             <Printer size={13} /> Print / PDF Report
@@ -376,7 +433,7 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
           )}
         </div>
 
-        {dateKeys.length === 0 ? (
+        {!isAllTimeView && dateKeys.length === 0 ? (
           <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-8 text-center text-sm text-stone-500">
             Add at least one visible date range to build the matrix.
           </div>
@@ -392,12 +449,16 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
                   <th className="sticky left-0 top-0 z-20 bg-stone-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 border-b border-stone-100">
                     Child
                   </th>
-                  {dateKeys.map(dateKey => (
+                  {isAllTimeView ? (
+                    <th className="sticky top-0 z-10 bg-stone-50 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-stone-500 border-b border-stone-100 min-w-[220px]">
+                      Star Summary
+                    </th>
+                  ) : dateKeys.map(dateKey => (
                     <th key={dateKey} className="sticky top-0 z-10 bg-stone-50 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-stone-500 border-b border-stone-100 min-w-[72px]">
                       {formatColumnDate(dateKey)}
                     </th>
                   ))}
-                  <th className="sticky right-0 top-0 z-20 bg-stone-50 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-stone-500 border-b border-stone-100 min-w-[92px]">
+                  <th className="sticky right-0 top-0 z-20 bg-stone-50 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-stone-500 border-b border-stone-100 min-w-[120px]">
                     Total
                   </th>
                 </tr>
@@ -405,12 +466,15 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
               <tbody>
                 {filteredParticipants.map(participant => {
                   const total = totalsByParticipant.get(participant.id) || 0
+                  const attendedDays = attendanceDaysByParticipant.get(participant.id) || 0
+                  const awardRate = awardRateByParticipant.get(participant.id) || 0
+                  const toneClass = totalBadgeClass(getStarTotalTone({ total, rate: awardRate, averageRate: averageAwardRate }))
                   return (
                     <tr key={participant.id} className="hover:bg-stone-50/70">
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 border-b border-stone-100 whitespace-nowrap">
                         <ParticipantNameText participant={participant} showDiagnosedHighlight={false} className="font-medium text-forest-950" />
                       </td>
-                      {dateKeys.map(dateKey => {
+                      {!isAllTimeView && dateKeys.map(dateKey => {
                         const key = `${participant.id}|${dateKey}`
                         const awarded = awardLookup.has(key)
                         const isSaving = savingKey === key
@@ -429,8 +493,14 @@ export default function StarOfTheDay({ participants, starAwards, setStarAwards, 
                           </td>
                         )
                       })}
+                      {isAllTimeView && (
+                        <td className="border-b border-stone-100 px-4 py-3 text-center text-xs text-stone-600">
+                          <div className="font-semibold text-stone-700">{total} star{total === 1 ? '' : 's'}</div>
+                          <div>{total}/{attendedDays || 0} days ({awardRate.toFixed(1)}%)</div>
+                        </td>
+                      )}
                       <td className="sticky right-0 z-10 bg-white px-4 py-3 border-b border-stone-100 text-center">
-                        <span className={`inline-flex min-w-[56px] items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold ${totalBadgeClass(total)}`}>
+                        <span className={`inline-flex min-w-[56px] items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClass}`}>
                           {total}
                         </span>
                       </td>
