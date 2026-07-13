@@ -8,7 +8,7 @@ const EMPTY = {
   siblings: false, siblingsName: '',
   parentName: '', parentEmail: '', parentPhone: '',
   parentRelationship: '',
-  parent2Name: '', parent2Email: '', parent2Phone: '',
+  parent2Name: '', parent2Relationship: '', parent2Email: '', parent2Phone: '',
   homePhone: '',
   approvedAdults: '',
   can_leave_alone: false,
@@ -203,7 +203,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
 
     const normalizedAdults = [...approvedAdultsList]
     ;[
-      { name: form.parent2Name, relationship: 'Parent' },
+      { name: form.parent2Name, relationship: form.parent2Relationship || 'Parent' },
       { name: form.parentName, relationship: form.parentRelationship || 'Parent' },
     ].forEach((adult) => {
       const adultName = adult.name
@@ -346,6 +346,10 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             <div>
               <label className="label">Additional Adult Name</label>
               <input className="input" value={form.parent2Name || ''} onChange={e => set('parent2Name', e.target.value)} placeholder="Second parent / guardian" />
+            </div>
+            <div>
+              <label className="label">Additional Adult Relationship</label>
+              <input className="input" value={form.parent2Relationship || ''} onChange={e => set('parent2Relationship', e.target.value)} placeholder="Mum, Dad, Guardian" />
             </div>
             <div>
               <label className="label">Additional Adult Phone</label>

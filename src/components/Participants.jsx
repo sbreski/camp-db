@@ -425,6 +425,7 @@ export default function Participants({ participants, setParticipants, deletePart
       parentPhone: String(participant.parentPhone || ''),
       parentEmail: String(participant.parentEmail || ''),
       parent2Name: String(participant.parent2Name || ''),
+      parent2Relationship: String(participant.parent2Relationship || ''),
       parent2Phone: String(participant.parent2Phone || ''),
       parent2Email: String(participant.parent2Email || ''),
       homePhone: String(participant.homePhone || ''),
@@ -545,6 +546,7 @@ export default function Participants({ participants, setParticipants, deletePart
         parentPhone: String(draft.parentPhone || '').trim(),
         parentEmail: String(draft.parentEmail || '').trim(),
         parent2Name: String(draft.parent2Name || '').trim(),
+        parent2Relationship: String(draft.parent2Relationship || '').trim(),
         parent2Phone: String(draft.parent2Phone || '').trim(),
         parent2Email: String(draft.parent2Email || '').trim(),
         homePhone: String(draft.homePhone || '').trim(),
@@ -748,9 +750,10 @@ export default function Participants({ participants, setParticipants, deletePart
                       'Siblings Name',
                       'Parent Name',
                       'Primary Adult Relationship',
-                      'Parent Phone',
+                      'Primary Adult Phone',
                       'Parent Email',
                       'Additional Adult Name',
+                      'Additional Adult Relationship',
                       'Additional Adult Phone',
                       'Additional Adult Email',
                       'Home Phone',
@@ -848,6 +851,11 @@ export default function Participants({ participants, setParticipants, deletePart
                           {allTableEditing ? (
                             <input className="input py-1" value={rowDraft.parent2Name || ''} onChange={e => updateAllTableDraft(p.id, 'parent2Name', e.target.value)} />
                           ) : (p.parent2Name || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {allTableEditing ? (
+                            <input className="input py-1" value={rowDraft.parent2Relationship || ''} onChange={e => updateAllTableDraft(p.id, 'parent2Relationship', e.target.value)} />
+                          ) : (p.parent2Relationship || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {allTableEditing ? (

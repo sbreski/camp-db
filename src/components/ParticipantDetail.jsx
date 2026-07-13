@@ -654,9 +654,10 @@ export default function ParticipantDetail({
     { key: 'schoolAttending', label: 'School Attending', type: 'text' },
     { key: 'parentName', label: 'Parent Name', type: 'text' },
     { key: 'parentRelationship', label: 'Primary Adult Relationship', type: 'text' },
-    { key: 'parentPhone', label: 'Parent Phone', type: 'text' },
+    { key: 'parentPhone', label: 'Primary Adult Phone', type: 'text' },
     { key: 'parentEmail', label: 'Parent Email', type: 'email' },
     { key: 'parent2Name', label: 'Additional Adult Name', type: 'text' },
+    { key: 'parent2Relationship', label: 'Additional Adult Relationship', type: 'text' },
     { key: 'parent2Phone', label: 'Additional Adult Phone', type: 'text' },
     { key: 'parent2Email', label: 'Additional Adult Email', type: 'email' },
     { key: 'homePhone', label: 'Home Phone', type: 'text' },
@@ -692,6 +693,7 @@ export default function ParticipantDetail({
       parentPhone: String(sourceParticipant?.parentPhone || ''),
       parentEmail: String(sourceParticipant?.parentEmail || ''),
       parent2Name: String(sourceParticipant?.parent2Name || ''),
+      parent2Relationship: String(sourceParticipant?.parent2Relationship || ''),
       parent2Phone: String(sourceParticipant?.parent2Phone || ''),
       parent2Email: String(sourceParticipant?.parent2Email || ''),
       homePhone: String(sourceParticipant?.homePhone || ''),
@@ -724,9 +726,10 @@ export default function ParticipantDetail({
     ['School Attending', participant.schoolAttending],
     ['Parent Name', participant.parentName],
     ['Primary Adult Relationship', participant.parentRelationship],
-    ['Parent Phone', participant.parentPhone],
+    ['Primary Adult Phone', participant.parentPhone],
     ['Parent Email', participant.parentEmail],
     ['Additional Adult Name', participant.parent2Name],
+    ['Additional Adult Relationship', participant.parent2Relationship],
     ['Additional Adult Phone', participant.parent2Phone],
     ['Additional Adult Email', participant.parent2Email],
     ['Home Phone', participant.homePhone],
@@ -838,6 +841,7 @@ export default function ParticipantDetail({
         parentPhone: String(uploadedDataDraft.parentPhone || '').trim(),
         parentEmail: String(uploadedDataDraft.parentEmail || '').trim(),
         parent2Name: String(uploadedDataDraft.parent2Name || '').trim(),
+        parent2Relationship: String(uploadedDataDraft.parent2Relationship || '').trim(),
         parent2Phone: String(uploadedDataDraft.parent2Phone || '').trim(),
         parent2Email: String(uploadedDataDraft.parent2Email || '').trim(),
         homePhone: String(uploadedDataDraft.homePhone || '').trim(),
@@ -1444,7 +1448,7 @@ export default function ParticipantDetail({
                   {participant.parentRelationship && <p className="text-stone-600 text-xs mb-1">Relationship: {participant.parentRelationship}</p>}
                   {participant.parentPhone && (
                     <a href={`tel:${participant.parentPhone}`} className="flex items-center gap-2 text-forest-700 hover:underline">
-                      <Phone size={13} /> {participant.parentPhone}
+                      <Phone size={13} /> Primary Adult: {participant.parentPhone}
                     </a>
                   )}
                   {participant.parentEmail && (
@@ -1454,12 +1458,13 @@ export default function ParticipantDetail({
                   )}
                 </div>
               )}
-              {(participant.parent2Name || participant.parent2Phone || participant.parent2Email) && (
+              {(participant.parent2Name || participant.parent2Relationship || participant.parent2Phone || participant.parent2Email) && (
                 <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
                   {participant.parent2Name && <p className="font-medium text-forest-950">{participant.parent2Name}</p>}
+                  {participant.parent2Relationship && <p className="text-stone-600 text-xs mb-1">Relationship: {participant.parent2Relationship}</p>}
                   {participant.parent2Phone && (
                     <a href={`tel:${participant.parent2Phone}`} className="flex items-center gap-2 text-forest-700 hover:underline">
-                      <Phone size={13} /> {participant.parent2Phone}
+                      <Phone size={13} /> Additional Adult: {participant.parent2Phone}
                     </a>
                   )}
                   {participant.parent2Email && (
@@ -1474,7 +1479,7 @@ export default function ParticipantDetail({
                   <Phone size={13} /> Home: {participant.homePhone}
                 </a>
               )}
-              {!participant.parentName && !participant.parentPhone && !participant.parentEmail && !participant.parent2Name && !participant.parent2Phone && !participant.parent2Email && !participant.homePhone && (
+              {!participant.parentName && !participant.parentPhone && !participant.parentEmail && !participant.parent2Name && !participant.parent2Relationship && !participant.parent2Phone && !participant.parent2Email && !participant.homePhone && (
                 <p className="text-stone-400 text-sm">No contact details recorded.</p>
               )}
               {participant.address && (

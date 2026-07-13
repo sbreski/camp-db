@@ -109,7 +109,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
   const [editingId, setEditingId] = useState(null)
   const [editingContact, setEditingContact] = useState({
     parentName: '', parentRelationship: '', parentEmail: '', parentPhone: '',
-    parent2Name: '', parent2Email: '', parent2Phone: '',
+    parent2Name: '', parent2Relationship: '', parent2Email: '', parent2Phone: '',
     homePhone: '',
   })
   const [editingAdults, setEditingAdults] = useState([])
@@ -141,6 +141,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
       parentEmail: participant.parentEmail || '',
       parentPhone: participant.parentPhone || '',
       parent2Name: participant.parent2Name || '',
+      parent2Relationship: participant.parent2Relationship || '',
       parent2Email: participant.parent2Email || '',
       parent2Phone: participant.parent2Phone || '',
       homePhone: participant.homePhone || '',
@@ -156,7 +157,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
     setEditingId(null)
     setEditingContact({
       parentName: '', parentRelationship: '', parentEmail: '', parentPhone: '',
-      parent2Name: '', parent2Email: '', parent2Phone: '',
+      parent2Name: '', parent2Relationship: '', parent2Email: '', parent2Phone: '',
       homePhone: '',
     })
     setEditingAdults([])
@@ -234,7 +235,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
     }
     const parent2Name = String(editingContact.parent2Name || '').trim()
     if (parent2Name && !hasSameAdult(normalizedAdults, parent2Name)) {
-      normalizedAdults.unshift(formatParentLabel(parent2Name))
+      normalizedAdults.unshift(formatParentLabel(parent2Name, editingContact.parent2Relationship || 'Parent'))
     }
 
     const targetIds = editingLinkedParticipantIds.length > 0 ? editingLinkedParticipantIds : [participant.id]
@@ -244,6 +245,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
       parentEmail: editingContact.parentEmail.trim(),
       parentPhone: editingContact.parentPhone.trim(),
       parent2Name,
+      parent2Relationship: String(editingContact.parent2Relationship || '').trim(),
       parent2Email: String(editingContact.parent2Email || '').trim(),
       parent2Phone: String(editingContact.parent2Phone || '').trim(),
       homePhone: String(editingContact.homePhone || '').trim(),
@@ -284,6 +286,7 @@ export default function Parents({ participants, onUpdateParticipants }) {
         p.parentName?.toLowerCase().includes(query) ||
         p.parentRelationship?.toLowerCase().includes(query) ||
         p.parent2Name?.toLowerCase().includes(query) ||
+        p.parent2Relationship?.toLowerCase().includes(query) ||
         p.parentEmail?.toLowerCase().includes(query) ||
         p.parent2Email?.toLowerCase().includes(query) ||
         p.parentPhone?.toLowerCase().includes(query) ||
@@ -442,7 +445,14 @@ export default function Parents({ participants, onUpdateParticipants }) {
                         {p.parentRelationship || <span className="text-stone-400">—</span>}
                       </td>
                       <td className="py-3 px-4 text-sm text-stone-700">
-                        {p.parent2Name || <span className="text-stone-400">—</span>}
+                        {p.parent2Name ? (
+                          <div>
+                            <div>{p.parent2Name}</div>
+                            {p.parent2Relationship && (
+                              <div className="text-xs text-stone-500">{p.parent2Relationship}</div>
+                            )}
+                          </div>
+                        ) : <span className="text-stone-400">—</span>}
                       </td>
                       <td className={`py-3 px-4 text-sm text-stone-700 ${!p.parentEmail && !p.parent2Email ? 'bg-red-100 text-red-700' : ''}`}> 
                         {(p.parentEmail || p.parent2Email) ? (
@@ -475,12 +485,12 @@ export default function Parents({ participants, onUpdateParticipants }) {
                           <div className="space-y-1">
                             {p.parentPhone && (
                               <a href={`tel:${p.parentPhone}`} className="block text-forest-600 hover:text-forest-800 hover:underline">
-                                {p.parentPhone}
+                                Primary Adult: {p.parentPhone}
                               </a>
                             )}
                             {p.parent2Phone && (
                               <a href={`tel:${p.parent2Phone}`} className="block text-forest-600 hover:text-forest-800 hover:underline">
-                                {p.parent2Phone}
+                                Additional Adult: {p.parent2Phone}
                               </a>
                             )}
                             {p.homePhone && (
@@ -571,6 +581,15 @@ export default function Parents({ participants, onUpdateParticipants }) {
                                   value={editingContact.parent2Name}
                                   onChange={e => setEditingContact(prev => ({ ...prev, parent2Name: e.target.value }))}
                                   placeholder="Second parent / guardian"
+                                />
+                              </div>
+                              <div>
+                                <label className="label">Additional Adult Relationship</label>
+                                <input
+                                  className="input"
+                                  value={editingContact.parent2Relationship}
+                                  onChange={e => setEditingContact(prev => ({ ...prev, parent2Relationship: e.target.value }))}
+                                  placeholder="Mum, Dad, Guardian"
                                 />
                               </div>
                               <div>
