@@ -78,7 +78,7 @@ function fmt(ts) {
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-const TABS = ['Overview', 'Medical', 'Allergy', 'Dietary', 'SEND', 'Attendance', 'Incidents']
+const TABS = ['Overview', 'Medical', 'Allergy', 'Dietary', 'SEND', 'Attendance', 'Incidents', 'Safeguarding']
 
 const TAB_TO_SHARE_CATEGORY = {
   Overview: 'notes',
@@ -659,6 +659,8 @@ export default function ParticipantDetail({
   const participantIncidents = incidents
     .filter(i => i.participantId === participantId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const participantStandardIncidents = participantIncidents.filter(i => i.type !== 'Safeguarding')
+  const participantSafeguardingIncidents = participantIncidents.filter(i => i.type === 'Safeguarding')
   const participantNoteHistory = participantNotesForParticipant(participant)
   const participantDocuments = participantDocumentsForParticipant(participant)
   const activeParticipantNotes = participantNoteHistory.filter(note => !note.deletedAt)
@@ -1515,7 +1517,8 @@ export default function ParticipantDetail({
             (tab === 'Allergy' && hasAllergy) ||
             (tab === 'Dietary' && hasDietary) ||
             (tab === 'SEND' && hasSend) ||
-            (tab === 'Incidents' && participantIncidents.length > 0)
+            (tab === 'Incidents' && participantStandardIncidents.length > 0) ||
+            (tab === 'Safeguarding' && (participantSafeguardingIncidents.length > 0 || participant.safeguardingFlag))
           return (
             <button
               key={tab}
@@ -2285,22 +2288,32 @@ export default function ParticipantDetail({
           </div>
         )}
 
-        {/* INCIDENTS */}
-        {activeTab === 'Incidents' && (
+        {/* INCIDENTS / SAFEGUARDING */}
+        {(activeTab === 'Incidents' || activeTab === 'Safeguarding') && (
           <div className="card">
+            {(() => {
+              const isSafeguardingTab = activeTab === 'Safeguarding'
+              const visibleIncidents = isSafeguardingTab ? participantSafeguardingIncidents : participantStandardIncidents
+              return (
+                <>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-display font-semibold text-forest-950 flex items-center gap-2">
-                  <AlertTriangle size={15} className="text-amber-500" /> Incidents & Accidents
+                  {isSafeguardingTab ? <SafeguardingFlagIcon size={15} /> : <AlertTriangle size={15} className="text-amber-500" />} {isSafeguardingTab ? 'Safeguarding' : 'Incidents & Accidents'}
                 </h3>
-                {canViewSafeguarding && (
+                {isSafeguardingTab && canViewSafeguarding && (
                   <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
                     Safeguarding Access Enabled
                   </p>
                 )}
+                {isSafeguardingTab && !canViewSafeguarding && (
+                  <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                    Limited Safeguarding Access
+                  </p>
+                )}
               </div>
               <button onClick={() => setShowIncident(s => !s)} className="btn-secondary text-xs flex items-center gap-1.5 py-1.5">
-                {showIncident ? 'Close Form' : '+ Log Incident'}
+                {showIncident ? 'Close Form' : isSafeguardingTab ? '+ Log Safeguarding' : '+ Log Incident'}
               </button>
             </div>
 
@@ -2323,6 +2336,7 @@ export default function ParticipantDetail({
                 participantName={participant.name || ''}
                 participantAge={participant.age || ''}
                 defaultStaffMember={currentStaffName}
+                defaultType={activeTab === 'Safeguarding' ? 'Safeguarding' : 'Incident/Accident'}
                 initial={editingIncident}
                 canEditSafeguarding={!editingIncident || canEditSafeguardingIncident(editingIncident)}
                 staffList={staffList}
@@ -2334,11 +2348,11 @@ export default function ParticipantDetail({
               />
             )}
 
-            {participantIncidents.length === 0 ? (
-              <p className="text-stone-400 text-sm text-center py-6">No incidents recorded.</p>
+            {visibleIncidents.length === 0 ? (
+              <p className="text-stone-400 text-sm text-center py-6">{isSafeguardingTab ? 'No safeguarding records.' : 'No incidents recorded.'}</p>
             ) : (
               <div className="space-y-3">
-                {participantIncidents.map(inc => {
+                {visibleIncidents.map(inc => {
                   const createdTime = new Date(inc.createdAt).getTime()
                   const updatedRaw = inc.updatedAt || inc.updated_at || null
                   const updatedTime = updatedRaw ? new Date(updatedRaw).getTime() : 0
@@ -2677,6 +2691,9 @@ export default function ParticipantDetail({
                 )})}
               </div>
             )}
+                </>
+              )
+            })()}
           </div>
         )}
       </div>

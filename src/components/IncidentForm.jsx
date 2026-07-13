@@ -13,6 +13,7 @@ export default function IncidentForm({
   participantAge = '',
   staffList = [],
   defaultStaffMember = '',
+  defaultType = 'Incident/Accident',
   initial = null,
   canEditSafeguarding = true,
   onSave,
@@ -23,9 +24,10 @@ export default function IncidentForm({
     || staffList.find(s => s.name === 'Sam Brenner')?.name
     || staffList[0]?.name
     || 'Sam Brenner'
+  const resolvedDefaultType = defaultType === 'Safeguarding' ? 'Safeguarding' : 'Incident/Accident'
 
   const [form, setForm] = useState(() => ({
-    type: 'Incident/Accident',
+    type: initial?.type || resolvedDefaultType,
     staffMember: defaultStaff,
     followUpTiming: 'today',  // 'none' | 'today' | 'tomorrow'
     pdfName: null,
@@ -34,7 +36,7 @@ export default function IncidentForm({
     id: initial?.id,
     pdfPayload: null,
   }))
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState(templateKeyForType(initial?.type || 'Incident/Accident', [
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState(templateKeyForType(initial?.type || resolvedDefaultType, [
     { key: 'incident-accident', type: 'Incident/Accident' },
     { key: 'mid-camp', type: 'Mid-Camp Assessment' },
     { key: 'send-assessment', type: 'SEND Assessment' },
@@ -84,7 +86,7 @@ export default function IncidentForm({
   ]), [])
 
   useEffect(() => {
-    const nextType = initial?.type || 'Incident/Accident'
+    const nextType = initial?.type || resolvedDefaultType
     const nextStaff = initial?.staffMember || defaultStaff
     setForm({
       ...(initial || {}),
@@ -99,7 +101,7 @@ export default function IncidentForm({
     formTypeRef.current = nextType
     setSelectedTemplateKey(templateKeyForType(nextType, templates))
     setUploadNotice('')
-  }, [initial?.id, initial?.type, initial?.staffMember, initial?.pdfName, initial?.pdfData, initial?.followUpRequired, initial?.followUpTiming, defaultStaff, templates])
+  }, [initial?.id, initial?.type, initial?.staffMember, initial?.pdfName, initial?.pdfData, initial?.followUpRequired, initial?.followUpTiming, defaultStaff, resolvedDefaultType, templates])
 
   function set(field, value) {
     setForm(prev => {
