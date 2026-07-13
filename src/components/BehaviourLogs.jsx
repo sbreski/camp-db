@@ -33,6 +33,7 @@ export default function BehaviourLogs({
 }) {
   const [showForm, setShowForm] = useState(false)
   const [participantFilter, setParticipantFilter] = useState('')
+  const [participantScope, setParticipantScope] = useState('active')
   const [viewMode, setViewMode] = useState('detailed')
   const [form, setForm] = useState({
     participantId: '',
@@ -43,13 +44,20 @@ export default function BehaviourLogs({
   })
 
   const visibleLogs = useMemo(() => {
+    const activeParticipantIds = new Set(
+      participants
+        .filter(p => (p.isActiveThisSeason ?? p.is_active_this_season) !== false)
+        .map(p => p.id)
+    )
+
     return [...behaviourLogs]
       .filter(log => {
         const participantId = log.participantId || log.participant_id
+        if (participantScope === 'active' && !activeParticipantIds.has(participantId)) return false
         return participantFilter ? participantId === participantFilter : true
       })
       .sort((a, b) => new Date(b.loggedAt || b.logged_at || b.createdAt || b.created_at) - new Date(a.loggedAt || a.logged_at || a.createdAt || a.created_at))
-  }, [behaviourLogs, participantFilter])
+  }, [behaviourLogs, participantFilter, participantScope, participants])
 
   const groupedByParticipant = useMemo(() => {
     const grouped = new Map()
@@ -312,6 +320,25 @@ export default function BehaviourLogs({
 
       <div className="card">
         <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="label">Participant Scope</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setParticipantScope('active')}
+                className={`rounded-lg border px-3 py-2 text-sm text-left transition ${participantScope === 'active' ? 'border-forest-700 bg-forest-50 text-forest-900 font-semibold' : 'border-stone-300 bg-white text-stone-700 hover:border-stone-400'}`}
+              >
+                Active Participants
+              </button>
+              <button
+                type="button"
+                onClick={() => setParticipantScope('all')}
+                className={`rounded-lg border px-3 py-2 text-sm text-left transition ${participantScope === 'all' ? 'border-forest-700 bg-forest-50 text-forest-900 font-semibold' : 'border-stone-300 bg-white text-stone-700 hover:border-stone-400'}`}
+              >
+                All Participants
+              </button>
+            </div>
+          </div>
           <div>
             <label className="label">Filter by participant</label>
             <select className="input" value={participantFilter} onChange={e => setParticipantFilter(e.target.value)}>
