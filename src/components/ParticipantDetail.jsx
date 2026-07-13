@@ -1300,6 +1300,15 @@ export default function ParticipantDetail({
     }
   }
 
+  function resolveStaffDisplayName(user) {
+    if (!user) return ''
+    const fullName = String(user.fullName || user.full_name || user.name || '').trim()
+    if (fullName) return fullName
+    const email = String(user.email || '').trim()
+    if (email) return email
+    return ''
+  }
+
   async function createShareItem() {
     const activeShareCategory = TAB_TO_SHARE_CATEGORY[activeTab] || null
     const categoriesToShare = activeShareCategory ? [activeShareCategory] : shareCategories
@@ -2166,7 +2175,7 @@ export default function ParticipantDetail({
                         checked={shareTargetUserIds.includes(user.id)}
                         onChange={() => toggleShareTargetUser(user.id)}
                       />
-                      {user.fullName}
+                      {resolveStaffDisplayName(user) || 'Unnamed staff member'}
                     </label>
                   ))}
                 </div>
@@ -2203,11 +2212,12 @@ export default function ParticipantDetail({
               ) : shareItems.length === 0 ? (
                 <p className="text-xs text-stone-500">Nothing shared yet for this participant.</p>
               ) : shareItems.map(item => {
-                const user = shareUsers.find(candidate => candidate.id === item.target_user_id)
+                const user = shareUsers.find(candidate => String(candidate.id) === String(item.target_user_id))
+                const recipientLabel = resolveStaffDisplayName(user) || String(item.target_user_id || 'Unknown staff member')
                 return (
                   <div key={item.id} className="rounded-xl border border-stone-200 p-3 text-sm">
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="font-semibold text-forest-900">{String(item.category || '').toUpperCase()} to {user?.email || item.target_user_id}</p>
+                      <p className="font-semibold text-forest-900">{String(item.category || '').toUpperCase()} to {recipientLabel}</p>
                       <button
                         type="button"
                         onClick={() => removeShareItem(item.id)}
