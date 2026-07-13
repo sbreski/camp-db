@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabase'
+import { normalizeParticipantList } from './utils/participantProfile'
 import Login from './components/Login'
 import Nav, { NAV_ITEMS } from './components/Nav'
 const loadDashboard = () => import('./components/Dashboard')
@@ -455,7 +456,8 @@ export default function App() {
 
   async function setParticipants(updater) {
     const errors = []
-    const next = typeof updater === 'function' ? updater(participants) : updater
+    const proposed = typeof updater === 'function' ? updater(participants) : updater
+    const next = normalizeParticipantList(proposed)
     const added = next.filter(p => !participants.find(x => x.id === p.id))
     const changed = next.filter(p => {
       const old = participants.find(x => x.id === p.id)

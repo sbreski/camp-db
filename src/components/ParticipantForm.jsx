@@ -5,7 +5,7 @@ const EMPTY = {
   name: '', pronouns: '', age: '',
   birthday: '',
   address: '', postcode: '', schoolAttending: '',
-  siblings: false, siblingsName: '',
+  siblings: false,
   parentName: '', parentEmail: '', parentPhone: '',
   parentRelationship: '',
   parent2Name: '', parent2Relationship: '', parent2Email: '', parent2Phone: '',
@@ -15,7 +15,7 @@ const EMPTY = {
   photoConsent: 'yes', otcConsent: false,
   otcAllowedItems: [], otcNotes: '',
   dietaryType: '', allergyDetails: '', hasEpiPen: false, mealAdjustments: '',
-  medicalType: [], medicalCondition: '', medicalDetails: '',
+  medicalCondition: '', medicalDetails: '',
   sendNeeds: '', sendDiagnosed: false, sendDiagnosis: '',
   isActiveThisSeason: true,
   notes: '',
@@ -177,13 +177,6 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
     return clean ? `${clean} (${rel})` : ''
   }
 
-  function toggleMedType(type) {
-    set('medicalType', form.medicalType.includes(type)
-      ? form.medicalType.filter(t => t !== type)
-      : [...form.medicalType, type]
-    )
-  }
-
   function toggleLinkedParticipant(participantId) {
     setLinkedParticipantIds(prev => (
       prev.includes(participantId)
@@ -290,10 +283,6 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
                 />
                 Has siblings attending
               </label>
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="label">Sibling Name(s)</label>
-              <input className="input" value={form.siblingsName || ''} onChange={e => set('siblingsName', e.target.value)} placeholder="Comma-separated names" />
             </div>
             <div className="col-span-2">
               <label className="inline-flex items-center gap-2 text-sm text-stone-700 mt-1">
@@ -498,90 +487,64 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
           </h4>
           <div className="space-y-3">
             <div>
-              <label className="label">Type (select all that apply)</label>
-              <div className="flex gap-2 flex-wrap">
-                {['Allergy', 'Medical', 'Dietary'].map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => toggleMedType(type)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-  form.medicalType.includes(type)
-    ? type === 'Allergy' ? 'bg-red-600 text-white border-red-600'
-      : type === 'Medical' ? 'bg-blue-600 text-white border-blue-600'
-      : type === 'Dietary' ? 'bg-emerald-600 text-white border-emerald-600'
-      : 'bg-white text-stone-600 border-stone-200'
-    : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
-}`}
->
-                    {type}
-                  </button>
-                ))}
-              </div>
+              <label className="label">Medical Condition</label>
+              <input
+                className="input"
+                value={form.medicalCondition || ''}
+                onChange={e => set('medicalCondition', e.target.value)}
+                placeholder="e.g. Asthma, Epilepsy"
+              />
             </div>
-            {form.medicalType.includes('Dietary') && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Dietary Type</label>
-                  <input
-                    className="input"
-                    value={form.dietaryType || ''}
-                    onChange={e => set('dietaryType', e.target.value)}
-                    placeholder="Vegetarian, halal, no dairy"
-                  />
-                </div>
-                <div>
-                  <label className="label">Dietary Details</label>
-                  <textarea
-                    className="input"
-                    rows={2}
-                    value={form.mealAdjustments || ''}
-                    onChange={e => set('mealAdjustments', e.target.value)}
-                    placeholder="Specific dietary requirements, substitutions, portions, timings"
-                  />
-                </div>
-              </div>
-            )}
-            {form.medicalType.includes('Medical') && (
+            <div>
+              <label className="label">Medical Details</label>
+              <textarea
+                className="input resize-none"
+                rows={3}
+                value={form.medicalDetails}
+                onChange={e => set('medicalDetails', e.target.value)}
+                placeholder="Describe medical conditions, medications, symptoms, treatment guidance"
+              />
+            </div>
+            <div>
+              <label className="inline-flex items-center gap-2 text-sm text-stone-700 mb-3">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.hasEpiPen)}
+                  onChange={e => set('hasEpiPen', e.target.checked)}
+                  className="rounded"
+                />
+                Has an EpiPen
+              </label>
+              <label className="label">Allergy Details</label>
+              <textarea
+                className="input resize-none"
+                rows={2}
+                value={form.allergyDetails || ''}
+                onChange={e => set('allergyDetails', e.target.value)}
+                placeholder="Allergen list and reaction severity"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="label">Medical Condition</label>
+                <label className="label">Dietary Type</label>
                 <input
                   className="input"
-                  value={form.medicalCondition || ''}
-                  onChange={e => set('medicalCondition', e.target.value)}
-                  placeholder="e.g. Asthma, Epilepsy"
-                />
-                <label className="label">Medical Details</label>
-                <textarea
-                  className="input resize-none"
-                  rows={3}
-                  value={form.medicalDetails}
-                  onChange={e => set('medicalDetails', e.target.value)}
-                  placeholder="Describe medical conditions, medications, symptoms, treatment guidance"
+                  value={form.dietaryType || ''}
+                  onChange={e => set('dietaryType', e.target.value)}
+                  placeholder="Vegetarian, halal, no dairy"
                 />
               </div>
-            )}
-            {form.medicalType.includes('Allergy') && (
               <div>
-                <label className="inline-flex items-center gap-2 text-sm text-stone-700 mb-3">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form.hasEpiPen)}
-                    onChange={e => set('hasEpiPen', e.target.checked)}
-                    className="rounded"
-                  />
-                  Has an EpiPen
-                </label>
-                <label className="label">Allergy Details</label>
+                <label className="label">Dietary Details</label>
                 <textarea
-                  className="input resize-none"
+                  className="input"
                   rows={2}
-                  value={form.allergyDetails || ''}
-                  onChange={e => set('allergyDetails', e.target.value)}
-                  placeholder="Allergen list and reaction severity"
+                  value={form.mealAdjustments || ''}
+                  onChange={e => set('mealAdjustments', e.target.value)}
+                  placeholder="Specific dietary requirements, substitutions, portions, timings"
                 />
               </div>
-            )}
+            </div>
           </div>
         </section>
 
@@ -599,11 +562,11 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
                 onChange={e => set('sendDiagnosed', e.target.checked)}
                 className="rounded"
               />
-              <label htmlFor="sendDiagnosed" className="text-sm text-stone-700 font-body">Formally diagnosed</label>
+              <label htmlFor="sendDiagnosed" className="text-sm text-stone-700 font-body">SEND Diagnosed (Yes/No)</label>
             </div>
             {form.sendDiagnosed && (
               <div>
-                <label className="label">Diagnosis</label>
+                <label className="label">SEND Diagnosis</label>
                 <textarea
                   className="input resize-none"
                   rows={2}

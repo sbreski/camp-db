@@ -4,6 +4,7 @@ import ParticipantNameText from './ParticipantNameText'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
 import { hasRecordedEpiPen } from '../utils/medical'
+import { participantFlags } from '../utils/participantProfile'
 
 const ALLERGEN_OPTIONS = [
   'Milk',
@@ -158,14 +159,18 @@ export default function Medical({ participants, setParticipants, actorInitials =
   }
 
   function matchesMedicalFilter(participant, filter) {
-    if (filter === 'SEND') return !!participant.sendNeeds
-    if (filter === 'Allergy') return participant.medicalType?.includes('Allergy')
-    if (filter === 'Dietary') return participant.medicalType?.includes('Dietary')
-    return participant.medicalType?.includes(filter)
+    const flags = participantFlags(participant)
+    if (filter === 'SEND') return flags.hasSend
+    if (filter === 'Allergy') return flags.hasAllergy
+    if (filter === 'Dietary') return flags.hasDietary
+    return flags.hasMedical
   }
 
   const medParticipants = participants.filter(p =>
-    (p.medicalType?.length > 0 || p.sendNeeds) &&
+    (() => {
+      const flags = participantFlags(p)
+      return flags.hasMedical || flags.hasAllergy || flags.hasDietary || flags.hasSend
+    })() &&
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -183,10 +188,10 @@ export default function Medical({ participants, setParticipants, actorInitials =
 
   const counts = {
     All: seasonFilteredParticipants.length,
-    Allergy: seasonFilteredParticipants.filter(p => p.medicalType?.includes('Allergy')).length,
-    Dietary: seasonFilteredParticipants.filter(p => p.medicalType?.includes('Dietary')).length,
-    Medical: seasonFilteredParticipants.filter(p => p.medicalType?.includes('Medical')).length,
-    SEND: seasonFilteredParticipants.filter(p => p.sendNeeds).length,
+    Allergy: seasonFilteredParticipants.filter(p => participantFlags(p).hasAllergy).length,
+    Dietary: seasonFilteredParticipants.filter(p => participantFlags(p).hasDietary).length,
+    Medical: seasonFilteredParticipants.filter(p => participantFlags(p).hasMedical).length,
+    SEND: seasonFilteredParticipants.filter(p => participantFlags(p).hasSend).length,
   }
 
   const epiPenParticipants = useMemo(() => {
@@ -1077,7 +1082,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
                         <div className="flex items-center gap-2 flex-wrap">
                           <ParticipantNameText participant={participant} className="font-display font-semibold text-forest-950" />
                           <span className="badge-epipen">EpiPen</span>
-                          {participant.medicalType?.includes('Allergy') && <span className="badge-allergy">Allergy</span>}
+                          {participantFlags(participant).hasAllergy && <span className="badge-allergy">Allergy</span>}
                         </div>
                         <p className="text-xs text-stone-400 mt-1">{participant.pronouns}{participant.age ? ` · Age ${participant.age}` : ''}</p>
                       </div>
@@ -1247,22 +1252,22 @@ export default function Medical({ participants, setParticipants, actorInitials =
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 justify-end">
-                  {p.medicalType?.map(t => (
-                    <span key={t} className={
-                      t === 'Allergy' ? 'badge-allergy' : t === 'Dietary' ? 'badge-dietary' : t === 'Medical' ? 'badge-medical' : 'badge-dietary'
-                    }>{t}</span>
-                  ))}
-                  {hasRecordedEpiPen(p) && <span className="badge-epipen">EpiPen</span>}
                   {(() => {
-                    const hasSendDiagnosis = Boolean(String(p.sendDiagnosis || '').trim())
-                    const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
-                    const hasSend = Boolean(String(p.sendNeeds || '').trim()) || hasDiagnosedSend
-                    if (!hasSend) return null
-                    return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>SEND</span>
+                    const flags = participantFlags(p)
+                    return (
+                      <>
+                        {flags.hasMedical && <span className="badge-medical">Medical</span>}
+                        {flags.hasDietary && <span className="badge-dietary">Dietary</span>}
+                        {flags.hasAllergy && <span className="badge-allergy">Allergy</span>}
+                        {flags.hasEpiPen && <span className="badge-epipen">EpiPen</span>}
+                        {flags.hasSend && <span className={flags.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>SEND</span>}
+                      </>
+                    )
                   })()}
                 </div>
               </div>
               {(() => {
+                const flags = participantFlags(p)
                 const showAll = selectedFilters.length === 0
                 const wantsMedical = showAll || selectedFilters.includes('Medical')
                 const wantsSend = showAll || selectedFilters.includes('SEND')
@@ -1272,7 +1277,7 @@ export default function Medical({ participants, setParticipants, actorInitials =
                   (wantsMedical && !!p.medicalDetails) ||
                   (wantsAllergy && !!(p.allergyDetails || hasRecordedEpiPen(p))) ||
                   (wantsDietary && !!(p.dietaryType || p.mealAdjustments)) ||
-                  (wantsSend && !!p.sendNeeds)
+                  (wantsSend && flags.hasSend)
 
                 if (!hasAnyShown) return null
 

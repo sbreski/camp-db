@@ -7,7 +7,7 @@ import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
 import { formatBirthDate } from '../utils/birthday'
-import { hasRecordedEpiPen } from '../utils/medical'
+import { parseMedicalFlags, participantFlags } from '../utils/participantProfile'
 
 function getNextDateKey(isoString) {
   const date = new Date(isoString)
@@ -631,18 +631,18 @@ export default function ParticipantDetail({
       ? participant.noteHistory
       : []
 
-  const hasEpiPen = hasRecordedEpiPen(participant)
-  const hasMedical = participant.medicalType?.length > 0 || participant.medicalCondition || participant.medicalDetails || hasEpiPen
+  const flags = participantFlags(participant)
+  const hasEpiPen = flags.hasEpiPen
+  const hasMedical = flags.hasMedical || flags.hasAllergy || flags.hasDietary
   const hasConsents = Boolean(
     participant.photoConsent
     || participant.otcConsent
     || (Array.isArray(participant.otcAllowedItems) && participant.otcAllowedItems.length > 0)
     || participant.otcNotes
   )
-  const hasDietaryAllergy = Boolean(participant.dietaryType || participant.allergyDetails || participant.mealAdjustments || hasEpiPen)
-  const hasSendDiagnosis = Boolean(String(participant.sendDiagnosis || '').trim())
-  const hasDiagnosedSend = Boolean(participant.sendDiagnosed) || hasSendDiagnosis
-  const hasSend = Boolean(String(participant.sendNeeds || '').trim()) || hasDiagnosedSend
+  const hasDietaryAllergy = flags.hasDietary || flags.hasAllergy
+  const hasDiagnosedSend = flags.sendDiagnosed
+  const hasSend = flags.hasSend
 
   const uploadedFieldSchema = [
     { key: 'name', label: 'Full Name', type: 'text' },
@@ -663,20 +663,20 @@ export default function ParticipantDetail({
     { key: 'homePhone', label: 'Home Phone', type: 'text' },
     { key: 'can_leave_alone', label: 'Permission to Leave Unaccompanied', type: 'boolean' },
     { key: 'approvedAdults', label: 'Approved Adults', type: 'textarea' },
+    { key: 'medicalFlags', label: 'M/D/A/S', type: 'text' },
     { key: 'medicalCondition', label: 'Medical Condition', type: 'text' },
     { key: 'medicalDetails', label: 'Medical Details', type: 'textarea' },
     { key: 'allergyDetails', label: 'Allergy Details', type: 'textarea' },
     { key: 'hasEpiPen', label: 'Has EpiPen', type: 'boolean' },
     { key: 'dietaryType', label: 'Dietary Type', type: 'text' },
+    { key: 'mealAdjustments', label: 'Dietary Details', type: 'textarea' },
     { key: 'otcNotes', label: 'Medication Details / OTC Notes', type: 'textarea' },
-    { key: 'sendNeeds', label: 'Additional Needs / SEND Support', type: 'textarea' },
-    { key: 'sendDiagnosed', label: 'EHCP / Diagnosed', type: 'boolean' },
-    { key: 'sendDiagnosis', label: 'Diagnosis / If yes or not sure', type: 'textarea' },
-    { key: 'notes', label: 'Declaration / Additional Notes', type: 'textarea' },
+    { key: 'sendDiagnosed', label: 'SEND Diagnosed (Yes/No)', type: 'boolean' },
+    { key: 'sendDiagnosis', label: 'SEND Diagnosis', type: 'textarea' },
+    { key: 'sendNeeds', label: 'Support Needs Details', type: 'textarea' },
+    { key: 'notes', label: 'Additional Notes', type: 'textarea' },
     { key: 'siblings', label: 'Siblings?', type: 'boolean' },
-    { key: 'siblingsName', label: 'Siblings Name', type: 'text' },
     { key: 'photoConsent', label: 'Photo Consent', type: 'select', options: ['yes', 'no', 'internal'] },
-    { key: 'familyGroupKey', label: 'Family Group Key', type: 'text' },
   ]
 
   function buildUploadedDataDraft(sourceParticipant) {
@@ -699,20 +699,20 @@ export default function ParticipantDetail({
       homePhone: String(sourceParticipant?.homePhone || ''),
       can_leave_alone: Boolean(sourceParticipant?.can_leave_alone ?? sourceParticipant?.canLeaveAlone),
       approvedAdults: String(sourceParticipant?.approvedAdults || ''),
+      medicalFlags: participantFlags(sourceParticipant).text,
       medicalCondition: String(sourceParticipant?.medicalCondition || ''),
       medicalDetails: String(sourceParticipant?.medicalDetails || ''),
       allergyDetails: String(sourceParticipant?.allergyDetails || ''),
       hasEpiPen: Boolean(sourceParticipant?.hasEpiPen ?? sourceParticipant?.has_epipen),
       dietaryType: String(sourceParticipant?.dietaryType || ''),
+      mealAdjustments: String(sourceParticipant?.mealAdjustments || sourceParticipant?.meal_adjustments || ''),
       otcNotes: String(sourceParticipant?.otcNotes || ''),
-      sendNeeds: String(sourceParticipant?.sendNeeds || ''),
       sendDiagnosed: Boolean(sourceParticipant?.sendDiagnosed),
       sendDiagnosis: String(sourceParticipant?.sendDiagnosis || ''),
+      sendNeeds: String(sourceParticipant?.sendNeeds || ''),
       notes: String(sourceParticipant?.notes || ''),
       siblings: Boolean(sourceParticipant?.siblings),
-      siblingsName: String(sourceParticipant?.siblingsName || ''),
       photoConsent: String(sourceParticipant?.photoConsent || 'yes'),
-      familyGroupKey: String(sourceParticipant?.familyGroupKey || sourceParticipant?.family_group_key || ''),
     }
   }
 
@@ -735,21 +735,20 @@ export default function ParticipantDetail({
     ['Home Phone', participant.homePhone],
     ['Permission to Leave Unaccompanied', (participant.can_leave_alone || participant.canLeaveAlone) ? 'Yes' : 'No'],
     ['Approved Adults', participant.approvedAdults],
-    ['Medical Type', Array.isArray(participant.medicalType) ? participant.medicalType.join(', ') : participant.medicalType],
+    ['M/D/A/S', participantFlags(participant).text],
     ['Medical Condition', participant.medicalCondition],
     ['Medical Details', participant.medicalDetails],
     ['Allergy Details', participant.allergyDetails],
     ['Has EpiPen', hasEpiPen ? 'Yes' : 'No'],
     ['Dietary Type', participant.dietaryType],
+    ['Dietary Details', participant.mealAdjustments || participant.meal_adjustments],
     ['Medication Details / OTC Notes', participant.otcNotes],
-    ['Additional Needs / SEND Support', participant.sendNeeds],
-    ['EHCP / Diagnosed', participant.sendDiagnosed ? 'Yes' : 'No'],
-    ['Diagnosis / If yes or not sure', participant.sendDiagnosis],
-    ['Declaration / Additional Notes', participant.notes],
+    ['SEND Diagnosed (Yes/No)', participant.sendDiagnosed ? 'Yes' : 'No'],
+    ['SEND Diagnosis', participant.sendDiagnosis],
+    ['Support Needs Details', participant.sendNeeds],
+    ['Additional Notes', participant.notes],
     ['Siblings?', participant.siblings ? 'Yes' : 'No'],
-    ['Siblings Name', participant.siblingsName],
     ['Photo Consent', participant.photoConsent],
-    ['Family Group Key', participant.familyGroupKey || participant.family_group_key],
   ]
 
   useEffect(() => {
@@ -828,6 +827,7 @@ export default function ParticipantDetail({
     setUploadedDataSaveNotice('')
 
     try {
+      const uploadedFlags = parseMedicalFlags(uploadedDataDraft.medicalFlags)
       const updates = {
         name: trimmedName,
         pronouns: String(uploadedDataDraft.pronouns || '').trim(),
@@ -847,20 +847,22 @@ export default function ParticipantDetail({
         homePhone: String(uploadedDataDraft.homePhone || '').trim(),
         can_leave_alone: Boolean(uploadedDataDraft.can_leave_alone),
         approvedAdults: String(uploadedDataDraft.approvedAdults || '').trim(),
+        medicalType: uploadedFlags.filter(flag => ['M', 'D', 'A'].includes(flag)).map(flag => (
+          flag === 'M' ? 'Medical' : flag === 'D' ? 'Dietary' : 'Allergy'
+        )),
         medicalCondition: String(uploadedDataDraft.medicalCondition || '').trim(),
         medicalDetails: String(uploadedDataDraft.medicalDetails || '').trim(),
         allergyDetails: String(uploadedDataDraft.allergyDetails || '').trim(),
-        hasEpiPen: Boolean(uploadedDataDraft.hasEpiPen),
+        hasEpiPen: Boolean(uploadedDataDraft.hasEpiPen) || uploadedFlags.includes('A'),
         dietaryType: String(uploadedDataDraft.dietaryType || '').trim(),
+        mealAdjustments: String(uploadedDataDraft.mealAdjustments || '').trim(),
         otcNotes: String(uploadedDataDraft.otcNotes || '').trim(),
-        sendNeeds: String(uploadedDataDraft.sendNeeds || '').trim(),
-        sendDiagnosed: Boolean(uploadedDataDraft.sendDiagnosed),
+        sendDiagnosed: Boolean(uploadedDataDraft.sendDiagnosed) || uploadedFlags.includes('S'),
         sendDiagnosis: String(uploadedDataDraft.sendDiagnosis || '').trim(),
+        sendNeeds: String(uploadedDataDraft.sendNeeds || '').trim(),
         notes: String(uploadedDataDraft.notes || '').trim(),
         siblings: Boolean(uploadedDataDraft.siblings),
-        siblingsName: String(uploadedDataDraft.siblingsName || '').trim(),
         photoConsent: String(uploadedDataDraft.photoConsent || 'yes').trim() || 'yes',
-        familyGroupKey: String(uploadedDataDraft.familyGroupKey || '').trim(),
       }
 
       await setParticipants(prev => prev.map(item => (
@@ -1390,7 +1392,7 @@ export default function ParticipantDetail({
           </div>
         </div>
         <div className="flex flex-wrap gap-2 mt-4">
-          {participant.medicalType?.includes('Allergy') && (
+          {flags.hasAllergy && (
             <span 
               className="badge-allergy cursor-help" 
               title={participant.allergyDetails || 'Allergy recorded (no details specified)'}
@@ -1398,9 +1400,9 @@ export default function ParticipantDetail({
               ⚠ Allergy
             </span>
           )}
-          {hasEpiPen && <span className="badge-epipen">EpiPen</span>}
-          {participant.medicalType?.includes('Dietary') && <span className="badge-dietary">🍽 Dietary</span>}
-          {participant.medicalType?.includes('Medical') && <span className="badge-medical">+ Medical</span>}
+          {flags.hasEpiPen && <span className="badge-epipen">EpiPen</span>}
+          {flags.hasDietary && <span className="badge-dietary">🍽 Dietary</span>}
+          {flags.hasMedical && <span className="badge-medical">+ Medical</span>}
           {hasSend && <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>★ SEND / Support</span>}
           {participant.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={12} />}
         </div>
@@ -1803,14 +1805,10 @@ export default function ParticipantDetail({
             {hasMedical ? (
   <div className="space-y-4">
     <div className="flex flex-wrap gap-2">
-      {participant.medicalType?.map(t => (
-        <span key={t} className={
-          t === 'Allergy' ? 'badge-allergy text-sm px-3 py-1' :
-          t === 'Dietary' ? 'badge-dietary text-sm px-3 py-1' :
-          t === 'Medical' ? 'badge-medical text-sm px-3 py-1' :
-          'text-sm px-3 py-1'
-        }>{t}</span>
-      ))}
+      {flags.hasMedical && <span className="badge-medical text-sm px-3 py-1">M</span>}
+      {flags.hasDietary && <span className="badge-dietary text-sm px-3 py-1">D</span>}
+      {flags.hasAllergy && <span className="badge-allergy text-sm px-3 py-1">A</span>}
+      {flags.hasSend && <span className={flags.sendDiagnosed ? 'badge-send-diagnosed text-sm px-3 py-1' : 'badge-send text-sm px-3 py-1'}>S</span>}
     </div>
     {participant.medicalDetails && (
       <div className="bg-stone-50 rounded-xl p-4 text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">

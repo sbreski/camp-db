@@ -7,7 +7,7 @@ import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { daysUntilBirthday, formatBirthDate, todayKey } from '../utils/birthday'
 import { hasRecordedEpiPen } from '../utils/medical'
-import { hasMeaningfulSendText } from '../utils/send'
+import { normalizeParticipantRecord, parseMedicalFlags, participantFlags } from '../utils/participantProfile'
 
 function photoConsentMode(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -271,7 +271,7 @@ export default function Participants({ participants, setParticipants, deletePart
   const [ageGroupFilter, setAgeGroupFilter] = useState(null)
 
   function addParticipant(data) {
-    setParticipants(prev => [...prev, { ...data, id: crypto.randomUUID() }])
+    setParticipants(prev => [...prev, normalizeParticipantRecord({ ...data, id: crypto.randomUUID() })])
     setShowForm(false)
   }
 
@@ -282,11 +282,11 @@ export default function Participants({ participants, setParticipants, deletePart
         const match = list.find(item => item.id === p.id)
         if (!match) return p
         const { _isUpdate, ...fields } = match
-        return { ...p, ...fields }
+        return normalizeParticipantRecord({ ...p, ...fields })
       })
       const newOnes = list
         .filter(item => !prev.find(p => p.id === item.id))
-        .map(({ _isUpdate, ...fields }) => fields)
+        .map(({ _isUpdate, ...fields }) => normalizeParticipantRecord(fields))
       return [...updated, ...newOnes]
     })
   }
@@ -410,6 +410,7 @@ export default function Participants({ participants, setParticipants, deletePart
   ), [participants])
 
   function buildAllTableDraftRow(participant) {
+    const flags = participantFlags(participant)
     return {
       name: String(participant.name || ''),
       pronouns: String(participant.pronouns || ''),
@@ -419,7 +420,6 @@ export default function Participants({ participants, setParticipants, deletePart
       postcode: String(participant.postcode || ''),
       address: String(participant.address || ''),
       siblings: Boolean(participant.siblings),
-      siblingsName: String(participant.siblingsName || ''),
       parentName: String(participant.parentName || ''),
       parentRelationship: String(participant.parentRelationship || ''),
       parentPhone: String(participant.parentPhone || ''),
@@ -432,34 +432,19 @@ export default function Participants({ participants, setParticipants, deletePart
       can_leave_alone: Boolean(participant.can_leave_alone ?? participant.canLeaveAlone),
       approvedAdults: String(participant.approvedAdults || ''),
       photoConsent: String(participant.photoConsent || 'yes'),
-      medicalTypeText: Array.isArray(participant.medicalType) ? participant.medicalType.join(', ') : String(participant.medicalType || ''),
+      medicalFlags: flags.text,
       medicalCondition: String(participant.medicalCondition || ''),
       medicalDetails: String(participant.medicalDetails || ''),
       allergyDetails: String(participant.allergyDetails || ''),
       hasEpiPen: Boolean(participant.hasEpiPen ?? participant.has_epipen),
       dietaryType: String(participant.dietaryType || ''),
+      mealAdjustments: String(participant.mealAdjustments || participant.meal_adjustments || ''),
       otcNotes: String(participant.otcNotes || ''),
-      sendNeeds: String(participant.sendNeeds || ''),
       sendDiagnosed: Boolean(participant.sendDiagnosed),
       sendDiagnosis: String(participant.sendDiagnosis || ''),
+      sendNeeds: String(participant.sendNeeds || ''),
       notes: String(participant.notes || ''),
-      familyGroupKey: String(participant.familyGroupKey || participant.family_group_key || ''),
     }
-  }
-
-  function normalizeMedicalTypeFromText(value) {
-    return String(value || '')
-      .split(/[;,|/\n]+/)
-      .map(item => item.trim())
-      .filter(Boolean)
-      .map((item) => {
-        const key = item.toLowerCase()
-        if (key.startsWith('allerg') || key === 'a') return 'Allergy'
-        if (key.startsWith('diet') || key === 'd') return 'Dietary'
-        if (key.startsWith('med') || key === 'm') return 'Medical'
-        return null
-      })
-      .filter(Boolean)
   }
 
   function rowDraftHasChanges(participant, draft) {
@@ -540,7 +525,6 @@ export default function Participants({ participants, setParticipants, deletePart
         postcode: String(draft.postcode || '').trim(),
         address: String(draft.address || '').trim(),
         siblings: Boolean(draft.siblings),
-        siblingsName: String(draft.siblingsName || '').trim(),
         parentName: String(draft.parentName || '').trim(),
         parentRelationship: String(draft.parentRelationship || '').trim(),
         parentPhone: String(draft.parentPhone || '').trim(),
@@ -553,18 +537,20 @@ export default function Participants({ participants, setParticipants, deletePart
         can_leave_alone: Boolean(draft.can_leave_alone),
         approvedAdults: String(draft.approvedAdults || '').trim(),
         photoConsent: normalizedPhotoConsent === 'no' ? 'no' : normalizedPhotoConsent === 'internal' ? 'internal' : 'yes',
-        medicalType: normalizeMedicalTypeFromText(draft.medicalTypeText),
+        medicalType: parseMedicalFlags(draft.medicalFlags).filter(flag => ['M', 'D', 'A'].includes(flag)).map(flag => (
+          flag === 'M' ? 'Medical' : flag === 'D' ? 'Dietary' : 'Allergy'
+        )),
         medicalCondition: String(draft.medicalCondition || '').trim(),
         medicalDetails: String(draft.medicalDetails || '').trim(),
         allergyDetails: String(draft.allergyDetails || '').trim(),
         hasEpiPen: Boolean(draft.hasEpiPen),
         dietaryType: String(draft.dietaryType || '').trim(),
+        mealAdjustments: String(draft.mealAdjustments || '').trim(),
         otcNotes: String(draft.otcNotes || '').trim(),
-        sendNeeds: String(draft.sendNeeds || '').trim(),
-        sendDiagnosed: Boolean(draft.sendDiagnosed),
+        sendDiagnosed: Boolean(draft.sendDiagnosed) || parseMedicalFlags(draft.medicalFlags).includes('S'),
         sendDiagnosis: String(draft.sendDiagnosis || '').trim(),
+        sendNeeds: String(draft.sendNeeds || '').trim(),
         notes: String(draft.notes || '').trim(),
-        familyGroupKey: String(draft.familyGroupKey || '').trim(),
       }
     }))
 
@@ -747,7 +733,6 @@ export default function Participants({ participants, setParticipants, deletePart
                       'Postcode',
                       'Address',
                       'Siblings?',
-                      'Siblings Name',
                       'Parent Name',
                       'Primary Adult Relationship',
                       'Primary Adult Phone',
@@ -760,18 +745,18 @@ export default function Participants({ participants, setParticipants, deletePart
                       'Permission to Leave Unaccompanied',
                       'Approved Adults',
                       'Photo Consent',
-                      'Medical Type',
+                      'M/D/A/S',
                       'Medical Condition',
                       'Medical Details',
                       'Allergy Details',
                       'Has EpiPen',
                       'Dietary Type',
+                      'Dietary Details',
                       'Medication Details / OTC Notes',
-                      'Additional Needs / SEND Support',
-                      'EHCP / Diagnosed',
-                      'Diagnosis / If yes or not sure',
-                      'Declaration / Additional Notes',
-                      'Family Group Key',
+                      'SEND Diagnosed (Yes/No)',
+                      'SEND Diagnosis',
+                      'Support Needs Details',
+                      'Additional Notes',
                     ].map(header => (
                       <th key={header} className="text-left px-3 py-2 font-semibold text-stone-600 uppercase tracking-wide whitespace-nowrap">{header}</th>
                     ))}
@@ -821,11 +806,6 @@ export default function Participants({ participants, setParticipants, deletePart
                           {allTableEditing ? (
                             <input type="checkbox" className="h-4 w-4" checked={Boolean(rowDraft.siblings)} onChange={e => updateAllTableDraft(p.id, 'siblings', e.target.checked)} />
                           ) : (p.siblings ? 'Yes' : 'No')}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {allTableEditing ? (
-                            <input className="input py-1" value={rowDraft.siblingsName} onChange={e => updateAllTableDraft(p.id, 'siblingsName', e.target.value)} />
-                          ) : (p.siblingsName || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {allTableEditing ? (
@@ -893,8 +873,8 @@ export default function Participants({ participants, setParticipants, deletePart
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {allTableEditing ? (
-                            <input className="input py-1" value={rowDraft.medicalTypeText} onChange={e => updateAllTableDraft(p.id, 'medicalTypeText', e.target.value)} placeholder="Allergy, Medical" />
-                          ) : (Array.isArray(p.medicalType) ? (p.medicalType.join(', ') || '—') : (p.medicalType || '—'))}
+                            <input className="input py-1" value={rowDraft.medicalFlags} onChange={e => updateAllTableDraft(p.id, 'medicalFlags', e.target.value)} placeholder="M/D/A/S" />
+                          ) : (participantFlags(p).text || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-pre-wrap">
                           {allTableEditing ? (
@@ -923,13 +903,13 @@ export default function Participants({ participants, setParticipants, deletePart
                         </td>
                         <td className="px-3 py-2 whitespace-pre-wrap">
                           {allTableEditing ? (
-                            <textarea className="input resize-none" rows={2} value={rowDraft.otcNotes} onChange={e => updateAllTableDraft(p.id, 'otcNotes', e.target.value)} />
-                          ) : (p.otcNotes || '—')}
+                            <textarea className="input resize-none" rows={2} value={rowDraft.mealAdjustments || ''} onChange={e => updateAllTableDraft(p.id, 'mealAdjustments', e.target.value)} />
+                          ) : (p.mealAdjustments || p.meal_adjustments || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-pre-wrap">
                           {allTableEditing ? (
-                            <textarea className="input resize-none" rows={2} value={rowDraft.sendNeeds} onChange={e => updateAllTableDraft(p.id, 'sendNeeds', e.target.value)} />
-                          ) : (p.sendNeeds || '—')}
+                            <textarea className="input resize-none" rows={2} value={rowDraft.otcNotes} onChange={e => updateAllTableDraft(p.id, 'otcNotes', e.target.value)} />
+                          ) : (p.otcNotes || '—')}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {allTableEditing ? (
@@ -943,13 +923,13 @@ export default function Participants({ participants, setParticipants, deletePart
                         </td>
                         <td className="px-3 py-2 whitespace-pre-wrap">
                           {allTableEditing ? (
+                            <textarea className="input resize-none" rows={2} value={rowDraft.sendNeeds} onChange={e => updateAllTableDraft(p.id, 'sendNeeds', e.target.value)} />
+                          ) : (p.sendNeeds || '—')}
+                        </td>
+                        <td className="px-3 py-2 whitespace-pre-wrap">
+                          {allTableEditing ? (
                             <textarea className="input resize-none" rows={2} value={rowDraft.notes} onChange={e => updateAllTableDraft(p.id, 'notes', e.target.value)} />
                           ) : (p.notes || '—')}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {allTableEditing ? (
-                            <input className="input py-1" value={rowDraft.familyGroupKey} onChange={e => updateAllTableDraft(p.id, 'familyGroupKey', e.target.value)} />
-                          ) : (p.familyGroupKey || p.family_group_key || '—')}
                         </td>
                       </tr>
                     )
@@ -1148,16 +1128,17 @@ export default function Participants({ participants, setParticipants, deletePart
                   {/* Badges inline on mobile below the name */}
                   <div className="flex items-center gap-1 flex-wrap mt-1 sm:hidden">
                     {(() => {
-                      const hasSendDiagnosis = hasMeaningfulSendText(p.sendDiagnosis)
-                      const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
-                      const hasSend = hasMeaningfulSendText(p.sendNeeds) || hasDiagnosedSend
-                      if (!hasSend) return null
-                      return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
+                      const flags = participantFlags(p)
+                      return (
+                        <>
+                          {flags.hasSend && <span className={flags.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>S</span>}
+                          {flags.hasAllergy && <span className="badge-allergy">A</span>}
+                          {flags.hasEpiPen && <span className="badge-epipen">EP</span>}
+                          {flags.hasDietary && <span className="badge-dietary">D</span>}
+                          {flags.hasMedical && <span className="badge-medical">M</span>}
+                        </>
+                      )
                     })()}
-                    {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
-                    {hasRecordedEpiPen(p) && <span className="badge-epipen">EP</span>}
-                    {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
-                    {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                     {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
                       {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}
@@ -1167,16 +1148,17 @@ export default function Participants({ participants, setParticipants, deletePart
                 {/* Badges on the right — desktop only */}
                 <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                   {(() => {
-                    const hasSendDiagnosis = hasMeaningfulSendText(p.sendDiagnosis)
-                    const hasDiagnosedSend = Boolean(p.sendDiagnosed) || hasSendDiagnosis
-                    const hasSend = hasMeaningfulSendText(p.sendNeeds) || hasDiagnosedSend
-                    if (!hasSend) return null
-                    return <span className={hasDiagnosedSend ? 'badge-send-diagnosed' : 'badge-send'}>S</span>
+                    const flags = participantFlags(p)
+                    return (
+                      <>
+                        {flags.hasSend && <span className={flags.sendDiagnosed ? 'badge-send-diagnosed' : 'badge-send'}>S</span>}
+                        {flags.hasAllergy && <span className="badge-allergy">A</span>}
+                        {flags.hasEpiPen && <span className="badge-epipen">EP</span>}
+                        {flags.hasDietary && <span className="badge-dietary">D</span>}
+                        {flags.hasMedical && <span className="badge-medical">M</span>}
+                      </>
+                    )
                   })()}
-                  {p.medicalType?.includes('Allergy') && <span className="badge-allergy">A</span>}
-                  {hasRecordedEpiPen(p) && <span className="badge-epipen">EP</span>}
-                  {p.medicalType?.includes('Dietary') && <span className="badge-dietary">D</span>}
-                  {p.medicalType?.includes('Medical') && <span className="badge-medical">M</span>}
                   {p.safeguardingFlag && <SafeguardingFlagIcon className="px-2 py-0.5" size={11} />}
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${isIncludedThisSeason(p) ? 'bg-green-100 text-green-700 border-green-200' : 'bg-stone-100 text-stone-600 border-stone-200'}`}>
                     {isIncludedThisSeason(p) ? 'Active' : 'Inactive'}

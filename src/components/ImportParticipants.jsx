@@ -3,6 +3,7 @@ import { Upload, X, CheckCircle, AlertCircle, FileText, Download } from 'lucide-
 import ViewportOverlay from './ViewportOverlay'
 import { hasMeaningfulSendText } from '../utils/send'
 import { hasRecordedEpiPen } from '../utils/medical'
+import { normalizeParticipantRecord, parseMedicalFlags, participantFlags } from '../utils/participantProfile'
 
 // Map common header names to our field keys
 const FIELD_MAP = {
@@ -23,14 +24,13 @@ const FIELD_MAP = {
   parent2Phone: ['parent 2 phone', 'second parent phone', 'additional adult phone', 'secondary guardian phone'],
   homePhone: ['home phone', 'home number', 'landline', 'home telephone'],
   siblings: ['siblings', 'sibling'],
-  siblingsName: ['siblings name', 'sibling name', 'names of siblings'],
-  familyGroupKey: ['family group key', 'family_group_key'],
   approvedAdults: ['approved adults', 'approved', 'authorised adults', 'authorized adults', 'collection', 'please provide names of adults permitted to pick up my child from camp this will be separated by commas'],
   can_leave_alone: ['can leave alone', 'can_leave_alone', 'leave alone', 'can go home alone', 'self leave', 'permission to leave unaccompanied', 'permission to leave unaccompanied wording for answer is i give my child permission to travel home by themselves only relevant to pupils 11 or myself or an authorised adult named below will collect my child after each session'],
-  medicalType: ['medical type', 'medical types', 'medical category', 'medical categories'],
+  medicalFlags: ['m/d/a/s', 'mdas', 'm d a s', 'medical flags', 'medical status', 'medical type', 'medical types', 'medical category', 'medical categories'],
   medicalCondition: ['medical condition', 'condition', 'condition name', 'primary medical condition', 'medical diagnosis'],
   medicalDetails: ['medical', 'medical details', 'medical info', 'health', 'allergies', 'dietary', 'does your child have any medical conditions we should be aware of', 'medical info', 'does your child need to take medication during the camp day', 'medication details'],
   dietaryType: ['dietary type', 'dietary requirements', 'dietary'],
+  mealAdjustments: ['dietary details', 'meal adjustments', 'meal requirements', 'dietary notes'],
   allergyDetails: ['allergy details', 'allergies', 'allergy info', 'please tell us about any allergies intolerances or dietary requirements your child has'],
   hasEpiPen: ['has epipen', 'epi pen', 'epipen', 'epipen required'],
   sendNeeds: ['send', 'send needs', 'support', 'support needs', 'additional needs', 'sen', 'does your child have any additional needs or require adjustments to take part fully in the camp', 'additional needs send support'],
@@ -67,18 +67,6 @@ function rowValueByAliases(row, aliases = []) {
 
 function normalizeNameKey(name) {
   return String(name || '').trim().toLowerCase()
-}
-
-function getParticipantFamilyGroupKey(participant) {
-  return String(participant?.familyGroupKey || participant?.family_group_key || '').trim()
-}
-
-function parseSiblingNames(value) {
-  return String(value || '')
-    .replace(/\band\b/gi, ',')
-    .split(/[,;\n]+/)
-    .map(item => item.trim())
-    .filter(Boolean)
 }
 
 function parseBoolean(value, defaultValue = false) {
@@ -307,13 +295,13 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
     parentName: 'Parent Name', parentRelationship: 'Primary Adult Relationship', parentEmail: 'Parent Email', parentPhone: 'Parent Phone',
     parent2Name: 'Additional Adult Name', parent2Relationship: 'Additional Adult Relationship', parent2Email: 'Additional Adult Email', parent2Phone: 'Additional Adult Phone',
     homePhone: 'Home Phone',
-    siblings: 'Siblings?', siblingsName: 'Siblings Name', familyGroupKey: 'Family Group Key',
+    siblings: 'Siblings?',
     approvedAdults: 'Approved Adults', medicalCondition: 'Medical Condition', medicalDetails: 'Medical Details',
     can_leave_alone: 'Can Leave Alone',
-    medicalType: 'Medical Type', dietaryType: 'Dietary Type', allergyDetails: 'Allergy Details',
-    sendNeeds: 'SEND / Support Needs', sendDiagnosed: 'SEND Diagnosed', sendDiagnosis: 'SEND Diagnosis',
+    medicalFlags: 'M/D/A/S', dietaryType: 'Dietary Type', mealAdjustments: 'Dietary Details', allergyDetails: 'Allergy Details',
+    sendDiagnosed: 'SEND Diagnosed (Yes/No)', sendDiagnosis: 'SEND Diagnosis', sendNeeds: 'Support Needs Details',
     photoConsent: 'Photo Consent', otcConsent: 'OTC Consent',
-    notes: 'Notes',
+    notes: 'Additional Notes',
   }
 
   function handleFile(e) {
@@ -341,94 +329,6 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
 
   function normalizeName(name) {
     return String(name || '').trim().toLowerCase()
-  }
-
-  function linkImportedFamilies(list) {
-    if (!Array.isArray(list) || list.length === 0) return list
-
-    const importedByName = new Map()
-    list.forEach((participant, index) => {
-      const key = normalizeNameKey(participant.name)
-      if (!key) return
-      if (!importedByName.has(key)) importedByName.set(key, [])
-      importedByName.get(key).push(index)
-    })
-
-    const existingByName = new Map()
-    ;(existingParticipants || []).forEach(participant => {
-      const key = normalizeNameKey(participant.name)
-      if (!key || existingByName.has(key)) return
-      existingByName.set(key, participant)
-    })
-
-    const parent = list.map((_, index) => index)
-
-    function find(index) {
-      if (parent[index] === index) return index
-      parent[index] = find(parent[index])
-      return parent[index]
-    }
-
-    function union(a, b) {
-      const rootA = find(a)
-      const rootB = find(b)
-      if (rootA !== rootB) parent[rootB] = rootA
-    }
-
-    const anchorFamilyKeyByIndex = new Map()
-
-    list.forEach((participant, index) => {
-      const siblingNames = parseSiblingNames(participant.siblingsName)
-      siblingNames.forEach(siblingName => {
-        const siblingKey = normalizeNameKey(siblingName)
-        if (!siblingKey) return
-
-        const importedMatches = importedByName.get(siblingKey) || []
-        if (importedMatches.length > 0) {
-          importedMatches.forEach(matchIndex => union(index, matchIndex))
-          return
-        }
-
-        const existingMatch = existingByName.get(siblingKey)
-        const existingFamilyKey = getParticipantFamilyGroupKey(existingMatch)
-        if (existingFamilyKey) {
-          anchorFamilyKeyByIndex.set(index, existingFamilyKey)
-        }
-      })
-    })
-
-    const memberIndexesByRoot = new Map()
-    list.forEach((_, index) => {
-      const root = find(index)
-      if (!memberIndexesByRoot.has(root)) memberIndexesByRoot.set(root, [])
-      memberIndexesByRoot.get(root).push(index)
-    })
-
-    for (const memberIndexes of memberIndexesByRoot.values()) {
-      const existingKey = memberIndexes
-        .map(index => getParticipantFamilyGroupKey(list[index]))
-        .find(Boolean)
-
-      const anchoredKey = memberIndexes
-        .map(index => anchorFamilyKeyByIndex.get(index))
-        .find(Boolean)
-
-      const hasSiblingSignal = memberIndexes.some(index => {
-        const participant = list[index]
-        const siblingNames = parseSiblingNames(participant.siblingsName)
-        return Boolean(participant.siblings) || siblingNames.length > 0
-      })
-
-      const shouldCreateGroup = memberIndexes.length > 1 || hasSiblingSignal
-      const familyGroupKey = existingKey || anchoredKey || (shouldCreateGroup ? `import-family:${crypto.randomUUID()}` : '')
-      if (!familyGroupKey) continue
-
-      memberIndexes.forEach(index => {
-        list[index].familyGroupKey = familyGroupKey
-      })
-    }
-
-    return list
   }
 
   function buildParticipants() {
@@ -471,11 +371,11 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
           p[field] = field === 'sendDiagnosed' ? parseSendDiagnosed(raw) : parseBoolean(raw, false)
           return
         }
-        if (field === 'medicalType') {
-          p[field] = parseCsvList(raw)
+        if (field === 'medicalFlags') {
+          p._medicalFlags = parseMedicalFlags(raw)
           return
         }
-        if (field === 'medicalCondition' || field === 'medicalDetails' || field === 'allergyDetails' || field === 'dietaryType') {
+        if (field === 'medicalCondition' || field === 'medicalDetails' || field === 'allergyDetails' || field === 'dietaryType' || field === 'mealAdjustments') {
           p[field] = isExplicitNegativeText(raw) ? '' : (raw || '')
           return
         }
@@ -494,8 +394,6 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
         }
         p[field] = raw || ''
       })
-
-      p.medicalType = normalizeMedicalTypeList(p.medicalType)
 
       // If one combined form answer includes both allergy and dietary info,
       // split it into separate fields to keep records structured.
@@ -516,19 +414,20 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
 
       p.pronouns = normalizePronounsValue(p.pronouns)
 
-      // Normalise medicalType from medicalDetails text
-      if (p.medicalType.length === 0 && p.medicalDetails) {
-        const types = []
-        const d = p.medicalDetails.toLowerCase()
-        if (!isExplicitNegativeText(d)) {
-          if (d.includes('allerg')) types.push('Allergy')
-          if (d.includes('medical') || d.includes('asthma') || d.includes('diabetes') || d.includes('inhaler')) types.push('Medical')
-          if (d.includes('vegetarian') || d.includes('vegan') || d.includes('gluten') || d.includes('dietary') || d.includes('halal') || d.includes('kosher')) types.push('Dietary')
-        }
-        p.medicalType = types
+      const importedFlags = Array.isArray(p._medicalFlags) ? p._medicalFlags : []
+      if (importedFlags.includes('M') && !String(p.medicalCondition || '').trim() && !String(p.medicalDetails || '').trim()) {
+        p.medicalDetails = 'Recorded via M flag'
+      }
+      if (importedFlags.includes('D') && !String(p.dietaryType || '').trim() && !String(p.mealAdjustments || '').trim()) {
+        p.dietaryType = 'Recorded via D flag'
+      }
+      if (importedFlags.includes('A') && !String(p.allergyDetails || '').trim() && !Boolean(p.hasEpiPen)) {
+        p.allergyDetails = 'Recorded via A flag'
+      }
+      if (importedFlags.includes('S') && !p.sendDiagnosed && !String(p.sendDiagnosis || '').trim() && !String(p.sendNeeds || '').trim()) {
+        p.sendDiagnosed = true
       }
 
-      if (!Array.isArray(p.medicalType)) p.medicalType = []
       if (p.hasEpiPen !== true && hasRecordedEpiPen(p)) {
         p.hasEpiPen = true
       }
@@ -540,10 +439,13 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
         p.sendDiagnosed = true
       }
 
-      return p
+      const normalized = normalizeParticipantRecord(p)
+      delete normalized._medicalFlags
+
+      return normalized
     }).filter(p => p.name?.trim())
 
-    return linkImportedFamilies(built)
+    return built
   }
 
   const preview = buildParticipants()
@@ -583,7 +485,6 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'Postcode',
       'Address',
       'Siblings?',
-      'Siblings Name',
       'Parent Name',
       'Primary Adult Relationship',
       'Primary Adult Phone',
@@ -596,17 +497,18 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
       'Permission to Leave Unaccompanied',
       'Approved Adults',
       'Photo Consent',
-      'Medical Type',
+      'M/D/A/S',
       'Medical Condition',
       'Medical Details',
       'Allergy Details',
+      'Has EpiPen (Yes/No)',
       'Dietary Type',
+      'Dietary Details',
       'Medication Details / OTC Notes',
-      'Additional Needs / SEND Support',
-      'EHCP / Diagnosed',
-      'Diagnosis / If yes or not sure',
-      'Declaration / Additional Notes',
-      'Family Group Key',
+      'SEND Diagnosed (Yes/No)',
+      'SEND Diagnosis',
+      'Support Needs Details',
+      'Additional Notes',
     ].join(',')
 
     const blob = new Blob([headers + '\n'], { type: 'text/csv' })
@@ -779,14 +681,7 @@ export default function ImportParticipants({ onImport, onClose, existingParticip
                           <td className="px-3 py-2 text-stone-600">{p.age || '—'}</td>
                           <td className="px-3 py-2 text-stone-600">{p.parentName || '—'}</td>
                           <td className="px-3 py-2">
-                            {p.medicalType?.length > 0
-                              ? p.medicalType.map(t => (
-                                <span key={t} className={`mr-1 text-[10px] font-bold px-1 rounded ${
-                                  t === 'Allergy' ? 'bg-red-100 text-red-700' :
-                                  t === 'Medical' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                                }`}>{t[0]}</span>
-                              ))
-                              : <span className="text-stone-300">—</span>}
+                            {participantFlags(p).text || <span className="text-stone-300">—</span>}
                           </td>
                         </tr>
                       )
