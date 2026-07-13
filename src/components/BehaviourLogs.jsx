@@ -2,14 +2,16 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, Plus, Trash2 } from 'lucide-react'
 import ParticipantNameText from './ParticipantNameText'
 
-const CATEGORY_OPTIONS = [
-  'Transition Difficulty',
-  'Peer Conflict',
-  'Following Instructions',
-  'Emotional Regulation',
-  'Positive Behaviour',
-  'Unsafe Behaviour',
-  'Refusal / Avoidance',
+const RATING_OPTIONS = [
+  { value: 'P', label: 'P (Positive)' },
+  { value: 'N', label: 'N (Negative)' },
+  { value: '-', label: '- (Neutral / Information)' },
+]
+
+const SEVERITY_OPTIONS = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
 ]
 
 function formatDateTime(ts) {
@@ -33,10 +35,9 @@ export default function BehaviourLogs({
   const [participantFilter, setParticipantFilter] = useState('')
   const [form, setForm] = useState({
     participantId: '',
-    category: CATEGORY_OPTIONS[0],
-    triggerText: '',
-    actionTaken: '',
-    outcome: '',
+    overview: '',
+    rating: '-',
+    severity: 'medium',
   })
 
   const visibleLogs = useMemo(() => {
@@ -51,8 +52,8 @@ export default function BehaviourLogs({
 
   async function createEntry(e) {
     e.preventDefault()
-    if (!form.participantId || !form.category.trim()) {
-      alert('Please choose a participant and category.')
+    if (!form.participantId || !form.overview.trim()) {
+      alert('Please choose a participant and add an overview.')
       return
     }
 
@@ -63,20 +64,20 @@ export default function BehaviourLogs({
           id: crypto.randomUUID(),
           participantId: form.participantId,
           loggedAt: new Date().toISOString(),
-          category: form.category.trim(),
-          triggerText: form.triggerText.trim() || null,
-          actionTaken: form.actionTaken.trim() || null,
-          outcome: form.outcome.trim() || null,
+          overview: form.overview.trim(),
+          rating: form.rating,
+          category: form.rating,
+          severity: form.severity,
+          outcome: form.overview.trim(),
           staffInitials: actorInitials,
         },
       ])
 
       setForm({
         participantId: '',
-        category: CATEGORY_OPTIONS[0],
-        triggerText: '',
-        actionTaken: '',
-        outcome: '',
+        overview: '',
+        rating: '-',
+        severity: 'medium',
       })
       setShowForm(false)
     } catch (error) {
@@ -122,24 +123,24 @@ export default function BehaviourLogs({
               </select>
             </div>
             <div>
-              <label className="label">Category *</label>
-              <select className="input" value={form.category} onChange={e => setField('category', e.target.value)} required>
-                {CATEGORY_OPTIONS.map(option => (
-                  <option key={option} value={option}>{option}</option>
+              <label className="label">Rating *</label>
+              <select className="input" value={form.rating} onChange={e => setField('rating', e.target.value)} required>
+                {RATING_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Severity *</label>
+              <select className="input" value={form.severity} onChange={e => setField('severity', e.target.value)} required>
+                {SEVERITY_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="label">Trigger</label>
-              <textarea className="input resize-none" rows={2} value={form.triggerText} onChange={e => setField('triggerText', e.target.value)} placeholder="What happened before the behaviour?" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label">Action Taken</label>
-              <textarea className="input resize-none" rows={2} value={form.actionTaken} onChange={e => setField('actionTaken', e.target.value)} placeholder="What intervention was used?" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label">Outcome</label>
-              <textarea className="input resize-none" rows={2} value={form.outcome} onChange={e => setField('outcome', e.target.value)} placeholder="How did it resolve?" />
+              <label className="label">Overview *</label>
+              <textarea className="input resize-none" rows={4} value={form.overview} onChange={e => setField('overview', e.target.value)} placeholder="Overview of why this log is being made" required />
             </div>
           </div>
           <div className="flex gap-2">
@@ -185,10 +186,9 @@ export default function BehaviourLogs({
               </div>
 
               <div className="mt-3 space-y-2 text-sm text-stone-700">
-                <p><span className="font-semibold text-stone-900">Category:</span> {entry.category}</p>
-                {entry.triggerText && <p><span className="font-semibold text-stone-900">Trigger:</span> {entry.triggerText}</p>}
-                {entry.actionTaken && <p><span className="font-semibold text-stone-900">Action:</span> {entry.actionTaken}</p>}
-                {entry.outcome && <p><span className="font-semibold text-stone-900">Outcome:</span> {entry.outcome}</p>}
+                <p><span className="font-semibold text-stone-900">Rating:</span> {entry.rating || entry.category || '-'}</p>
+                <p><span className="font-semibold text-stone-900">Severity:</span> {entry.severity ? `${entry.severity.charAt(0).toUpperCase()}${entry.severity.slice(1)}` : 'Medium'}</p>
+                <p><span className="font-semibold text-stone-900">Overview:</span> {entry.overview || entry.outcome || entry.triggerText || entry.actionTaken || '—'}</p>
               </div>
             </div>
           )

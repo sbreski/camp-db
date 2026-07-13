@@ -225,6 +225,7 @@ function toSnake(obj) {
     participantId: 'participant_id', signIn: 'sign_in', signOut: 'sign_out',
     signInBy: 'sign_in_by', signOutBy: 'sign_out_by',
     loggedAt: 'logged_at', triggerText: 'trigger_text', actionTaken: 'action_taken', escalatedIncidentId: 'escalated_incident_id',
+    overview: 'overview', rating: 'rating',
     staffInitials: 'staff_initials',
     dayDate: 'day_date', startTime: 'start_time', endTime: 'end_time',
     activityName: 'activity_name', groupName: 'group_name', leadStaff: 'lead_staff', assignedEmail: 'assigned_email',
@@ -322,6 +323,7 @@ function toCamel(obj) {
     participant_id: 'participantId', sign_in: 'signIn', sign_out: 'signOut',
     sign_in_by: 'signInBy', sign_out_by: 'signOutBy',
     logged_at: 'loggedAt', trigger_text: 'triggerText', action_taken: 'actionTaken', escalated_incident_id: 'escalatedIncidentId',
+    overview: 'overview', rating: 'rating',
     staff_initials: 'staffInitials',
     day_date: 'dayDate', start_time: 'startTime', end_time: 'endTime',
     activity_name: 'activityName', group_name: 'groupName', lead_staff: 'leadStaff', assigned_email: 'assignedEmail',
@@ -401,9 +403,24 @@ export default function App() {
   const [rawCampPeriodRows, setRawCampPeriodRowsState, loadingCampPeriod, reloadCampPeriod] = useSupabaseTable('camp_period_settings', 'updated_at', { enabled: tableQueriesEnabled, cacheScope: tableCacheScope })
   const [rawStaff, setRawStaffState, loadingS, reloadS] = useSupabaseTable('staff', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsStaff, cacheScope: tableCacheScope })
 
-  const participants = rawParticipants.map(toCamel)
   const attendance = rawAttendance.map(toCamel)
   const incidents = rawIncidents.map(toCamel)
+  const openSafeguardingParticipantIds = new Set(
+    incidents
+      .filter(incident => (
+        String(incident.type || '').trim().toLowerCase() === 'safeguarding'
+        && !incident.resolvedAt
+        && !incident.resolved_at
+      ))
+      .map(incident => incident.participantId || incident.participant_id)
+      .filter(Boolean)
+  )
+  const participants = rawParticipants
+    .map(toCamel)
+    .map(participant => ({
+      ...participant,
+      safeguardingFlag: openSafeguardingParticipantIds.has(participant.id),
+    }))
   const medicationAdministration = rawMedicationAdministration
   const behaviourLogs = rawBehaviourLogs.map(toCamel)
   const timetableEntries = rawTimetableEntries.map(toCamel)
