@@ -555,7 +555,6 @@ export default function Medical({ participants, setParticipants, actorInitials =
       const payload = {
         id: crypto.randomUUID(),
         participant_id: formParticipantId,
-        medication_form_id: null,
         form_name: `${formType}: ${formFile.name}`,
         storage_path: storagePath,
         uploaded_by_initials: actorInitials,
