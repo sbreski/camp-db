@@ -38,7 +38,7 @@ function isIncludedThisSeason(participant) {
   return flag !== false
 }
 
-export default function Medical({ participants, setParticipants, actorInitials = 'ST', onView, medicationAdministration: medicationAdministrationProp, setMedicationAdministration: setMedicationAdministrationProp, canManageShares = false }) {
+export default function Medical({ participants, setParticipants, actorInitials = 'ST', onView, medicationAdministration: medicationAdministrationProp, setMedicationAdministration: setMedicationAdministrationProp, canManageShares = false, canViewSendDiagnosis = false }) {
   const [selectedFilters, setSelectedFilters] = useState([])
   const [search, setSearch] = useState('')
   const [subTab, setSubTab] = useState('active')
@@ -451,7 +451,12 @@ export default function Medical({ participants, setParticipants, actorInitials =
   }
 
   function summaryForParticipantCategory(participant, category) {
-    if (category === 'send') return String(participant.sendNeeds || '').trim()
+    if (category === 'send') {
+      const parts = []
+      if (canViewSendDiagnosis && participant.sendDiagnosis) parts.push(`Diagnosis: ${String(participant.sendDiagnosis).trim()}`)
+      if (participant.sendNeeds) parts.push(`Support Needs: ${String(participant.sendNeeds).trim()}`)
+      return parts.join(' | ')
+    }
     if (category === 'allergy') return String(participant.allergyDetails || '').trim()
     if (category === 'medical') return String(participant.medicalDetails || '').trim()
     if (category === 'notes') return String(participant.notes || '').trim()
@@ -642,7 +647,10 @@ export default function Medical({ participants, setParticipants, actorInitials =
         allergy: p.allergyDetails || '—',
         dietary: [p.dietaryType, p.mealAdjustments].filter(Boolean).join(' - ') || '—',
         medical: p.medicalDetails || '—',
-        send: p.sendNeeds || '—',
+        send: [
+          canViewSendDiagnosis && p.sendDiagnosis ? `Diagnosis: ${p.sendDiagnosis}` : '',
+          p.sendNeeds ? `Support Needs: ${p.sendNeeds}` : '',
+        ].filter(Boolean).join(' | ') || '—',
       }
 
       const detailCells = detailColumns
@@ -1302,10 +1310,20 @@ export default function Medical({ participants, setParticipants, actorInitials =
                   {[p.dietaryType, p.mealAdjustments].filter(Boolean).join(' - ')}
                 </div>
               )}
-              {wantsSend && p.sendNeeds && (
-                <div className="mt-2 p-3 bg-purple-50 rounded-lg text-sm text-purple-900 leading-relaxed">
-                  <p className="text-xs font-semibold text-purple-500 uppercase tracking-wide mb-1">Support Needs</p>
-                  {p.sendNeeds}
+              {wantsSend && (p.sendNeeds || (canViewSendDiagnosis && p.sendDiagnosis)) && (
+                <div className="mt-2 p-3 bg-purple-50 rounded-lg text-sm text-purple-900 leading-relaxed space-y-2">
+                  {canViewSendDiagnosis && p.sendDiagnosis && (
+                    <div>
+                      <p className="text-xs font-semibold text-purple-500 uppercase tracking-wide mb-1">SEND Diagnosis</p>
+                      <p>{p.sendDiagnosis}</p>
+                    </div>
+                  )}
+                  {p.sendNeeds && (
+                    <div>
+                      <p className="text-xs font-semibold text-purple-500 uppercase tracking-wide mb-1">Support Needs</p>
+                      <p>{p.sendNeeds}</p>
+                    </div>
+                  )}
                 </div>
               )}
                   </>
