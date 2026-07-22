@@ -7,7 +7,7 @@ import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
 
 const TIMETABLE_URL = 'https://docs.google.com/spreadsheets/d/1Ts4Z2fneVbuid-KLp8AjJzUlgEB2vUOIfs1aaLTSVGI/edit?usp=sharing'
-const CAMP_GOOGLE_DRIVE_URL = import.meta.env.VITE_CAMP_GOOGLE_DRIVE_URL || 'https://drive.google.com/drive/folders/'
+const CAMP_GOOGLE_DRIVE_URL = import.meta.env.VITE_CAMP_GOOGLE_DRIVE_URL || 'https://drive.google.com/drive/folders/16lijqPEOpX0nnosYmM656Da2Adlgpe9m?usp=share_link'
 
 function isMissingTableError(error, tableName) {
   const message = String(error?.message || '').toLowerCase()
