@@ -392,7 +392,8 @@ export default function App() {
   const needsBehaviourLogs = ['behaviour', 'participant', 'signin'].includes(page)
   const needsTimetable = ['timetable'].includes(page)
   const needsStarOfDay = ['star-of-day'].includes(page)
-  const needsStaff = ['participant', 'incidents', 'log-incidents', 'staff', 'documents', 'timetable'].includes(page) || permissionsLoading
+  // Staff data is needed for the global header identity (name/role) on all non-dashboard pages.
+  const needsStaff = page !== 'dashboard' || permissionsLoading
 
   const [rawParticipants, , loadingP, reloadP] = useSupabaseTable('participants', 'created_at', { softDelete: true, enabled: tableQueriesEnabled && needsParticipants, cacheScope: tableCacheScope })
   const [rawAttendance, , loadingA, reloadA] = useSupabaseTable('attendance', 'date', { enabled: tableQueriesEnabled && needsAttendance, cacheScope: tableCacheScope })
