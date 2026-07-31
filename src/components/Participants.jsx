@@ -5,9 +5,10 @@ import ImportParticipants from './ImportParticipants'
 import ParticipantNameText, { participantDisplayName } from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
-import { daysUntilBirthday, formatBirthDate, todayKey } from '../utils/birthday'
+import { daysUntilBirthday, formatBirthDate, todayKey, calculateAgeFromBirthday } from '../utils/birthday'
 import { hasRecordedEpiPen } from '../utils/medical'
 import { normalizeParticipantRecord, parseMedicalFlags, participantFlags } from '../utils/participantProfile'
+import { useStorage } from '../hooks/useStorage'
 
 function photoConsentMode(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -246,7 +247,7 @@ function DemographicsPanel({ participants, ageSplits, setAgeSplits, genderFilter
 }
 
 export default function Participants({ participants, setParticipants, deleteParticipant: deleteParticipantRecord, onView, canViewUploadedData = false, currentUserEmail = '' }) {
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useStorage('participants.search', '')
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showAllTable, setShowAllTable] = useState(false)
@@ -261,14 +262,29 @@ export default function Participants({ participants, setParticipants, deletePart
   const [allTableEditError, setAllTableEditError] = useState('')
   const [allTablePendingAutoSave, setAllTablePendingAutoSave] = useState(false)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([])
-  const [subTab, setSubTab] = useState('active')
-  const [sortKey, setSortKey] = useState('firstName')
-  const [sortDirection, setSortDirection] = useState('asc')
+  const [subTab, setSubTab] = useStorage('participants.subTab', 'active')
+  const [sortKey, setSortKey] = useStorage('participants.sortKey', 'firstName')
+  const [sortDirection, setSortDirection] = useStorage('participants.sortDirection', 'asc')
 
   // Demographics / filter state
-  const [ageSplits, setAgeSplits] = useState([10, 14, 18])
-  const [genderFilter, setGenderFilter] = useState(new Set(['m', 'f', 'nb']))
-  const [ageGroupFilter, setAgeGroupFilter] = useState(null)
+  const [ageSplits, setAgeSplits] = useStorage('participants.ageSplits', [10, 14, 18])
+  const [genderFilterValues, setGenderFilterValues] = useStorage('participants.genderFilter', ['m', 'f', 'nb'])
+  const [ageGroupFilter, setAgeGroupFilter] = useStorage('participants.ageGroupFilter', null)
+  const genderFilter = useMemo(() => {
+    const fallback = ['m', 'f', 'nb']
+    const list = Array.isArray(genderFilterValues) ? genderFilterValues : fallback
+    const sanitized = list.filter(g => ['m', 'f', 'nb'].includes(g))
+    return new Set(sanitized.length > 0 ? sanitized : fallback)
+  }, [genderFilterValues])
+
+  function setGenderFilter(updater) {
+    setGenderFilterValues((prev) => {
+      const prevSet = new Set(Array.isArray(prev) ? prev : ['m', 'f', 'nb'])
+      const nextSet = typeof updater === 'function' ? updater(prevSet) : updater
+      const nextArray = Array.from(nextSet || []).filter(g => ['m', 'f', 'nb'].includes(g))
+      return nextArray.length > 0 ? nextArray : ['m', 'f', 'nb']
+    })
+  }
 
   function addParticipant(data) {
     setParticipants(prev => [...prev, normalizeParticipantRecord({ ...data, id: crypto.randomUUID() })])
@@ -512,6 +528,7 @@ export default function Participants({ participants, setParticipants, deletePart
       const draft = allTableDraftById[participant.id]
       if (!draft) return participant
 
+      const derivedAge = calculateAgeFromBirthday(String(draft.birthday || '').trim())
       const parsedAge = parseInt(String(draft.age || '').trim(), 10)
       const normalizedPhotoConsent = String(draft.photoConsent || '').trim().toLowerCase()
 
@@ -519,7 +536,7 @@ export default function Participants({ participants, setParticipants, deletePart
         ...participant,
         name: String(draft.name || '').trim() || participant.name,
         pronouns: String(draft.pronouns || '').trim(),
-        age: Number.isNaN(parsedAge) ? '' : parsedAge,
+        age: derivedAge === null ? (Number.isNaN(parsedAge) ? '' : parsedAge) : derivedAge,
         birthday: String(draft.birthday || '').trim(),
         schoolAttending: String(draft.schoolAttending || '').trim(),
         postcode: String(draft.postcode || '').trim(),

@@ -6,7 +6,7 @@ import ParticipantNameText from './ParticipantNameText'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 import { supabase } from '../supabase'
 import { getFreshAccessToken } from '../utils/authToken'
-import { formatBirthDate } from '../utils/birthday'
+import { formatBirthDate, calculateAgeFromBirthday } from '../utils/birthday'
 import { parseMedicalFlags, participantFlags } from '../utils/participantProfile'
 
 function getNextDateKey(isoString) {
@@ -980,8 +980,9 @@ export default function ParticipantDetail({
       return
     }
 
+    const derivedAge = calculateAgeFromBirthday(String(uploadedDataDraft.birthday || '').trim())
     const parsedAge = parseInt(String(uploadedDataDraft.age || '').trim(), 10)
-    const nextAge = Number.isNaN(parsedAge) ? '' : parsedAge
+    const nextAge = derivedAge === null ? (Number.isNaN(parsedAge) ? '' : parsedAge) : derivedAge
 
     setUploadedDataSaving(true)
     setUploadedDataError('')

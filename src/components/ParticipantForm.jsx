@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
+import { calculateAgeFromBirthday } from '../utils/birthday'
 
 const EMPTY = {
   name: '', pronouns: '', age: '',
@@ -110,10 +111,13 @@ function normalizeDateInput(value) {
 }
 
 export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, participants = [] }) {
+  const initialBirthday = normalizeDateInput(initial.birthday || initial.dob)
+  const initialDerivedAge = calculateAgeFromBirthday(initialBirthday)
   const [form, setForm] = useState({
     ...EMPTY,
     ...initial,
-    birthday: normalizeDateInput(initial.birthday || initial.dob),
+    birthday: initialBirthday,
+    age: initialDerivedAge === null ? String(initial.age ?? '') : String(initialDerivedAge),
     siblings: Boolean(initial.siblings),
     photoConsent: initial.photoConsent || 'yes',
     otcConsent: Boolean(initial.otcConsent),
@@ -139,6 +143,22 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
+
+  useEffect(() => {
+    const birthday = String(form.birthday || '').trim()
+    if (!birthday) {
+      if (String(form.age || '').trim() !== '') {
+        setForm(prev => ({ ...prev, age: '' }))
+      }
+      return
+    }
+
+    const derivedAge = calculateAgeFromBirthday(birthday)
+    if (derivedAge === null) return
+    if (String(form.age) !== String(derivedAge)) {
+      setForm(prev => ({ ...prev, age: String(derivedAge) }))
+    }
+  }, [form.birthday])
 
   function addApprovedAdult() {
     const next = formatApprovedAdultEntry({
@@ -194,6 +214,8 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
     e.preventDefault()
     if (!form.name.trim()) return
 
+    const derivedAge = calculateAgeFromBirthday(form.birthday)
+
     const normalizedAdults = [...approvedAdultsList]
     ;[
       { name: form.parent2Name, relationship: form.parent2Relationship || 'Parent' },
@@ -215,6 +237,7 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
 
     onSave({
       ...form,
+      age: derivedAge === null ? form.age : derivedAge,
       approvedAdults: normalizedAdults.join(', '),
       otcAllowedItems: otcAllowedItemsInput.split(',').map(item => item.trim()).filter(Boolean),
       ...(initial.id ? { _linkedParticipantIds: linkedIds } : {}),
@@ -249,7 +272,8 @@ export default function ParticipantForm({ onSave, onCancel, initial = EMPTY, par
             </div>
             <div>
               <label className="label">Age</label>
-              <input className="input" type="number" min="1" max="25" value={form.age} onChange={e => set('age', e.target.value)} placeholder="10" />
+              <input className="input" type="number" min="1" max="25" value={form.age} readOnly placeholder="Auto from birthday" />
+              <p className="text-xs text-stone-500 mt-1">Auto-calculated from birthday.</p>
             </div>
             <div>
               <label className="label">Birthday</label>

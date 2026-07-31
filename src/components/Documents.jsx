@@ -5,7 +5,7 @@ import { toCsv } from '../utils/workflow'
 import { getFreshAccessToken } from '../utils/authToken'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 
-export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST' }) {
+export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST', viewOnly = false }) {
   const [section, setSection] = useState('policies') // 'policies' or 'other'
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(false)
@@ -392,11 +392,13 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-display font-bold text-forest-950">Documents</h2>
+          <h2 className="text-2xl font-display font-bold text-forest-950">{viewOnly ? 'Documents' : 'Document Upload'}</h2>
           <p className="text-stone-500 text-sm mt-1">
-            {section === 'policies' 
-              ? 'Upload and manage camp policies' 
-              : 'Manage visitor logs, safeguarding concerns, and other sensitive documents'}
+            {viewOnly
+              ? (section === 'policies' ? 'Browse uploaded camp policy documents' : 'Browse uploaded documents')
+              : (section === 'policies' 
+                ? 'Upload and manage camp policies' 
+                : 'Manage visitor logs, safeguarding concerns, and other sensitive documents')}
           </p>
         </div>
       </div>
@@ -559,6 +561,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
         </div>
       )}
 
+      {!viewOnly && (
       <div className="card space-y-4">
         <h3 className="font-display font-semibold text-forest-950">Upload New Document</h3>
         
@@ -667,7 +670,9 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
           </button>
         </div>
       </div>
+      )}
 
+      {!viewOnly && (
       <div className="card space-y-3">
         <h3 className="font-display font-semibold text-forest-950">Data Backup & Export</h3>
         <p className="text-xs text-stone-500">
@@ -694,6 +699,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
           </button>
         </div>
       </div>
+      )}
 
       {/* Documents list */}
       {loading ? (
@@ -742,13 +748,15 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                       >
                         <Download size={16} />
                       </button>
-                      <button
-                        onClick={() => deleteDocument(doc.id, doc.filepath)}
-                        className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {!viewOnly && (
+                        <button
+                          onClick={() => deleteDocument(doc.id, doc.filepath)}
+                          className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

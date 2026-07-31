@@ -68,7 +68,7 @@ const Documents = lazyWithRetry(loadDocuments, 'documents')
 export const CAMP_NAME = 'Impact Kidz Summer Camp'
 export const STAFF_PASSWORD = import.meta.env.VITE_STAFF_PASSWORD || ''
 const OWNER_EMAIL = (import.meta.env.VITE_OWNER_EMAIL || '').toLowerCase()
-const BASIC_TABS = ['dashboard', 'signin', 'shared-info']
+const BASIC_TABS = ['dashboard', 'signin', 'shared-info', 'documents-view']
 const ALL_TABS = NAV_ITEMS.map(item => item.id)
 const TABLE_CACHE_TTL_MS = 30 * 1000
 const SESSION_CHECK_TIMEOUT_MS = 6000
@@ -79,6 +79,7 @@ const ROUTE_PREFETCHERS = {
   dashboard: loadDashboard,
   signin: loadSignInOut,
   'shared-info': loadSharedInfo,
+  'documents-view': loadDocuments,
   attendance: loadAttendanceOverview,
   'star-of-day': loadStarOfTheDay,
   participants: loadParticipants,
@@ -97,6 +98,7 @@ const TAB_PATHS = {
   dashboard: '/dashboard',
   signin: '/signin',
   'shared-info': '/shared-info',
+  'documents-view': '/documents',
   attendance: '/attendance',
   'star-of-day': '/star-of-day',
   participants: '/participants',
@@ -108,7 +110,7 @@ const TAB_PATHS = {
   incidents: '/incidents',
   'log-incidents': '/log-incidents',
   staff: '/staff',
-  documents: '/documents',
+  documents: '/document-upload',
 }
 const PATH_TO_TAB = Object.fromEntries(Object.entries(TAB_PATHS).map(([tabId, path]) => [path, tabId]))
 
@@ -977,6 +979,7 @@ export default function App() {
     if (!valid.includes('dashboard')) valid.unshift('dashboard')
     if (!valid.includes('signin')) valid.unshift('signin')
     if (!valid.includes('shared-info')) valid.unshift('shared-info')
+    if (!valid.includes('documents-view')) valid.unshift('documents-view')
     return [...new Set(valid)]
   }
 
@@ -1453,7 +1456,7 @@ export default function App() {
   useEffect(() => {
     if (!authed || permissionsLoading) return
 
-    const likelyTabs = ['dashboard', 'signin', 'participants', 'incidents', 'log-incidents', 'attendance', 'star-of-day', 'medical', 'documents']
+    const likelyTabs = ['dashboard', 'signin', 'documents-view', 'participants', 'incidents', 'log-incidents', 'attendance', 'star-of-day', 'medical', 'documents']
       .filter(tab => allowedTabIds.includes(tab) && tab !== page)
       .slice(0, 4)
 
@@ -1684,6 +1687,7 @@ export default function App() {
         setParticipants(prev => prev.map(p => (targetIds.includes(p.id) ? { ...p, ...updates } : p)))
       }} />
       case 'dressing-rooms': return <DressingRooms participants={participants} />
+      case 'documents-view': return <Documents canViewSafeguarding={canViewSafeguarding} isOwnerUser={isOwnerUser} actorInitials={actorInitials} viewOnly={true} />
       case 'documents': return <Documents canViewSafeguarding={canViewSafeguarding} isOwnerUser={isOwnerUser} actorInitials={actorInitials} />
       case 'participant': return (
         <ParticipantDetail

@@ -48,3 +48,35 @@ export function formatBirthDate(value) {
     year: 'numeric',
   })
 }
+
+export function calculateAgeFromBirthday(value, nowDate = new Date()) {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+
+  const year = Number.parseInt(match[1], 10)
+  const month = Number.parseInt(match[2], 10)
+  const day = Number.parseInt(match[3], 10)
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) return null
+
+  const birthday = new Date(year, month - 1, day, 12, 0, 0, 0)
+  if (
+    Number.isNaN(birthday.getTime())
+    || birthday.getFullYear() !== year
+    || birthday.getMonth() !== month - 1
+    || birthday.getDate() !== day
+  ) {
+    return null
+  }
+
+  const now = new Date(nowDate)
+  if (Number.isNaN(now.getTime())) return null
+
+  let age = now.getFullYear() - year
+  const hasHadBirthdayThisYear = (
+    now.getMonth() > birthday.getMonth()
+    || (now.getMonth() === birthday.getMonth() && now.getDate() >= birthday.getDate())
+  )
+  if (!hasHadBirthdayThisYear) age -= 1
+
+  return age >= 0 ? age : null
+}

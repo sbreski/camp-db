@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'signin', label: 'Sign In / Out', icon: LogIn },
   { id: 'shared-info', label: 'Shared Info', icon: ClipboardList },
+  { id: 'documents-view', label: 'Documents', icon: FileText },
   { id: 'attendance', label: 'Attendance', icon: CalendarDays },
   { id: 'star-of-day', label: 'Star of the Day', icon: Star },
   { id: 'participants', label: 'Participants', icon: Users },
@@ -18,7 +19,7 @@ export const NAV_ITEMS = [
   { id: 'log-incidents', label: 'Log Incidents', icon: AlertTriangle },
   { id: 'incidents', label: 'Reports', icon: BookAlert },
   { id: 'staff', label: 'Staff', icon: UserCog },
-  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'documents', label: 'Document Upload', icon: FileText },
 ]
 
 export default function Nav({ page, onNavigate, onLogout, visibleTabIds = [] }) {
