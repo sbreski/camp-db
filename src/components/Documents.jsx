@@ -6,6 +6,7 @@ import { getFreshAccessToken } from '../utils/authToken'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 
 export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST', viewOnly = false }) {
+  const canModify = !viewOnly
   const [section, setSection] = useState('policies') // 'policies' or 'other'
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(false)
@@ -97,6 +98,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function closeSafeguardingReport(report) {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!window.confirm(`Mark safeguarding report for ${report.participantName} as resolved/closed?`)) return
 
     setSafeguardingActionId(report.id)
@@ -111,6 +116,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function reopenSafeguardingReport(report) {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!window.confirm(`Reopen safeguarding report for ${report.participantName}?`)) return
 
     setSafeguardingActionId(report.id)
@@ -125,6 +134,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function clearSafeguardingLogs(scope) {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!isOwnerUser) {
       alert('Only the owner account can clear safeguarding logs.')
       return
@@ -160,6 +173,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function deleteSafeguardingReport(report) {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!isOwnerUser) {
       alert('Only the owner account can delete safeguarding reports.')
       return
@@ -191,6 +208,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function handleUpload() {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!selectedFile || !selectedCategory.trim()) {
       alert('Please select a file and category')
       return
@@ -267,6 +288,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function deleteDocument(id, filepath) {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!window.confirm('Are you sure you want to delete this document?')) return
 
     try {
@@ -323,6 +348,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function exportTableCsv(tableName, filenamePrefix) {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!(await ensureLoggedIn())) return
     setExporting(true)
     try {
@@ -341,6 +370,10 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   }
 
   async function exportJsonBackup() {
+    if (!canModify) {
+      alert('This Documents view is read-only.')
+      return
+    }
     if (!(await ensureLoggedIn())) return
     setExporting(true)
     try {
@@ -458,7 +491,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                 ))}
               </div>
             </div>
-            {isOwnerUser ? (
+            {isOwnerUser && canModify ? (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => clearSafeguardingLogs('closed')}
@@ -513,7 +546,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                       >
                         Download
                       </button>
-                      {isOwnerUser && (
+                      {isOwnerUser && canModify && (
                         <button
                           onClick={() => deleteSafeguardingReport(report)}
                           disabled={safeguardingActionId === report.id}
@@ -522,7 +555,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                           Delete
                         </button>
                       )}
-                      {report.status === 'open' && (
+                      {canModify && report.status === 'open' && (
                         <button
                           onClick={() => closeSafeguardingReport(report)}
                           disabled={safeguardingActionId === report.id}
@@ -531,7 +564,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                           Resolve / Close
                         </button>
                       )}
-                      {report.status === 'closed' && (
+                      {canModify && report.status === 'closed' && (
                         <button
                           onClick={() => reopenSafeguardingReport(report)}
                           disabled={safeguardingActionId === report.id}
