@@ -1393,7 +1393,7 @@ export default function App() {
   const actorInitials = initialsFromName(actorFullName || currentUserEmail || 'Staff')
   const roleFromStaffProfile = String(currentStaff?.role || '').trim()
   const headerDisplayName = String(actorFullName || currentUserEmail || 'Staff member').trim()
-  const headerDisplayRole = roleFromStaffProfile || 'No job title set'
+  const headerDisplayRole = roleFromStaffProfile
   const canViewSafeguarding = Boolean(
     isOwnerUser
       || isAdminUser
@@ -1756,7 +1756,7 @@ export default function App() {
           <div className="w-full max-w-[1600px] mx-auto px-6 xl:px-8 h-full flex items-center justify-end">
             <div className="text-right leading-tight">
               <p className="text-sm font-display font-semibold text-forest-950">{headerDisplayName}</p>
-              <p className="text-xs text-stone-600">{headerDisplayRole}</p>
+              {headerDisplayRole && <p className="text-xs text-stone-600">{headerDisplayRole}</p>}
             </div>
           </div>
         </div>

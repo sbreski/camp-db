@@ -77,7 +77,7 @@ export default function Nav({
         ) : (
           <div className="min-w-0 pr-3">
             <p className="font-display font-semibold text-white text-sm truncate">{currentUserName}</p>
-            <p className="text-[11px] text-forest-200 truncate">{currentUserRole}</p>
+            {currentUserRole && <p className="text-[11px] text-forest-200 truncate">{currentUserRole}</p>}
           </div>
         )}
         <button onClick={() => setMobileOpen(o => !o)} className="text-white p-1 flex-shrink-0" aria-label="Toggle navigation menu">
