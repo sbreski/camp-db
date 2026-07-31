@@ -1,5 +1,5 @@
 import { useState, Fragment } from 'react'
-import { Users, Search, Mail } from 'lucide-react'
+import { Users, Search, Mail, Printer } from 'lucide-react'
 
 function parseApprovedAdults(str) {
   if (!str) return []
@@ -99,6 +99,15 @@ function getLikelySiblingIdsFromContact(contact, allParticipants, fallbackPartic
     .map(p => p.id)
 
   return matches.length > 0 ? matches : [fallbackParticipantId]
+}
+
+function esc(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
 }
 
 
@@ -272,6 +281,96 @@ export default function Parents({ participants, onUpdateParticipants }) {
     setSelectedParents(new Set())
   }
 
+  function printParents(mode = 'filtered') {
+    const records = mode === 'selected'
+      ? filtered.filter(participant => selectedParents.has(participant.id))
+      : filtered
+
+    const title = mode === 'selected'
+      ? 'Selected Parent Contacts'
+      : 'Parent Contacts'
+
+    const rows = records.map(participant => {
+      const approvedAdults = parseApprovedAdults(participant.approvedAdults)
+      const phoneLines = [
+        participant.parentPhone ? `Primary: ${participant.parentPhone}` : '',
+        participant.parent2Phone ? `Additional: ${participant.parent2Phone}` : '',
+        participant.homePhone ? `Home: ${participant.homePhone}` : '',
+      ].filter(Boolean)
+
+      return `
+        <tr>
+          <td>${esc(participant.name || '—')}</td>
+          <td>${esc(participant.pronouns || '—')}</td>
+          <td>${esc(participant.parentName || '—')}</td>
+          <td>${esc(participant.parentRelationship || '—')}</td>
+          <td>${esc(participant.parent2Name || '—')}</td>
+          <td>${esc(participant.parent2Relationship || '—')}</td>
+          <td>${esc([participant.parentEmail, participant.parent2Email].filter(Boolean).join('\n') || '—').replaceAll('\n', '<br />')}</td>
+          <td>${esc(phoneLines.join('\n') || '—').replaceAll('\n', '<br />')}</td>
+          <td>${esc(approvedAdults.join('\n') || '—').replaceAll('\n', '<br />')}</td>
+        </tr>
+      `
+    }).join('')
+
+    const scopeLabel = subTab === 'active'
+      ? 'Active participants'
+      : subTab === 'inactive'
+        ? 'Inactive participants'
+        : 'All participants'
+
+    const searchLabel = search.trim() ? `Search: ${search.trim()}` : 'Search: none'
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>${esc(title)}</title>
+          <style>
+            body { font-family: Georgia, serif; margin: 24px; color: #1f2937; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            .meta { color: #6b7280; font-size: 12px; margin-bottom: 14px; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; }
+            th { background: #f3f4f6; }
+          </style>
+        </head>
+        <body>
+          <h1>${esc(title)}</h1>
+          <div class="meta">${esc(scopeLabel)} | ${esc(searchLabel)} | Generated: ${esc(new Date().toLocaleString('en-GB'))}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Participant</th>
+                <th>Pronouns</th>
+                <th>Primary Adult</th>
+                <th>Relationship</th>
+                <th>Additional Adult</th>
+                <th>Additional Relationship</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Approved Adults</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="9">No parent contacts in this view.</td></tr>'}
+            </tbody>
+          </table>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `
+
+    const win = window.open('', '_blank', 'width=1200,height=800')
+    if (!win) {
+      alert('Allow pop-ups to print this report.')
+      return
+    }
+    win.document.write(html)
+    win.document.close()
+  }
+
   function isIncludedThisSeason(participant) {
     const flag = participant.isActiveThisSeason ?? participant.is_active_this_season
     if (typeof flag === 'string') return flag.toLowerCase() !== 'false'
@@ -353,6 +452,9 @@ export default function Parents({ participants, onUpdateParticipants }) {
           {selectedParents.size > 0 && (
             <>
               <span className="text-sm text-stone-600">{selectedParents.size} selected</span>
+              <button onClick={() => printParents('selected')} className="btn-secondary flex items-center gap-2 w-full sm:w-auto justify-center">
+                <Printer size={14} /> Print Selected
+              </button>
               <button onClick={emailSelectedParents} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
                 <Mail size={14} /> Email Selected
               </button>
@@ -361,6 +463,9 @@ export default function Parents({ participants, onUpdateParticipants }) {
               </button>
             </>
           )}
+          <button onClick={() => printParents('filtered')} className="btn-secondary flex items-center gap-2 w-full sm:w-auto justify-center">
+            <Printer size={14} /> Print Current View
+          </button>
         </div>
       </div>
 
