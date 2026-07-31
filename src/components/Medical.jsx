@@ -17,6 +17,19 @@ const ALLERGEN_OPTIONS = [
   'Shellfish',
 ]
 
+function participantFirstName(participant) {
+  return String(participant?.name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)[0] || ''
+}
+
+function compareParticipantsByFirstName(a, b) {
+  const firstCompare = participantFirstName(a).localeCompare(participantFirstName(b), undefined, { sensitivity: 'base' })
+  if (firstCompare !== 0) return firstCompare
+  return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' })
+}
+
 function nowLocalDateTimeValue() {
   const now = new Date()
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -98,9 +111,13 @@ export default function Medical({ participants, setParticipants, actorInitials =
   }))
 
   const seasonParticipantOptions = useMemo(() => {
-    if (subTab === 'active') return participants.filter(isIncludedThisSeason)
-    if (subTab === 'inactive') return participants.filter(participant => !isIncludedThisSeason(participant))
-    return participants
+    const filteredParticipants = subTab === 'active'
+      ? participants.filter(isIncludedThisSeason)
+      : subTab === 'inactive'
+        ? participants.filter(participant => !isIncludedThisSeason(participant))
+        : participants
+
+    return [...filteredParticipants].sort(compareParticipantsByFirstName)
   }, [participants, subTab])
 
   useEffect(() => {
@@ -166,13 +183,15 @@ export default function Medical({ participants, setParticipants, actorInitials =
     return flags.hasMedical
   }
 
-  const medParticipants = participants.filter(p =>
-    (() => {
-      const flags = participantFlags(p)
-      return flags.hasMedical || flags.hasAllergy || flags.hasDietary || flags.hasSend
-    })() &&
-    p.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const medParticipants = useMemo(() => {
+    return participants
+      .filter(p => {
+        const flags = participantFlags(p)
+        return (flags.hasMedical || flags.hasAllergy || flags.hasDietary || flags.hasSend)
+          && p.name.toLowerCase().includes(search.toLowerCase())
+      })
+      .sort(compareParticipantsByFirstName)
+  }, [participants, search])
 
   const activeMedParticipants = medParticipants.filter(isIncludedThisSeason)
   const inactiveMedParticipants = medParticipants.filter(p => !isIncludedThisSeason(p))
@@ -241,6 +260,11 @@ export default function Medical({ participants, setParticipants, actorInitials =
     if (!formParticipantId) return medicationForms
     return medicationForms.filter(form => form.participant_id === formParticipantId)
   }, [medicationForms, formParticipantId])
+
+  const marLinkedForms = useMemo(() => {
+    return [...(formsByParticipant.get(marDraft.participantId) || [])]
+      .sort((a, b) => String(a.form_name || '').localeCompare(String(b.form_name || ''), undefined, { sensitivity: 'base' }))
+  }, [formsByParticipant, marDraft.participantId])
 
   const marRows = useMemo(() => {
     return medicationAdministration.slice(0, 100)
@@ -787,11 +811,11 @@ export default function Medical({ participants, setParticipants, actorInitials =
                 <label className="label">Linked Medical Form</label>
                 <select className="input" value={marDraft.linkedFormId} onChange={e => updateMarDraft('linkedFormId', e.target.value)}>
                   <option value="">None / ad-hoc</option>
-                  {(formsByParticipant.get(marDraft.participantId) || []).map(form => (
+                  {marLinkedForms.map(form => (
                     <option key={form.id} value={form.id}>{form.form_name}</option>
                   ))}
                 </select>
-                {(formsByParticipant.get(marDraft.participantId) || []).length === 0 && (
+                {marLinkedForms.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">No medical forms uploaded for this child yet — upload one in the Medical Forms tab first, or record as ad-hoc.</p>
                 )}
               </div>

@@ -19,6 +19,19 @@ const CATEGORY_LABELS = {
   notes: 'Additional Notes',
 }
 
+function participantFirstName(participant) {
+  return String(participant?.name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)[0] || ''
+}
+
+function compareParticipantsByFirstName(a, b) {
+  const firstCompare = participantFirstName(a).localeCompare(participantFirstName(b), undefined, { sensitivity: 'base' })
+  if (firstCompare !== 0) return firstCompare
+  return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' })
+}
+
 export default function SharedInfo({ currentUser, participants }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -47,6 +60,17 @@ export default function SharedInfo({ currentUser, participants }) {
     }
     return map
   }, [activeParticipants])
+
+  const participantGroups = useMemo(() => {
+    return [...grouped.entries()]
+      .map(([participantId, participantItems]) => ({
+        participantId,
+        participant: participantMap.get(participantId),
+        items: participantItems,
+      }))
+      .filter(group => Boolean(group.participant))
+      .sort((a, b) => compareParticipantsByFirstName(a.participant, b.participant))
+  }, [grouped, participantMap])
 
   async function loadSharedItems() {
     if (!currentUser?.id) {
@@ -94,9 +118,9 @@ export default function SharedInfo({ currentUser, participants }) {
     const categoryForPrint = mode === 'all' ? 'all' : activeCategory
     const blocks = []
 
-    for (const [participantId, participantItems] of grouped.entries()) {
-      const participant = participantMap.get(participantId)
-      if (!participant) continue
+    for (const group of participantGroups) {
+      const participant = group.participant
+      const participantItems = group.items
 
       const filteredItems = categoryForPrint === 'all'
         ? participantItems
@@ -227,17 +251,17 @@ export default function SharedInfo({ currentUser, participants }) {
         <div className="card text-center py-10">
           <p className="text-stone-500">Loading shared info...</p>
         </div>
-      ) : grouped.size === 0 ? (
+      ) : participantGroups.length === 0 ? (
         <div className="card text-center py-10">
           <p className="text-stone-500">No shared items yet.</p>
           <p className="text-xs text-stone-400 mt-1">Admins can share SEND, allergy, medical, and dietary notes from participant profiles.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {[...grouped.entries()].map(([participantId, items]) => {
-            const participant = participantMap.get(participantId)
-            // Only show if participant is active
-            if (!participant) return null
+          {participantGroups.map(group => {
+            const participantId = group.participantId
+            const participant = group.participant
+            const items = group.items
             // Filter items by category if not 'all'
             const filteredItems = activeCategory === 'all'
               ? items
