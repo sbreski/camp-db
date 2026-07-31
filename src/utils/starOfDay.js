@@ -4,13 +4,10 @@ export function isParticipantInSeason(participant) {
   return seasonFlag !== false
 }
 
-export function getStarTotalTone({ total = 0, rate = 0, averageRate = 0 } = {}) {
-  if (total <= 0 || rate <= 0) return 'neutral'
-  if (averageRate <= 0) return 'positive'
-
-  if (rate < averageRate * 0.8) return 'low'
-  if (rate <= averageRate * 1.2) return 'positive'
-  return 'high'
+export function getStarTotalTone({ total = 0 } = {}) {
+  if (total <= 0) return 'neutral'
+  if (total >= 3) return 'high'
+  return 'positive'
 }
 
 export function addDays(dateKey, days) {

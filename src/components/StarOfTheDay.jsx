@@ -33,7 +33,6 @@ function defaultCustomRanges(today) {
 
 function totalBadgeClass(tone) {
   if (tone === 'high') return 'bg-red-100 text-red-700 border-red-200'
-  if (tone === 'low') return 'bg-yellow-100 text-yellow-800 border-yellow-200'
   if (tone === 'positive') return 'bg-green-100 text-green-700 border-green-200'
   return 'bg-stone-100 text-stone-600 border-stone-200'
 }
@@ -468,7 +467,7 @@ export default function StarOfTheDay({ participants, attendance = [], starAwards
                   const total = totalsByParticipant.get(participant.id) || 0
                   const attendedDays = attendanceDaysByParticipant.get(participant.id) || 0
                   const awardRate = awardRateByParticipant.get(participant.id) || 0
-                  const toneClass = totalBadgeClass(getStarTotalTone({ total, rate: awardRate, averageRate: averageAwardRate }))
+                  const toneClass = totalBadgeClass(getStarTotalTone({ total }))
                   return (
                     <tr key={participant.id} className="hover:bg-stone-50/70">
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 border-b border-stone-100 whitespace-nowrap">
