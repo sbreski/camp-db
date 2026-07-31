@@ -456,6 +456,16 @@ export default function App() {
     return String(name || '').trim().split(/\s+/).filter(Boolean)[0] || ''
   }
 
+  function normalizeUsername(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[']/g, '')
+      .replace(/[^a-z0-9]+/g, '.')
+      .replace(/\.{2,}/g, '.')
+      .replace(/^\.+|\.+$/g, '')
+  }
+
   function stripMissingColumn(error, payload) {
     const message = String(error?.message || '')
     const match = message.match(/column "([^"]+)" of relation "[^"]+" does not exist/)
@@ -1386,8 +1396,20 @@ export default function App() {
   }, [authed, sessionExpiryAt])
 
   const currentUserEmail = (currentUser?.email || '').toLowerCase()
+  const currentUserLoginAlias = currentUserEmail.endsWith('@login.local')
+    ? currentUserEmail.replace('@login.local', '')
+    : ''
+  const normalizedCurrentUserName = normalizeUsername(currentUser?.user_metadata?.full_name || '')
   const isOwnerUser = Boolean(OWNER_EMAIL && currentUserEmail === OWNER_EMAIL)
-  const currentStaff = staffList.find(staff => String(staff.email || '').toLowerCase() === currentUserEmail) || null
+  const currentStaff =
+    staffList.find(staff => String(staff.email || '').toLowerCase() === currentUserEmail)
+    || (currentUserLoginAlias
+      ? staffList.find(staff => normalizeUsername(staff?.name) === currentUserLoginAlias)
+      : null)
+    || (normalizedCurrentUserName
+      ? staffList.find(staff => normalizeUsername(staff?.name) === normalizedCurrentUserName)
+      : null)
+    || null
 
   const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '') || (currentUser?.user_metadata?.full_name || '')
   const actorFirstName = firstNameFromName(actorFullName)
@@ -1399,9 +1421,7 @@ export default function App() {
     isOwnerUser
       || isAdminUser
       || canViewSafeguardingPerm
-      || ['camp coordinator', 'director'].includes(
-        String(staffList.find(staff => String(staff.email || '').toLowerCase() === currentUserEmail)?.role || '').trim().toLowerCase()
-      )
+      || ['camp coordinator', 'director'].includes(String(currentStaff?.role || '').trim().toLowerCase())
   )
 
   const canViewSendDiagnosis = Boolean(
