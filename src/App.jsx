@@ -1391,8 +1391,9 @@ export default function App() {
   const actorFullName = currentStaff?.name || (isOwnerUser ? 'Sam Brenner' : '') || (currentUser?.user_metadata?.full_name || '')
   const actorFirstName = firstNameFromName(actorFullName)
   const actorInitials = initialsFromName(actorFullName || currentUserEmail || 'Staff')
+  const roleFromStaffProfile = String(currentStaff?.role || '').trim()
   const headerDisplayName = String(actorFullName || currentUserEmail || 'Staff member').trim()
-  const headerDisplayRole = String(currentStaff?.role || '').trim() || 'No job title set'
+  const headerDisplayRole = roleFromStaffProfile || 'No job title set'
   const canViewSafeguarding = Boolean(
     isOwnerUser
       || isAdminUser
@@ -1750,15 +1751,17 @@ export default function App() {
         currentUserName={headerDisplayName}
         currentUserRole={headerDisplayRole}
       />
-      <div className="hidden md:block fixed top-0 left-56 right-0 h-14 bg-white/95 backdrop-blur border-b border-stone-200 z-20">
-        <div className="w-full max-w-[1600px] mx-auto px-6 xl:px-8 h-full flex items-center justify-end">
-          <div className="text-right leading-tight">
-            <p className="text-sm font-display font-semibold text-forest-950">{headerDisplayName}</p>
-            <p className="text-xs text-stone-600">{headerDisplayRole}</p>
+      {page !== 'dashboard' && (
+        <div className="hidden md:block fixed top-0 left-56 right-0 h-14 bg-white/95 backdrop-blur border-b border-stone-200 z-20">
+          <div className="w-full max-w-[1600px] mx-auto px-6 xl:px-8 h-full flex items-center justify-end">
+            <div className="text-right leading-tight">
+              <p className="text-sm font-display font-semibold text-forest-950">{headerDisplayName}</p>
+              <p className="text-xs text-stone-600">{headerDisplayRole}</p>
+            </div>
           </div>
         </div>
-      </div>
-      <main className="pt-14 md:pt-14 md:ml-56">
+      )}
+      <main className={`pt-14 ${page === 'dashboard' ? 'md:pt-0' : 'md:pt-14'} md:ml-56`}>
         <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 xl:px-8 py-6">
           {attendanceError && (
             <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
