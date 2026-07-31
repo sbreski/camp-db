@@ -22,7 +22,14 @@ export const NAV_ITEMS = [
   { id: 'documents', label: 'Document Upload', icon: FileText },
 ]
 
-export default function Nav({ page, onNavigate, onLogout, visibleTabIds = [] }) {
+export default function Nav({
+  page,
+  onNavigate,
+  onLogout,
+  visibleTabIds = [],
+  currentUserName = 'Staff member',
+  currentUserRole = 'No job title set',
+}) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const visibleItems = NAV_ITEMS.filter(item => visibleTabIds.includes(item.id))
 
@@ -63,10 +70,11 @@ export default function Nav({ page, onNavigate, onLogout, visibleTabIds = [] }) 
 
       {/* Mobile topbar */}
       <nav className="md:hidden fixed top-0 left-0 right-0 bg-forest-950 z-30 flex items-center justify-between px-4 h-14">
-        <h1 className="font-display font-bold text-white text-sm">
-          Impact Kidz <span className="text-amber-400">Camp</span>
-        </h1>
-        <button onClick={() => setMobileOpen(o => !o)} className="text-white p-1">
+        <div className="min-w-0 pr-3">
+          <p className="font-display font-semibold text-white text-sm truncate">{currentUserName}</p>
+          <p className="text-[11px] text-forest-200 truncate">{currentUserRole}</p>
+        </div>
+        <button onClick={() => setMobileOpen(o => !o)} className="text-white p-1 flex-shrink-0" aria-label="Toggle navigation menu">
           {mobileOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </nav>
