@@ -23,6 +23,11 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   const [safeguardingActionId, setSafeguardingActionId] = useState('')
   const [safeguardingFilter, setSafeguardingFilter] = useState('open')
   const [documentAccessActionId, setDocumentAccessActionId] = useState('')
+  const [accountOptions, setAccountOptions] = useState([])
+  const [loadingAccountOptions, setLoadingAccountOptions] = useState(false)
+  const [documentAccessRowsByDocId, setDocumentAccessRowsByDocId] = useState({})
+  const [selectedAccessUserByDocId, setSelectedAccessUserByDocId] = useState({})
+  const [expandedAccessDocId, setExpandedAccessDocId] = useState('')
 
   useEffect(() => {
     loadDocuments()
@@ -32,6 +37,11 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     if (section !== 'other' || !canViewSafeguarding) return
     loadSafeguardingReports()
   }, [section, canViewSafeguarding])
+
+  useEffect(() => {
+    if (!canToggleViewAccess) return
+    loadAccountOptions().catch(() => {})
+  }, [canToggleViewAccess])
 
   async function loadDocuments() {
     setLoading(true)
@@ -53,6 +63,30 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
       console.error('Error loading documents:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadAccountOptions() {
+    setLoadingAccountOptions(true)
+    try {
+      const accessToken = await getFreshAccessToken()
+      const response = await fetch('/api/admin-users', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || 'Unable to load login accounts')
+
+      const options = (payload.users || []).map(user => ({
+        id: user.id,
+        label: user.fullName || user.internalEmail || user.email || user.username || user.id,
+        email: user.internalEmail || user.email || '',
+      }))
+      setAccountOptions(options)
+    } catch (error) {
+      console.error('Error loading account options:', error)
+      setAccountOptions([])
+    } finally {
+      setLoadingAccountOptions(false)
     }
   }
 
@@ -339,6 +373,91 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     return message.includes('is_view_blocked') && message.includes('does not exist')
   }
 
+  function isMissingDocumentViewAccessTableError(error) {
+    const message = String(error?.message || '').toLowerCase()
+    return message.includes('document_view_access') && message.includes('does not exist')
+  }
+
+  async function loadDocumentUserAccess(documentId) {
+    if (!canToggleViewAccess || !documentId) return
+
+    const { data, error } = await supabase
+      .from('document_view_access')
+      .select('document_id,user_id,granted_at')
+      .eq('document_id', documentId)
+      .order('granted_at', { ascending: false })
+
+    if (error) {
+      if (isMissingDocumentViewAccessTableError(error)) {
+        throw new Error('Missing migration: run db/53_documents_per_user_view_access.sql in Supabase.')
+      }
+      throw error
+    }
+
+    setDocumentAccessRowsByDocId(prev => ({ ...prev, [documentId]: data || [] }))
+  }
+
+  function accountLabelForUserId(userId) {
+    const match = accountOptions.find(option => option.id === userId)
+    if (!match) return userId
+    return match.email ? `${match.label} (${match.email})` : match.label
+  }
+
+  async function grantDocumentUserAccess(documentId) {
+    const userId = selectedAccessUserByDocId[documentId]
+    if (!userId) {
+      alert('Select a login account first.')
+      return
+    }
+
+    setDocumentAccessActionId(documentId)
+    try {
+      const { error } = await supabase
+        .from('document_view_access')
+        .upsert({ document_id: documentId, user_id: userId }, { onConflict: 'document_id,user_id' })
+
+      if (error) {
+        if (isMissingDocumentViewAccessTableError(error)) {
+          throw new Error('Missing migration: run db/53_documents_per_user_view_access.sql in Supabase.')
+        }
+        throw error
+      }
+
+      await loadDocumentUserAccess(documentId)
+      setSelectedAccessUserByDocId(prev => ({ ...prev, [documentId]: '' }))
+    } catch (error) {
+      alert(error.message || 'Unable to grant document access')
+    } finally {
+      setDocumentAccessActionId('')
+    }
+  }
+
+  async function revokeDocumentUserAccess(documentId, userId) {
+    if (!window.confirm(`Remove access for ${accountLabelForUserId(userId)}?`)) return
+
+    setDocumentAccessActionId(documentId)
+    try {
+      const { error } = await supabase
+        .from('document_view_access')
+        .delete()
+        .eq('document_id', documentId)
+        .eq('user_id', userId)
+
+      if (error) {
+        if (isMissingDocumentViewAccessTableError(error)) {
+          throw new Error('Missing migration: run db/53_documents_per_user_view_access.sql in Supabase.')
+        }
+        throw error
+      }
+
+      await loadDocumentUserAccess(documentId)
+    } catch (error) {
+      alert(error.message || 'Unable to revoke document access')
+    } finally {
+      setDocumentAccessActionId('')
+    }
+  }
+
   async function toggleDocumentViewAccess(doc, shouldBlock) {
     if (!canToggleViewAccess) return
 
@@ -461,11 +580,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     }
   }
 
-  const visibleDocuments = documents.filter(doc => {
-    if (!viewOnly) return true
-    if (canToggleViewAccess) return true
-    return !isDocumentViewBlocked(doc)
-  })
+  const visibleDocuments = documents
 
   const groupedByCategory = visibleDocuments.reduce((acc, doc) => {
     const cat = doc.category || 'Uncategorized'
@@ -656,6 +771,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
         <div className="card border-amber-200 bg-amber-50">
           <p className="text-sm text-amber-900 font-medium">Admin access mode is enabled.</p>
           <p className="text-xs text-amber-800 mt-1">Use Block Access / Restore Access on each document to control visibility on this page for standard users.</p>
+          <p className="text-xs text-amber-800 mt-1">When blocked, use Manage Access to allow specific login accounts.</p>
         </div>
       )}
 
@@ -854,6 +970,23 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                             : (isDocumentViewBlocked(doc) ? 'Restore Access' : 'Block Access')}
                         </button>
                       )}
+                      {canToggleViewAccess && isDocumentViewBlocked(doc) && (
+                        <button
+                          onClick={async () => {
+                            const opening = expandedAccessDocId !== doc.id
+                            setExpandedAccessDocId(opening ? doc.id : '')
+                            if (!opening) return
+                            try {
+                              await loadDocumentUserAccess(doc.id)
+                            } catch (error) {
+                              alert(error.message || 'Unable to load document access users')
+                            }
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-stone-200 text-stone-700 bg-white hover:bg-stone-50"
+                        >
+                          {expandedAccessDocId === doc.id ? 'Hide Access' : 'Manage Access'}
+                        </button>
+                      )}
                       <button
                         onClick={() => downloadDocument(doc.filepath, doc.filename)}
                         className="p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
@@ -871,6 +1004,59 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                         </button>
                       )}
                     </div>
+
+                    {canToggleViewAccess && isDocumentViewBlocked(doc) && expandedAccessDocId === doc.id && (
+                      <div className="w-full rounded-lg border border-stone-200 bg-stone-50 p-3 space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <select
+                            value={selectedAccessUserByDocId[doc.id] || ''}
+                            onChange={event => setSelectedAccessUserByDocId(prev => ({ ...prev, [doc.id]: event.target.value }))}
+                            className="input flex-1"
+                            disabled={loadingAccountOptions || documentAccessActionId === doc.id}
+                          >
+                            <option value="">Select login account...</option>
+                            {accountOptions.map(option => (
+                              <option key={option.id} value={option.id}>
+                                {option.email ? `${option.label} (${option.email})` : option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => grantDocumentUserAccess(doc.id)}
+                            disabled={loadingAccountOptions || documentAccessActionId === doc.id || !selectedAccessUserByDocId[doc.id]}
+                            className={`btn-secondary text-xs ${loadingAccountOptions || documentAccessActionId === doc.id || !selectedAccessUserByDocId[doc.id] ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          >
+                            {documentAccessActionId === doc.id ? 'Saving...' : 'Grant Access'}
+                          </button>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-stone-600 mb-2">Accounts with access</p>
+                          {(documentAccessRowsByDocId[doc.id] || []).length === 0 ? (
+                            <p className="text-xs text-stone-500">No individual access granted yet.</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {(documentAccessRowsByDocId[doc.id] || []).map(row => (
+                                <span
+                                  key={`${row.document_id}:${row.user_id}`}
+                                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full border border-stone-300 bg-white text-xs text-stone-700"
+                                >
+                                  {accountLabelForUserId(row.user_id)}
+                                  <button
+                                    onClick={() => revokeDocumentUserAccess(doc.id, row.user_id)}
+                                    disabled={documentAccessActionId === doc.id}
+                                    className="text-stone-400 hover:text-rose-600"
+                                    title="Remove access"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
