@@ -5,8 +5,9 @@ import { toCsv } from '../utils/workflow'
 import { getFreshAccessToken } from '../utils/authToken'
 import SafeguardingFlagIcon from './SafeguardingFlagIcon'
 
-export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST', viewOnly = false }) {
+export default function Documents({ canViewSafeguarding = false, isOwnerUser = false, actorInitials = 'ST', viewOnly = false, canManageDocumentAccess = false }) {
   const canModify = !viewOnly
+  const canToggleViewAccess = viewOnly && canManageDocumentAccess
   const [section, setSection] = useState('policies') // 'policies' or 'other'
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(false)
@@ -21,6 +22,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
   const [loadingSafeguarding, setLoadingSafeguarding] = useState(false)
   const [safeguardingActionId, setSafeguardingActionId] = useState('')
   const [safeguardingFilter, setSafeguardingFilter] = useState('open')
+  const [documentAccessActionId, setDocumentAccessActionId] = useState('')
 
   useEffect(() => {
     loadDocuments()
@@ -328,6 +330,56 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     }
   }
 
+  function isDocumentViewBlocked(doc) {
+    return Boolean(doc?.is_view_blocked)
+  }
+
+  function isMissingViewAccessColumnError(error) {
+    const message = String(error?.message || '').toLowerCase()
+    return message.includes('is_view_blocked') && message.includes('does not exist')
+  }
+
+  async function toggleDocumentViewAccess(doc, shouldBlock) {
+    if (!canToggleViewAccess) return
+
+    const actionLabel = shouldBlock ? 'block access to' : 'restore access to'
+    if (!window.confirm(`Are you sure you want to ${actionLabel} ${doc.filename}?`)) return
+
+    setDocumentAccessActionId(doc.id)
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      const payload = {
+        is_view_blocked: shouldBlock,
+        view_blocked_at: shouldBlock ? new Date().toISOString() : null,
+        view_blocked_by_user_id: shouldBlock ? (userData?.user?.id || null) : null,
+      }
+
+      let { error } = await supabase
+        .from('documents')
+        .update(payload)
+        .eq('id', doc.id)
+
+      if (error && isMissingViewAccessColumnError(error)) {
+        const fallback = await supabase
+          .from('documents')
+          .update({ is_view_blocked: shouldBlock })
+          .eq('id', doc.id)
+        error = fallback.error
+      }
+
+      if (error) throw error
+      await loadDocuments()
+    } catch (error) {
+      if (isMissingViewAccessColumnError(error)) {
+        alert('Document access columns are missing. Run db/52_documents_view_access_controls.sql in Supabase first.')
+      } else {
+        alert('Unable to update document access: ' + error.message)
+      }
+    } finally {
+      setDocumentAccessActionId('')
+    }
+  }
+
   function downloadBlob(content, filename, mimeType = 'text/plain') {
     const blob = new Blob([content], { type: mimeType })
     const url = URL.createObjectURL(blob)
@@ -409,7 +461,13 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
     }
   }
 
-  const groupedByCategory = documents.reduce((acc, doc) => {
+  const visibleDocuments = documents.filter(doc => {
+    if (!viewOnly) return true
+    if (canToggleViewAccess) return true
+    return !isDocumentViewBlocked(doc)
+  })
+
+  const groupedByCategory = visibleDocuments.reduce((acc, doc) => {
     const cat = doc.category || 'Uncategorized'
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(doc)
@@ -594,6 +652,13 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
         </div>
       )}
 
+      {canToggleViewAccess && (
+        <div className="card border-amber-200 bg-amber-50">
+          <p className="text-sm text-amber-900 font-medium">Admin access mode is enabled.</p>
+          <p className="text-xs text-amber-800 mt-1">Use Block Access / Restore Access on each document to control visibility on this page for standard users.</p>
+        </div>
+      )}
+
       {!viewOnly && (
       <div className="card space-y-4">
         <h3 className="font-display font-semibold text-forest-950">Upload New Document</h3>
@@ -742,7 +807,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
       ) : Object.keys(groupedByCategory).length === 0 ? (
         <div className="card text-center py-8">
           <FileText size={32} className="mx-auto text-stone-300 mb-2" />
-          <p className="text-stone-500">No documents uploaded yet</p>
+          <p className="text-stone-500">No documents available</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -771,9 +836,24 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                           })}
                           {(doc.uploaded_by_initials || doc.uploadedByInitials) ? ` · Uploaded by ${doc.uploaded_by_initials || doc.uploadedByInitials}` : ''}
                         </p>
+                        {isDocumentViewBlocked(doc) && (
+                          <p className="text-[11px] text-rose-700 font-medium mt-1">Blocked from standard Documents view</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                      {canToggleViewAccess && (
+                        <button
+                          onClick={() => toggleDocumentViewAccess(doc, !isDocumentViewBlocked(doc))}
+                          disabled={documentAccessActionId === doc.id}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${isDocumentViewBlocked(doc) ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : 'border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100'} ${documentAccessActionId === doc.id ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          title={isDocumentViewBlocked(doc) ? 'Restore view access' : 'Block view access'}
+                        >
+                          {documentAccessActionId === doc.id
+                            ? (isDocumentViewBlocked(doc) ? 'Restoring...' : 'Blocking...')
+                            : (isDocumentViewBlocked(doc) ? 'Restore Access' : 'Block Access')}
+                        </button>
+                      )}
                       <button
                         onClick={() => downloadDocument(doc.filepath, doc.filename)}
                         className="p-2 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"

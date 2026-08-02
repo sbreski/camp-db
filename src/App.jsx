@@ -1711,7 +1711,7 @@ export default function App() {
         setParticipants(prev => prev.map(p => (targetIds.includes(p.id) ? { ...p, ...updates } : p)))
       }} />
       case 'dressing-rooms': return <DressingRooms participants={participants} />
-      case 'documents-view': return <Documents canViewSafeguarding={canViewSafeguarding} isOwnerUser={isOwnerUser} actorInitials={actorInitials} viewOnly={true} />
+      case 'documents-view': return <Documents canViewSafeguarding={canViewSafeguarding} isOwnerUser={isOwnerUser} actorInitials={actorInitials} viewOnly={true} canManageDocumentAccess={isOwnerUser || isAdminUser} />
       case 'documents': return <Documents canViewSafeguarding={canViewSafeguarding} isOwnerUser={isOwnerUser} actorInitials={actorInitials} />
       case 'participant': return (
         <ParticipantDetail
