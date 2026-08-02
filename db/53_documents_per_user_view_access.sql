@@ -24,6 +24,8 @@ create policy "document view access select"
 on public.document_view_access for select
 to authenticated
 using (
+  user_id = auth.uid()
+  or
   public.user_is_admin()
   or public.user_has_any_tab(array['documents'])
 );

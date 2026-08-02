@@ -952,7 +952,7 @@ export default function Documents({ canViewSafeguarding = false, isOwnerUser = f
                           })}
                           {(doc.uploaded_by_initials || doc.uploadedByInitials) ? ` · Uploaded by ${doc.uploaded_by_initials || doc.uploadedByInitials}` : ''}
                         </p>
-                        {isDocumentViewBlocked(doc) && (
+                        {canToggleViewAccess && isDocumentViewBlocked(doc) && (
                           <p className="text-[11px] text-rose-700 font-medium mt-1">Blocked from standard Documents view</p>
                         )}
                       </div>
