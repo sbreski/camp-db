@@ -157,6 +157,7 @@ export default function ParticipantDetail({
   const [editingParticipantNote, setEditingParticipantNote] = useState(null)
   const [editingRegisterHistoryEntry, setEditingRegisterHistoryEntry] = useState(null)
   const [uploadingParticipantDocument, setUploadingParticipantDocument] = useState(false)
+  const [permanentlyDeletingParticipantDocumentId, setPermanentlyDeletingParticipantDocumentId] = useState('')
   const [expandedIncidentId, setExpandedIncidentId] = useState('')
   const [noteDraftByIncident, setNoteDraftByIncident] = useState({})
   const [editingNote, setEditingNote] = useState(null)
@@ -1362,6 +1363,34 @@ export default function ParticipantDetail({
     }))
   }
 
+  async function permanentlyDeleteParticipantDocument(doc) {
+    if (!doc?.id) return
+    if (!window.confirm(`Permanently delete "${doc.name || 'this document'}"? This cannot be undone.`)) return
+
+    setPermanentlyDeletingParticipantDocumentId(doc.id)
+    try {
+      const storagePath = resolveStoredDocumentPath(doc)
+      if (storagePath) {
+        const bucket = storagePath.startsWith('participants/') ? 'documents' : 'incidents'
+        const { error } = await supabase.storage.from(bucket).remove([storagePath])
+        if (error) throw error
+      }
+
+      await setParticipants(prev => prev.map(current => (
+        current.id === participant.id
+          ? {
+              ...current,
+              participantDocuments: participantDocumentsForParticipant(current).filter(item => item.id !== doc.id),
+            }
+          : current
+      )))
+    } catch (error) {
+      alert(error.message || 'Unable to permanently delete participant document')
+    } finally {
+      setPermanentlyDeletingParticipantDocumentId('')
+    }
+  }
+
   async function withAccessToken() {
     return getFreshAccessToken()
   }
@@ -1980,13 +2009,23 @@ export default function ParticipantDetail({
                           </button>
                         )}
                         {doc.deletedAt && (
-                          <button
-                            type="button"
-                            onClick={() => recoverParticipantDocument(doc.id)}
-                            className="underline text-emerald-700 hover:text-emerald-900"
-                          >
-                            Recover
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => recoverParticipantDocument(doc.id)}
+                              className="underline text-emerald-700 hover:text-emerald-900"
+                            >
+                              Recover
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => permanentlyDeleteParticipantDocument(doc)}
+                              disabled={permanentlyDeletingParticipantDocumentId === doc.id}
+                              className="underline text-red-700 hover:text-red-900 disabled:cursor-wait disabled:opacity-50"
+                            >
+                              {permanentlyDeletingParticipantDocumentId === doc.id ? 'Deleting...' : 'Permanently delete'}
+                            </button>
+                          </>
                         )}
                       </div>
                     ))}
